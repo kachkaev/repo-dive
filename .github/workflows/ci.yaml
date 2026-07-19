@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  checks:
+    name: Run checks (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            label: Linux
+          - os: macos-15
+            label: macOS
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@08c4be7e2e672a47d11bd04269e27e5f3e8529cb # v6.0.0
+
+      - name: Setup node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          cache: pnpm
+          node-version-file: .tool-versions
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Load CSpell cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          key: cspell-${{ github.run_id }}
+          path: node_modules/.cache/cspell
+          restore-keys: |
+            cspell-
+
+      - name: Run pnpm build
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm build; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Please fix the above build errors locally for the check to pass.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
+      - name: Run pnpm lint:cspell
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm lint:cspell; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Please fix the above errors locally for the check to pass.'
+            echo 'If you do not see them, try merging target branch into yours.'
+            echo 'You can add exceptions to `cspell-words.txt`, if necessary.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
+      - name: Run pnpm lint:eslint
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm lint:eslint; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Try running `pnpm fix:eslint` locally to apply autofixes.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
+      - name: Run pnpm lint:knip
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm lint:knip; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Try running `pnpm fix:knip` locally to apply autofixes.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
+      - name: Run pnpm lint:markdownlint
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm lint:markdownlint; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Try running `pnpm fix:markdownlint` locally to apply autofixes.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
+      - name: Run pnpm lint:pnpm-dedupe
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm lint:pnpm-dedupe; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Some dependencies can be deduplicated, which will make pnpm-lock.yaml'
+            echo 'lighter and potentially save us from unexplainable bugs.'
+            echo 'Please run `pnpm fix:pnpm-dedupe` locally and commit pnpm-lock.yaml.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
+      - name: Run pnpm lint:prettier
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm lint:prettier; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Try running `pnpm fix:prettier` locally to apply autofixes.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
+      - name: Run pnpm lint:tsc
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm lint:tsc; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Please fix the above errors locally for the check to pass.'
+            echo 'If you don’t see them, try merging target branch into yours.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
+      - name: Run node dist/cli.js --help
+        if: ${{ success() || failure() }}
+        run: |
+          if ! node dist/cli.js --help; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Please fix the above bundled CLI errors locally for the check to pass.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
+      - name: Run pnpm test
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm test; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Please fix the above test failures locally for the check to pass.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi

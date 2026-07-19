@@ -1,0 +1,14 @@
+{
+  "$schema": "../node_modules/@changesets/config/schema.json",
+  "access": "public",
+  "baseBranch": "main",
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "kachkaev/repo-insights" }
+  ],
+  "commit": false,
+  "fixed": [],
+  "ignore": [],
+  "linked": [],
+  "updateInternalDependencies": "patch"
+}
