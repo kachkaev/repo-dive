@@ -140,11 +140,14 @@ const collectCommit = ({
   sha,
   collectors,
   force,
+  failures,
 }: {
   readonly catalog: Catalog;
   readonly sha: string;
   readonly collectors: readonly Collector[];
   readonly force: boolean;
+  /** Failed runs are recorded here instead of aborting the whole scan. */
+  readonly failures: string[];
 }): Effect.Effect<{ run: number; skipped: number }, Error> =>
   Effect.gen(function* () {
     const pending: Collector[] = [];
@@ -165,8 +168,18 @@ const collectCommit = ({
       (collector) => collector.strategy === "worktree",
     );
 
+    let run = 0;
     for (const collector of direct) {
-      yield* runCollector({ catalog, sha, collector });
+      const outcome = yield* runCollector({ catalog, sha, collector }).pipe(
+        Effect.map(() => true),
+        Effect.catch((error) => {
+          failures.push(error.message);
+          return Effect.succeed(false);
+        }),
+      );
+      if (outcome) {
+        run += 1;
+      }
     }
 
     if (needingWorktree.length > 0) {
@@ -174,13 +187,26 @@ const collectCommit = ({
         Effect.forEach(
           needingWorktree,
           (collector) =>
-            runCollector({ catalog, sha, collector, worktreePath }),
+            runCollector({ catalog, sha, collector, worktreePath }).pipe(
+              Effect.map(() => {
+                run += 1;
+              }),
+              Effect.catch((error) => {
+                failures.push(error.message);
+                return Effect.void;
+              }),
+            ),
           { discard: true },
         ),
+      ).pipe(
+        Effect.catch((error) => {
+          failures.push(`Worktree for ${sha.slice(0, 10)}: ${error.message}`);
+          return Effect.void;
+        }),
       );
     }
 
-    return { run: pending.length, skipped };
+    return { run, skipped };
   });
 
 const samplingLabel = (policy: SamplingPolicy): string =>
@@ -245,6 +271,7 @@ export const runScan = ({
     let totalRun = 0;
     let totalSkipped = 0;
     let processed = 0;
+    const failures: string[] = [];
 
     yield* Effect.forEach(
       selected,
@@ -256,6 +283,7 @@ export const runScan = ({
             .filter((plan) => plan.shas.has(commit.hash))
             .map((plan) => plan.collector),
           force,
+          failures,
         }).pipe(
           Effect.tap(({ run, skipped }) =>
             Effect.gen(function* () {
@@ -279,8 +307,21 @@ export const runScan = ({
         `Commits: ${summary.commitCount} (${summary.authorCount} authors, ${
           summary.firstCommitDate ?? "n/a"
         } — ${summary.lastCommitDate ?? "n/a"})`,
-        `Collector runs: ${totalRun} new, ${totalSkipped} already collected`,
+        `Collector runs: ${totalRun} new, ${totalSkipped} already collected` +
+          (failures.length > 0 ? `, ${failures.length} failed` : ""),
         `Catalog: ${catalog.rootPath}`,
       ].join("\n"),
     );
+
+    if (failures.length > 0) {
+      yield* Console.error(
+        [
+          `${failures.length} collector runs failed (re-run scan to retry):`,
+          ...failures.slice(0, 10).map((message) => `  ${message}`),
+          ...(failures.length > 10
+            ? [`  … and ${failures.length - 10} more`]
+            : []),
+        ].join("\n"),
+      );
+    }
   });
