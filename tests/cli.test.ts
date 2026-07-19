@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -43,8 +49,9 @@ function createFixtureRepo(): string {
   runGit(repoPath, "commit", "-m", "Add hello");
 
   writeFileSync(path.join(repoPath, "hello.txt"), "hello world\n");
+  writeFileSync(path.join(repoPath, "readme.md"), "# Fixture\n");
   runGit(repoPath, "add", ".");
-  runGit(repoPath, "commit", "-m", "Update hello");
+  runGit(repoPath, "commit", "-m", "Update hello, add readme");
 
   return repoPath;
 }
@@ -55,26 +62,103 @@ void test("root help lists the available subcommands", () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /SUBCOMMANDS/);
   assert.match(result.stdout, /scan/);
+  assert.match(result.stdout, /status/);
 });
 
-void test("scan help exposes the repo flag", () => {
+void test("scan help exposes the flags", () => {
   const result = runCli("scan", "--help");
 
   assert.equal(result.status, 0);
   assert.match(result.stdout, /--repo string/);
+  assert.match(result.stdout, /--collectors string/);
+  assert.match(result.stdout, /--max-commits integer/);
 });
 
-void test("scan summarizes a repository", () => {
+void test("scan collects snapshots into the catalog and is resumable", () => {
   const repoPath = createFixtureRepo();
 
   try {
-    const result = runCli("scan", "--repo", repoPath);
+    const firstRun = runCli("scan", "--repo", repoPath);
 
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /Commits: 2/);
-    assert.match(result.stdout, /Authors: 1/);
-    assert.match(result.stdout, /First commit: 2026-01-02T03:04:05/);
-    assert.match(result.stdout, /Latest commit: 2026-01-02T03:04:05/);
+    assert.equal(firstRun.status, 0, firstRun.stderr);
+    assert.match(firstRun.stdout, /Commits: 2 \(1 authors/);
+    assert.match(firstRun.stdout, /Collector runs: 6 new, 0 already collected/);
+
+    const headSha = runGit(repoPath, "rev-parse", "HEAD").trim();
+    const commitDir = path.join(
+      repoPath,
+      ".repo-insighter",
+      "commits",
+      headSha,
+    );
+    for (const collector of ["commit-meta", "churn", "file-types"]) {
+      assert.ok(
+        existsSync(path.join(commitDir, collector, "output.json")),
+        `${collector} output should exist`,
+      );
+      assert.ok(
+        existsSync(path.join(commitDir, collector, "collector.json")),
+        `${collector} sidecar should exist`,
+      );
+    }
+
+    const commitMeta = readFileSync(
+      path.join(commitDir, "commit-meta", "output.json"),
+      "utf8",
+    );
+    assert.match(commitMeta, /"subject": "Update hello, add readme"/);
+    assert.match(commitMeta, /"authorEmail": "author@example\.com"/);
+
+    const churn = readFileSync(
+      path.join(commitDir, "churn", "output.json"),
+      "utf8",
+    );
+    assert.match(churn, /"filesChanged": 2/);
+
+    const fileTypes = readFileSync(
+      path.join(commitDir, "file-types", "output.json"),
+      "utf8",
+    );
+    assert.match(fileTypes, /"totalFiles": 2/);
+
+    const secondRun = runCli("scan", "--repo", repoPath);
+    assert.equal(secondRun.status, 0, secondRun.stderr);
+    assert.match(
+      secondRun.stdout,
+      /Collector runs: 0 new, 6 already collected/,
+    );
+  } finally {
+    rmSync(repoPath, { force: true, recursive: true });
+  }
+});
+
+void test("status reports catalog coverage", () => {
+  const repoPath = createFixtureRepo();
+
+  try {
+    const beforeScan = runCli("status", "--repo", repoPath);
+    assert.equal(beforeScan.status, 0, beforeScan.stderr);
+    assert.match(beforeScan.stdout, /No catalog found/);
+
+    runCli("scan", "--repo", repoPath, "--collectors", "commit-meta");
+
+    const afterScan = runCli("status", "--repo", repoPath);
+    assert.equal(afterScan.status, 0, afterScan.stderr);
+    assert.match(afterScan.stdout, /commit-meta: 2\/2 commits collected/);
+    assert.match(afterScan.stdout, /churn: 0\/2 commits collected/);
+  } finally {
+    rmSync(repoPath, { force: true, recursive: true });
+  }
+});
+
+void test("scan rejects unknown collectors", () => {
+  const repoPath = createFixtureRepo();
+
+  try {
+    const result = runCli("scan", "--repo", repoPath, "--collectors", "nope");
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Unknown collector: nope/);
   } finally {
     rmSync(repoPath, { force: true, recursive: true });
   }

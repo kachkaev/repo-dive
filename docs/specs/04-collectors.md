@@ -50,9 +50,16 @@ The cube records which commits were sampled so charts can interpolate honestly r
 
 The unit of work is **(commit, collector, collector version)**. Before running, the scanner diffs the plan against `collector.json` sidecars already in the catalog and only schedules the gap. Interrupting a scan loses at most the in-flight commits; re-running continues where it stopped. Effect's structured concurrency handles parallelism (several collectors per commit, several commits in flight) with clean cancellation.
 
-## Built-in roster (v1 order)
+## Built-in roster
 
-1.  **commits** (`log`) — metadata, parents, diff stats; the base everything else joins against
+Implemented (v0, in `src/lib/collectors/`):
+
+1.  **commit-meta** (`log`) — author/committer identities, dates, parents, subject; the base everything else joins against
+1.  **churn** (`log`) — lines added/deleted per commit vs first parent, by file extension
+1.  **file-types** (`tree`) — file count and bytes per extension at the commit's tree (cheap stand-in for a real language breakdown)
+
+Planned next:
+
 1.  **languages** (`tree`) — LOC per language per commit (tokei/scc-style; embed vs reimplement TBD)
 1.  **authors** (`log`) — commits/churn per author over time (mailmap-aware)
 1.  **eslint** (`worktree`, sampled) — diagnostics by rule and severity — the proof that arbitrary external tools fit

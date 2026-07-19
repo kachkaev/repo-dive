@@ -1,6 +1,6 @@
 # CLI surface
 
-_Draft. Only `scan` exists today, as a placeholder._
+_Draft. `scan` and `status` are implemented; the rest is design._
 
 ## Commands
 

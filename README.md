@@ -25,10 +25,17 @@ See [docs/specs](docs/specs/README.md) for the architecture being designed and [
 ```sh
 pnpm install
 pnpm build
-node dist/cli.js scan --repo /path/to/repo
+node dist/cli.js scan --repo /path/to/repo   # collect snapshots into .repo-insighter/
+node dist/cli.js status --repo /path/to/repo # show catalog coverage
 ```
 
-`scan` currently prints a summary of the repository's commit history (commit count, authors, date range). It is a placeholder that will evolve into the snapshot collection pipeline.
+`scan` walks the repository's history and runs the built-in collectors against every commit, writing raw snapshots into a `.repo-insighter/` catalog inside the analyzed repo. It is resumable: re-running skips everything already collected. Collectors so far:
+
+- **commit-meta** — author/committer identities, dates, parents, subject
+- **churn** — lines added/deleted per commit, broken down by file extension
+- **file-types** — file count and bytes per extension at each commit's tree
+
+The `index` step (normalizing snapshots into the SQLite metrics cube) is next; see the specs.
 
 ## Development
 
