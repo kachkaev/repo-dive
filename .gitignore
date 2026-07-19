@@ -1,0 +1,24 @@
+## Dependencies
+/node_modules/
+/.pnpm-store/
+/.pnp
+.pnp.js
+.pnpm-debug.log*
+
+## TypeScript
+*.tsbuildinfo
+
+## Testing
+/coverage/
+/dist/
+
+## Misc
+.DS_Store
+.husky/_/
+.env*.local
+*.log
+*.pem
+/repo-insights-*.tgz
+
+## Repo insights catalog (when running the tool against this repository)
+/.repo-insights/

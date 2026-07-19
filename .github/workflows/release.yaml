@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  release:
+    environment: release
+    if: github.repository == 'kachkaev/repo-insights'
+    name: Release
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@08c4be7e2e672a47d11bd04269e27e5f3e8529cb # v6.0.0
+
+      - name: Setup node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          cache: pnpm
+          node-version-file: .tool-versions
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Verify build
+        run: pnpm build
+
+      - name: Verify lint
+        run: pnpm lint
+
+      - name: Verify bundled CLI
+        run: node dist/cli.js --help
+
+      - name: Verify tests
+        run: pnpm test
+
+      - name: Create release pull request or prepare publish
+        id: changesets
+        uses: changesets/action@c48e67d110a68bc90ccf1098e9646092baacaa87 # v1.6.0
+        with:
+          title: Version packages
+          version: pnpm changesets:version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to npm
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: pnpm changesets:publish
