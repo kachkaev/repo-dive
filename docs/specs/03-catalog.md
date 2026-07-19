@@ -21,11 +21,13 @@ A dot-folder at the root of the analyzed repository:
   catalog.json            # manifest: format version, tool version, vcs ("git"), repo identity, config
   commits/
     <full-sha>/
-      commit.json         # commit metadata: author, dates, parents, message, diff stats
-      languages/          # one subfolder per collector
-        output.json       # the collector's raw output (e.g. tokei --output json)
-        collector.json    # collector name+version, timing, exit status, input hashes
-      eslint/
+      commit-meta/        # one subfolder per collector
+        output.json       # the collector's raw output, stored verbatim
+        collector.json    # sidecar: collector name+version, timing (the incrementality marker)
+      churn/
+        output.json
+        collector.json
+      file-types/
         output.json
         collector.json
   index/

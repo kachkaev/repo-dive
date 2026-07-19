@@ -32,6 +32,7 @@ matplotlib
 MCP
 mergestat
 msgpackr
+npmjs
 numstat
 onefetch
 Picci
@@ -42,6 +43,7 @@ rebuildable
 repoinsights
 rollups
 scc
+Sigstore
 simonw
 smol
 Sourcegraph

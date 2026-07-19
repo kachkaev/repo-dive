@@ -1,0 +1,150 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+import { Effect } from "effect";
+
+import type { Collector } from "./collectors/types.ts";
+
+export const catalogDirName = ".repo-insighter";
+const catalogFormatVersion = 1;
+
+export type Catalog = {
+  readonly repoRoot: string;
+  readonly rootPath: string;
+};
+
+type CatalogManifest = {
+  readonly formatVersion: number;
+  readonly vcs: "git";
+  readonly createdAt: string;
+};
+
+type CollectorSidecar = {
+  readonly collector: string;
+  readonly version: string;
+  readonly completedAt: string;
+  readonly durationMs: number;
+};
+
+const toError = (error: unknown) =>
+  error instanceof Error ? error : new Error(String(error));
+
+const writeJson = (filePath: string, value: unknown) =>
+  Effect.tryPromise({
+    try: () =>
+      writeFile(filePath, `${JSON.stringify(value, undefined, 2)}\n`, "utf8"),
+    catch: toError,
+  });
+
+const readJsonIfExists = (filePath: string) =>
+  Effect.tryPromise({
+    try: async (): Promise<unknown> => {
+      try {
+        return JSON.parse(await readFile(filePath, "utf8"));
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          "code" in error &&
+          error.code === "ENOENT"
+        ) {
+          return undefined;
+        }
+        throw error;
+      }
+    },
+    catch: toError,
+  });
+
+const versionOf = (sidecar: unknown): unknown =>
+  typeof sidecar === "object" && sidecar !== null && "version" in sidecar
+    ? sidecar.version
+    : undefined;
+
+const formatVersionOf = (manifest: unknown): unknown =>
+  typeof manifest === "object" &&
+  manifest !== null &&
+  "formatVersion" in manifest
+    ? manifest.formatVersion
+    : undefined;
+
+/**
+ * Opens (creating if needed) the catalog folder at the root of the analyzed
+ * repository. The catalog ignores itself via its own .gitignore.
+ */
+export const openCatalog = (repoRoot: string): Effect.Effect<Catalog, Error> =>
+  Effect.gen(function* () {
+    const rootPath = path.join(repoRoot, catalogDirName);
+    yield* Effect.tryPromise({
+      try: () => mkdir(rootPath, { recursive: true }),
+      catch: toError,
+    });
+
+    const manifestPath = path.join(rootPath, "catalog.json");
+    const manifest = yield* readJsonIfExists(manifestPath);
+
+    if (manifest === undefined) {
+      yield* Effect.tryPromise({
+        try: () => writeFile(path.join(rootPath, ".gitignore"), "*\n", "utf8"),
+        catch: toError,
+      });
+      yield* writeJson(manifestPath, {
+        formatVersion: catalogFormatVersion,
+        vcs: "git",
+        createdAt: new Date().toISOString(),
+      } satisfies CatalogManifest);
+    } else {
+      const formatVersion = formatVersionOf(manifest);
+      if (formatVersion !== catalogFormatVersion) {
+        return yield* Effect.fail(
+          new Error(
+            `Catalog at ${rootPath} has format version ${String(formatVersion)}, ` +
+              `but this version of repo-insighter expects ${catalogFormatVersion}. ` +
+              "Delete the folder to re-collect from scratch.",
+          ),
+        );
+      }
+    }
+
+    return { repoRoot, rootPath };
+  });
+
+const collectorDir = (catalog: Catalog, sha: string, collectorName: string) =>
+  path.join(catalog.rootPath, "commits", sha, collectorName);
+
+/** A (commit, collector) pair is done when a sidecar with a matching version exists. */
+export const isCollected = (
+  catalog: Catalog,
+  sha: string,
+  collector: Collector,
+): Effect.Effect<boolean, Error> =>
+  readJsonIfExists(
+    path.join(collectorDir(catalog, sha, collector.name), "collector.json"),
+  ).pipe(Effect.map((sidecar) => versionOf(sidecar) === collector.version));
+
+export const writeCollectorOutput = ({
+  catalog,
+  sha,
+  collector,
+  output,
+  durationMs,
+}: {
+  readonly catalog: Catalog;
+  readonly sha: string;
+  readonly collector: Collector;
+  readonly output: unknown;
+  readonly durationMs: number;
+}): Effect.Effect<void, Error> =>
+  Effect.gen(function* () {
+    const dir = collectorDir(catalog, sha, collector.name);
+    yield* Effect.tryPromise({
+      try: () => mkdir(dir, { recursive: true }),
+      catch: toError,
+    });
+    yield* writeJson(path.join(dir, "output.json"), output);
+    yield* writeJson(path.join(dir, "collector.json"), {
+      collector: collector.name,
+      version: collector.version,
+      completedAt: new Date().toISOString(),
+      durationMs,
+    } satisfies CollectorSidecar);
+  });
