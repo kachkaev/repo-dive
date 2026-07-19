@@ -2,10 +2,7 @@
   "$schema": "../node_modules/@changesets/config/schema.json",
   "access": "public",
   "baseBranch": "main",
-  "changelog": [
-    "@changesets/changelog-github",
-    { "repo": "kachkaev/repo-insighter" }
-  ],
+  "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [],
   "ignore": [],
