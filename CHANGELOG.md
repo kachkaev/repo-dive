@@ -1,5 +1,11 @@
 # repo-insighter
 
+## 0.1.0
+
+### Minor Changes
+
+- 17ad1f1: Ask the repository questions: new `query` command runs read-only SQL against the metrics cube, and `repo-insighter mcp` serves the cube over the Model Context Protocol (stdio) with `schema` and `query` tools for AI agents.
+
 ## 0.0.3
 
 ### Patch Changes
