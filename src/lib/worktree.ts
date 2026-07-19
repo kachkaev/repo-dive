@@ -26,7 +26,11 @@ export const withTemporaryWorktree = <A>(
     });
     const worktreePath = path.join(parentDir, sha.slice(0, 12));
 
+    // core.hooksPath=/dev/null keeps the analyzed repo's own hooks (husky,
+    // mise, install-on-checkout, …) from running — the checkout must be inert.
     yield* runGit([
+      "-c",
+      "core.hooksPath=/dev/null",
       "-C",
       repoRoot,
       "worktree",
