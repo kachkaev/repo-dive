@@ -115,7 +115,7 @@
     "vite": "8.1.5",
     "yaml": "2.9.0"
   },
-  "packageManager": "pnpm@11.15.0",
+  "packageManager": "pnpm@11.15.1",
   "engines": {
     "node": ">=22.13.0"
   },
