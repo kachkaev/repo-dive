@@ -77,3 +77,51 @@ export const runGit = (
   args: readonly string[],
   options?: { readonly okExitCodes?: readonly number[] },
 ): Effect.Effect<string, Error> => runCommand("git", args, options);
+
+/**
+ * Runs a command with `input` written to stdin and stdout captured as raw
+ * bytes — needed for `git cat-file --batch`, whose framing is byte-length
+ * based and must not pass through text decoding.
+ */
+export const runCommandBytes = (
+  command: string,
+  args: readonly string[],
+  options: { readonly input: string },
+): Effect.Effect<Uint8Array, Error> =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const handle = yield* ChildProcess.make(command, [...args], {
+        stdin: Stream.make(new TextEncoder().encode(options.input)),
+      });
+
+      const chunks: Uint8Array[] = [];
+      const { stderr, exitCode } = yield* Effect.all(
+        {
+          collect: Stream.runForEach(handle.stdout, (chunk) =>
+            Effect.sync(() => {
+              chunks.push(chunk);
+            }),
+          ),
+          stderr: captureStream(handle.stderr),
+          exitCode: handle.exitCode,
+        },
+        { concurrency: "unbounded" },
+      );
+
+      const code = Number(exitCode);
+      if (code !== 0) {
+        return yield* Effect.fail(
+          new GitCommandError([command, ...args], code, stderr),
+        );
+      }
+
+      const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const result = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return result;
+    }),
+  ).pipe(Effect.mapError(toError), Effect.provide(NodeServices.layer));

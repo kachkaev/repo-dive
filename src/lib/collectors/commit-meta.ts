@@ -5,6 +5,7 @@ import { arrayAt, stringAt } from "../json.ts";
 import type { Collector, Fact } from "./types.ts";
 
 const fieldSeparator = "\u001F";
+const recordSeparator = "\u001E";
 
 const format = [
   "%H",
@@ -100,6 +101,29 @@ export const commitMetaCollector: Collector = {
   collect: ({ repoRoot, sha }) =>
     runGit(["-C", repoRoot, "show", "-s", `--format=${format}`, sha]).pipe(
       Effect.map(parseCommitMeta),
+    ),
+  // One `git log` pass over the whole history instead of one `git show` per
+  // commit — the difference between minutes and hours on 30k+ commit repos.
+  collectBatch: ({ repoRoot, shas }) =>
+    runGit([
+      "-C",
+      repoRoot,
+      "log",
+      `--format=${recordSeparator}${format}`,
+    ]).pipe(
+      Effect.map((stdout) => {
+        const outputs = new Map<string, unknown>();
+        for (const record of stdout.split(recordSeparator)) {
+          if (!record.trim()) {
+            continue;
+          }
+          const meta = parseCommitMeta(record);
+          if (shas.has(meta.sha)) {
+            outputs.set(meta.sha, meta);
+          }
+        }
+        return outputs;
+      }),
     ),
   normalize: (raw) => {
     const facts: Fact[] = [

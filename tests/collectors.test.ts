@@ -108,29 +108,37 @@ void test("parseTrailers extracts key-value trailers", async () => {
   assert.deepEqual(parseTrailers(""), []);
 });
 
-void test("aggregateDirectives classifies directives and pairs blocks", async () => {
-  const { aggregateDirectives } =
+void test("directives scanning classifies directives and pairs blocks", async () => {
+  const { mergeDirectives, scanFileForDirectives } =
     await import("../src/lib/collectors/directives.ts");
-  const matches = [
-    {
-      filePath: "a.ts",
-      line: 3,
-      content: "// eslint-disable-next-line no-console, unicorn/no-null -- why",
-    },
-    { filePath: "a.ts", line: 10, content: "/* eslint-disable no-alert */" },
-    { filePath: "a.ts", line: 20, content: "/* eslint-enable no-alert */" },
-    { filePath: "a.ts", line: 30, content: "// @ts-expect-error legacy" },
-    { filePath: "b.ts", line: 1, content: "/* eslint-disable */" },
-    {
-      filePath: "b.ts",
-      line: 5,
-      content: "const x = 1; // eslint-disable-line no-magic-numbers",
-    },
-    { filePath: "b.ts", line: 8, content: "// @ts-ignore" },
-    { filePath: "c.ts", line: 1, content: "// @ts-nocheck" },
-  ];
 
-  const output = aggregateDirectives(matches);
+  const fileA = [
+    "const a = 1;",
+    "",
+    "// eslint-disable-next-line no-console, unicorn/no-null -- why",
+    ...Array.from({ length: 6 }, () => "code();"),
+    "/* eslint-disable no-alert */",
+    ...Array.from({ length: 9 }, () => "alert();"),
+    "/* eslint-enable no-alert */",
+    "// @ts-expect-error legacy",
+  ].join("\n");
+  const fileB = [
+    "/* eslint-disable */",
+    "code();",
+    "code();",
+    "code();",
+    "const x = 1; // eslint-disable-line no-magic-numbers",
+    "code();",
+    "code();",
+    "// @ts-ignore",
+  ].join("\n");
+  const fileC = "// @ts-nocheck\ncode();";
+
+  const output = mergeDirectives([
+    scanFileForDirectives(fileA),
+    scanFileForDirectives(fileB),
+    scanFileForDirectives(fileC),
+  ]);
 
   assert.equal(output.eslintNextLine.count, 1);
   assert.deepEqual(output.eslintNextLine.byRule, {
@@ -237,4 +245,19 @@ void test("parseBlamePorcelain attributes lines to authors and cohorts", async (
     authorEmail: "bob@example.com",
     cohortMonth: "2025-07",
   });
+});
+
+void test("scanFileForTodos counts markers per line", async () => {
+  const { scanFileForTodos } =
+    await import("../src/lib/collectors/todo-comments.ts");
+  const output = scanFileForTodos(
+    [
+      "// TODO: fix",
+      "// FIXME and TODO on one line",
+      "code();",
+      "// HACK",
+    ].join("\n"),
+  );
+  assert.equal(output.total, 4);
+  assert.deepEqual(output.byMarker, { TODO: 2, FIXME: 1, HACK: 1 });
 });

@@ -4,6 +4,8 @@ import { runGit } from "../git.ts";
 import { numberAt, recordAt } from "../json.ts";
 import { type Collector, extensionOf, type Fact } from "./types.ts";
 
+const recordSeparator = "\u001E";
+
 type ChurnByExtension = {
   files: number;
   added: number;
@@ -71,6 +73,30 @@ export const churnCollector: Collector = {
   collect: ({ repoRoot, sha }) =>
     runGit(["-C", repoRoot, "show", "--numstat", "--format=", sha]).pipe(
       Effect.map(parseNumstat),
+    ),
+  // One `git log --numstat` pass instead of one `git show` per commit.
+  collectBatch: ({ repoRoot, shas }) =>
+    runGit([
+      "-C",
+      repoRoot,
+      "log",
+      `--format=${recordSeparator}%H`,
+      "--numstat",
+    ]).pipe(
+      Effect.map((stdout) => {
+        const outputs = new Map<string, unknown>();
+        for (const record of stdout.split(recordSeparator)) {
+          const newlineIndex = record.indexOf("\n");
+          if (newlineIndex === -1) {
+            continue;
+          }
+          const sha = record.slice(0, newlineIndex).trim();
+          if (shas.has(sha)) {
+            outputs.set(sha, parseNumstat(record.slice(newlineIndex + 1)));
+          }
+        }
+        return outputs;
+      }),
     ),
   normalize: (raw) => {
     const facts: Fact[] = [];

@@ -43,6 +43,15 @@ export type Collector = {
   readonly defaultSampling: SamplingPolicy;
   readonly collect: (context: CollectContext) => Effect.Effect<unknown, Error>;
   /**
+   * Optional bulk path: produce outputs for many commits in O(1) subprocesses
+   * (e.g. one `git log` pass over the whole history). Commits missing from
+   * the returned map fall back to per-commit collect().
+   */
+  readonly collectBatch?: (context: {
+    readonly repoRoot: string;
+    readonly shas: ReadonlySet<string>;
+  }) => Effect.Effect<ReadonlyMap<string, unknown>, Error>;
+  /**
    * Turns one raw output (as re-read from the catalog, hence `unknown`) into
    * facts for the cube. Pure and cheap: `index` re-runs it freely, so
    * normalization logic can improve without re-collecting.

@@ -272,6 +272,74 @@ export const runScan = ({
     let totalSkipped = 0;
     let processed = 0;
     const failures: string[] = [];
+
+    // Batch phase: collectors that can cover many commits per subprocess do so
+    // up front; whatever they produced is excluded from the per-commit phase.
+    const batchDone = new Map<string, ReadonlySet<string>>();
+    for (const plan of plans) {
+      const { collector } = plan;
+      if (!collector.collectBatch) {
+        continue;
+      }
+      const pending = new Set<string>();
+      for (const sha of plan.shas) {
+        if (force || !(yield* isCollected(catalog, sha, collector))) {
+          pending.add(sha);
+        }
+      }
+      totalSkipped += plan.shas.size - pending.size;
+      if (pending.size === 0) {
+        batchDone.set(collector.name, plan.shas);
+        continue;
+      }
+
+      const batchStartedAt = Date.now();
+      const outputs = yield* collector
+        .collectBatch({ repoRoot, shas: pending })
+        .pipe(
+          Effect.catch((error) => {
+            failures.push(`Batch ${collector.name}: ${error.message}`);
+            return Effect.succeed(new Map<string, unknown>());
+          }),
+        );
+      const durationMs = Math.max(
+        1,
+        Math.round((Date.now() - batchStartedAt) / Math.max(1, outputs.size)),
+      );
+
+      const written = new Set<string>();
+      yield* Effect.forEach(
+        [...outputs.entries()],
+        ([sha, output]) =>
+          writeCollectorOutput({
+            catalog,
+            sha,
+            collector,
+            output,
+            durationMs,
+          }).pipe(
+            Effect.map(() => {
+              written.add(sha);
+            }),
+          ),
+        { concurrency: 16, discard: true },
+      );
+      totalRun += written.size;
+
+      const done = new Set(plan.shas);
+      for (const sha of pending) {
+        if (!written.has(sha)) {
+          done.delete(sha); // fall back to per-commit collect()
+        }
+      }
+      batchDone.set(collector.name, done);
+      if (written.size > 0) {
+        yield* Console.log(
+          `Batched ${collector.name}: ${written.size} commits in one pass.`,
+        );
+      }
+    }
+
     const startedAt = Date.now();
 
     const formatEta = (): string => {
@@ -292,7 +360,11 @@ export const runScan = ({
           catalog,
           sha: commit.hash,
           collectors: plans
-            .filter((plan) => plan.shas.has(commit.hash))
+            .filter(
+              (plan) =>
+                plan.shas.has(commit.hash) &&
+                !batchDone.get(plan.collector.name)?.has(commit.hash),
+            )
             .map((plan) => plan.collector),
           force,
           failures,
