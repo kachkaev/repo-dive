@@ -91,11 +91,23 @@ function shapeStacked(
 }
 
 /** Falls back when serving a dashboard.json written before configurable caps. */
-const defaultMaxAuthorsInCharts = 10;
+const defaultMaxContributorsInCharts = 10;
+
+/** Icon + label for non-human contributor kinds; humans get no badge. */
+const kindBadge: Record<"bot" | "ai", { icon: string; title: string }> = {
+  bot: { icon: "🤖", title: "Bot" },
+  ai: { icon: "✨", title: "AI agent" },
+};
 
 export function App({ data }: { data: DashboardData }) {
-  const maxAuthorsInCharts =
-    data.config?.authors.maxInCharts ?? defaultMaxAuthorsInCharts;
+  const maxContributorsInCharts =
+    data.config?.contributors.maxInCharts ?? defaultMaxContributorsInCharts;
+  const humanContributors = data.contributors.filter(
+    (contributor) => (contributor.kind ?? "human") === "human",
+  );
+  const nonHumanContributors = data.contributors.filter(
+    (contributor) => contributor.kind === "bot" || contributor.kind === "ai",
+  );
   const latestLanguages = data.languages.at(-1);
   const latestDirectives = data.directives.at(-1);
   const latestFileTypes = data.fileTypes.at(-1);
@@ -199,18 +211,21 @@ export function App({ data }: { data: DashboardData }) {
       return;
     }
     return shapeStacked(
-      data.survival.map((row) => ({ date: row.date, values: row.byAuthor })),
-      maxAuthorsInCharts,
+      data.survival.map((row) => ({
+        date: row.date,
+        values: row.byContributor,
+      })),
+      maxContributorsInCharts,
     );
-  }, [data.survival, maxAuthorsInCharts]);
+  }, [data.survival, maxContributorsInCharts]);
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
       <header className="mb-8">
         <h1 className="text-2xl font-semibold">{data.repo.name}</h1>
         <p className="mt-1 text-sm text-(--text-secondary)">
-          {formatCount(data.repo.commitCount)} commits · {data.repo.authorCount}{" "}
-          authors ·{" "}
+          {formatCount(data.repo.commitCount)} commits ·{" "}
+          {data.repo.contributorCount} contributors ·{" "}
           {data.repo.firstCommitDate
             ? `${formatDate(data.repo.firstCommitDate)} — ${formatDate(data.repo.lastCommitDate ?? "")}`
             : "no history"}{" "}
@@ -341,7 +356,7 @@ export function App({ data }: { data: DashboardData }) {
 
       {survivalAuthorChart && (
         <Section
-          title="Code survival by author"
+          title="Code survival by contributor"
           subtitle="who wrote the lines that are still alive"
         >
           <TimeSeriesChart mode="area" {...survivalAuthorChart} />
@@ -363,42 +378,68 @@ export function App({ data }: { data: DashboardData }) {
         </Section>
       )}
 
-      <Section title="Authors" subtitle="top contributors by commit count">
+      <Section
+        title="Contributors"
+        subtitle="human contributors by commit count"
+      >
         <DataTable
-          caption={`All ${data.authors.length} listed authors`}
-          header={["author", "commits", "added", "deleted"]}
-          rows={data.authors.map((author) => [
+          caption={`All ${data.contributors.length} listed contributors`}
+          header={["contributor", "commits", "added", "deleted"]}
+          rows={data.contributors.map((contributor) => [
             <>
-              {author.url ? (
+              {contributor.kind && contributor.kind !== "human" ? (
+                <span
+                  title={kindBadge[contributor.kind].title}
+                  className="mr-1 select-none"
+                >
+                  {kindBadge[contributor.kind].icon}
+                </span>
+              ) : undefined}
+              {contributor.url ? (
                 <a
-                  href={author.url}
+                  href={contributor.url}
                   target="_blank"
                   rel="noreferrer"
                   className="font-medium hover:underline"
                 >
-                  {author.name}
+                  {contributor.name}
                 </a>
               ) : (
-                author.name
+                contributor.name
               )}{" "}
               <span className="text-(--text-muted)">
-                &lt;{author.email}&gt;
+                &lt;{contributor.email}&gt;
               </span>
             </>,
-            author.commits,
-            formatCount(author.added),
-            formatCount(author.deleted),
+            contributor.commits,
+            formatCount(contributor.added),
+            formatCount(contributor.deleted),
           ])}
         />
         <BarList
-          items={data.authors
-            .slice(0, maxAuthorsInCharts * 2)
-            .map((author) => ({
-              label: author.name || author.email,
-              value: author.commits,
-              href: author.url,
+          items={humanContributors
+            .slice(0, maxContributorsInCharts * 2)
+            .map((contributor) => ({
+              label: contributor.name || contributor.email,
+              value: contributor.commits,
+              href: contributor.url,
             }))}
         />
+        {nonHumanContributors.length > 0 && (
+          <>
+            <h3 className="mt-6 mb-2 text-sm font-medium text-(--text-secondary)">
+              Bots &amp; AI agents
+            </h3>
+            <BarList
+              color="var(--series-9)"
+              items={nonHumanContributors.map((contributor) => ({
+                label: `${kindBadge[contributor.kind === "ai" ? "ai" : "bot"].icon} ${contributor.name || contributor.email}`,
+                value: contributor.commits,
+                href: contributor.url,
+              }))}
+            />
+          </>
+        )}
       </Section>
     </main>
   );

@@ -283,7 +283,7 @@ void test("report exports a self-contained HTML file", (testContext) => {
   }
 });
 
-void test("index merges author aliases from repo-insighter.config.ts", () => {
+void test("index merges contributor aliases from repo-insighter.config.ts", () => {
   const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-insighter-alias-"));
   runGit(repoPath, "init", "-b", "main");
 
@@ -305,6 +305,12 @@ void test("index merges author aliases from repo-insighter.config.ts", () => {
   try {
     commitAs("alice@work.example", "Alice", "first");
     commitAs("alice@personal.example", "Alice", "second");
+    // A bot identity — its kind should be auto-derived without config.
+    commitAs(
+      "29139614+renovate[bot]@users.noreply.github.com",
+      "renovate[bot]",
+      "bump deps",
+    );
 
     // A .ts config (exercises Node's type stripping through the real CLI). The
     // `defineConfig` import is covered by unit tests — a temp repo has no
@@ -314,7 +320,7 @@ void test("index merges author aliases from repo-insighter.config.ts", () => {
       path.join(repoPath, "repo-insighter.config.ts"),
       [
         "const config = {",
-        "  authors: {",
+        "  contributors: {",
         "    aliases: [",
         "      {",
         '        emails: ["alice@work.example", "alice@personal.example"],',
@@ -339,15 +345,29 @@ void test("index merges author aliases from repo-insighter.config.ts", () => {
         "utf8",
       ),
     );
-    const authorCount = numberAt(recordAt(dashboard, "repo"), "authorCount");
-    assert.equal(authorCount, 1, "aliases should collapse to 1 author");
+    const contributorCount = numberAt(
+      recordAt(dashboard, "repo"),
+      "contributorCount",
+    );
+    assert.equal(
+      contributorCount,
+      2,
+      "Alice's aliases collapse; bot is separate",
+    );
 
-    const authors = arrayAt(dashboard, "authors");
-    assert.equal(authors.length, 1);
-    assert.equal(stringAt(authors[0], "email"), "alice@work.example");
-    assert.equal(stringAt(authors[0], "name"), "Alice A.");
-    assert.equal(stringAt(authors[0], "url"), "https://github.com/alice");
-    assert.equal(numberAt(authors[0], "commits"), 2);
+    const contributors = arrayAt(dashboard, "contributors");
+    const alice = contributors.find(
+      (row) => stringAt(row, "email") === "alice@work.example",
+    );
+    assert.ok(alice, "Alice should be present");
+    assert.equal(stringAt(alice, "name"), "Alice A.");
+    assert.equal(stringAt(alice, "url"), "https://github.com/alice");
+    assert.equal(stringAt(alice, "kind"), "human");
+    assert.equal(numberAt(alice, "commits"), 2);
+
+    const bot = contributors.find((row) => stringAt(row, "kind") === "bot");
+    assert.ok(bot, "renovate should be auto-classified as a bot");
+    assert.equal(stringAt(bot, "email"), "renovate[bot]");
   } finally {
     rmSync(repoPath, { force: true, recursive: true });
   }

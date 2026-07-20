@@ -46,15 +46,19 @@ type SurvivalRow = {
   sha: string;
   date: string;
   byCohort: Record<string, number>;
-  byAuthor: Record<string, number>;
+  byContributor: Record<string, number>;
   byExtension: Record<string, number>;
 };
 
-type AuthorRow = {
+type ContributorKind = "human" | "bot" | "ai";
+
+type ContributorRow = {
   email: string;
   name: string;
-  /** Optional profile URL from the config's author aliases. */
+  /** Optional profile URL from the config's contributor aliases. */
   url?: string;
+  /** Missing in dashboard.json written before contributor kinds landed. */
+  kind?: ContributorKind;
   commits: number;
   added: number;
   deleted: number;
@@ -64,15 +68,15 @@ export type DashboardData = {
   generatedAt: string;
   /** Optional: absent in dashboard.json written before configurable caps landed. */
   config?: {
-    authors: {
-      /** How many authors per-author charts keep before folding into "Other". */
+    contributors: {
+      /** How many contributors per-contributor charts keep before folding into "Other". */
       maxInCharts: number;
     };
   };
   repo: {
     name: string;
     commitCount: number;
-    authorCount: number;
+    contributorCount: number;
     firstCommitDate?: string;
     lastCommitDate?: string;
   };
@@ -83,7 +87,7 @@ export type DashboardData = {
   directives: DirectivesRow[];
   topRules: Array<{ rule: string; count: number }>;
   survival: SurvivalRow[];
-  authors: AuthorRow[];
+  contributors: ContributorRow[];
   aiIdentities: Array<{ identity: string; commits: number }>;
 };
 

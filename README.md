@@ -61,24 +61,24 @@ Everything works with zero config. To refine it, drop a `repo-insighter.config.t
 import { defineConfig } from "repo-insighter/config";
 
 export default defineConfig({
-  authors: {
+  contributors: {
     aliases: [
       // Shorthand: emails only, the first is canonical.
       ["alice@work.example", "alice@personal.example"],
-      // Rich form: a display name and a profile link.
+      // Rich form: a display name, a profile link and an explicit kind.
       {
         emails: ["bob@work.example", "12345+bob@users.noreply.github.com"],
         displayName: "Bob",
         url: "https://github.com/bob",
       },
     ],
-    // How many authors charts keep before folding the rest into "Other" (default 10).
+    // How many contributors charts keep before folding the rest into "Other" (default 10).
     maxInCharts: 10,
   },
 });
 ```
 
-`authors.aliases` merges the multiple identities one person commits under (work + personal email, GitHub noreply, name variants) so attribution, the authors table and code-survival-by-author count them once; a group can also carry a `displayName` and a profile `url`. The config is read by `index`. See [docs/specs/07-config.md](docs/specs/07-config.md) for details.
+`contributors.aliases` merges the multiple identities one person commits under (work + personal email, GitHub noreply, name variants) so attribution, the contributors table and code-survival-by-contributor count them once; a group can also carry a `displayName`, a profile `url` and a `kind` (`human`/`bot`/`ai`, otherwise auto-derived — the dashboard badges bots and AI agents and lists them apart from humans). The config is read by `index`. See [docs/specs/07-config.md](docs/specs/07-config.md) for details.
 
 ## Development
 

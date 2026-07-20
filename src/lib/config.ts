@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 
 import { Effect } from "effect";
 
+import type { ContributorKind } from "../config.ts";
 import { prettifyAuthorEmail } from "./indexing.ts";
 
 /** Config file names, in resolution order. First match wins. */
@@ -16,26 +17,42 @@ const configFileNames = [
 
 export const defaultMaxInCharts = 10;
 
-/** An author's canonical, display-ready identity after alias resolution. */
-type ResolvedAuthor = {
-  /** Prettified canonical email — shown in the authors table's email column. */
+/** Automation bots — commits that don't reflect authored work. */
+const botPattern = /\brenovate\b|\bdependabot\b|github-actions|\[bot\]/i;
+/** Known AI coding agents (mirrors the co-author heuristic in indexing.ts). */
+const aiPattern =
+  /claude|copilot|cursor|chatgpt|openai|gemini|aider|devin|coderabbit|codegen|sweep|windsurf/i;
+
+/** Classifies a `"Name <email>"` identity when the config leaves `kind` unset. */
+export const deriveContributorKind = (identity: string): ContributorKind =>
+  botPattern.test(identity) ? "bot" : aiPattern.test(identity) ? "ai" : "human";
+
+/** A contributor's canonical, display-ready identity after alias resolution. */
+type ResolvedContributor = {
+  /** Prettified canonical email — shown in the contributors table's email column. */
   readonly canonicalEmail: string;
-  /** The label used in charts and as the author's name: `displayName` if set. */
+  /** The label used in charts and as the name: `displayName` if set. */
   readonly label: string;
   /** Explicit display-name override from the config, if any. */
   readonly displayName: string | undefined;
   /** Profile URL from the config, if any. */
   readonly url: string | undefined;
+  /** Explicit or auto-derived contributor kind. */
+  readonly kind: ContributorKind;
 };
 
 export type ResolvedConfig = {
   /**
-   * Resolves an author email to its canonical identity: alias groups fold to
-   * their first entry, GitHub noreply addresses are prettified, and any
-   * `displayName`/`url` overrides are applied.
+   * Resolves a commit author's email (and optional name) to its canonical
+   * contributor identity: alias groups fold to their first entry, GitHub
+   * noreply addresses are prettified, `displayName`/`url` overrides are applied
+   * and `kind` is taken from the config or derived from the identity.
    */
-  readonly resolveAuthor: (email: string) => ResolvedAuthor;
-  /** How many authors per-author charts keep before folding into "Other". */
+  readonly resolveContributor: (
+    email: string,
+    name?: string,
+  ) => ResolvedContributor;
+  /** How many contributors per-contributor charts keep before folding into "Other". */
   readonly maxInCharts: number;
 };
 
@@ -44,12 +61,14 @@ type AliasEntry = {
   readonly canonicalEmail: string;
   readonly displayName: string | undefined;
   readonly url: string | undefined;
+  readonly kind: ContributorKind | undefined;
 };
 
-const bareResolveAuthor = (
+const bareResolveContributor = (
   aliases: ReadonlyMap<string, AliasEntry>,
   email: string,
-): ResolvedAuthor => {
+  name: string | undefined,
+): ResolvedContributor => {
   const entry =
     aliases.get(email.toLowerCase()) ??
     aliases.get(prettifyAuthorEmail(email).toLowerCase());
@@ -59,6 +78,7 @@ const bareResolveAuthor = (
     label: entry?.displayName ?? canonicalEmail,
     displayName: entry?.displayName,
     url: entry?.url,
+    kind: entry?.kind ?? deriveContributorKind(`${name ?? ""} <${email}>`),
   };
 };
 
@@ -66,7 +86,8 @@ const bareResolveAuthor = (
 const defaultResolvedConfig: ResolvedConfig = {
   // Wrapped (not a bare reference) to defer the cross-module lookup to call
   // time — `indexing.ts` and this module import each other.
-  resolveAuthor: (email) => bareResolveAuthor(new Map(), email),
+  resolveContributor: (email, name) =>
+    bareResolveContributor(new Map(), email, name),
   maxInCharts: defaultMaxInCharts,
 };
 
@@ -93,6 +114,23 @@ const parseOptionalString = (
   return value.trim();
 };
 
+const contributorKinds: readonly ContributorKind[] = ["human", "bot", "ai"];
+
+const parseKind = (
+  value: unknown,
+  label: string,
+): ContributorKind | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  for (const kind of contributorKinds) {
+    if (value === kind) {
+      return kind;
+    }
+  }
+  throw configError(`${label} must be one of "human", "bot" or "ai".`);
+};
+
 const parseEmails = (rawEmails: unknown, at: string): string[] => {
   if (!Array.isArray(rawEmails) || rawEmails.length === 0) {
     throw configError(
@@ -117,13 +155,15 @@ const parseAliasGroup = (
   emails: string[];
   displayName: string | undefined;
   url: string | undefined;
+  kind: ContributorKind | undefined;
 } => {
-  const at = `\`authors.aliases[${groupIndex}]\``;
+  const at = `\`contributors.aliases[${groupIndex}]\``;
   if (Array.isArray(group)) {
     return {
       emails: parseEmails(group, at),
       displayName: undefined,
       url: undefined,
+      kind: undefined,
     };
   }
   if (isPlainObject(group)) {
@@ -134,6 +174,7 @@ const parseAliasGroup = (
         `${at}\`.displayName\``,
       ),
       url: parseOptionalString(prop(group, "url"), `${at}\`.url\``),
+      kind: parseKind(prop(group, "kind"), `${at}\`.kind\``),
     };
   }
   throw configError(
@@ -141,22 +182,25 @@ const parseAliasGroup = (
   );
 };
 
-/** Validates the raw `authors.aliases` and builds the email → group-metadata map. */
+/** Validates the raw `contributors.aliases` and builds the email → group-metadata map. */
 const buildAliasMap = (aliases: unknown): Map<string, AliasEntry> => {
   const map = new Map<string, AliasEntry>();
   if (aliases === undefined) {
     return map;
   }
   if (!Array.isArray(aliases)) {
-    throw configError("`authors.aliases` must be an array.");
+    throw configError("`contributors.aliases` must be an array.");
   }
   for (const [groupIndex, group] of aliases.entries()) {
-    const { emails, displayName, url } = parseAliasGroup(group, groupIndex);
+    const { emails, displayName, url, kind } = parseAliasGroup(
+      group,
+      groupIndex,
+    );
     const [canonicalEmail] = emails;
     if (canonicalEmail === undefined) {
       continue;
     }
-    const entry: AliasEntry = { canonicalEmail, displayName, url };
+    const entry: AliasEntry = { canonicalEmail, displayName, url, kind };
     for (const email of emails) {
       const key = email.toLowerCase();
       const existing = map.get(key);
@@ -185,7 +229,7 @@ const parseMaxInCharts = (value: unknown): number => {
     value > 100
   ) {
     throw configError(
-      "`authors.maxInCharts` must be an integer between 1 and 100.",
+      "`contributors.maxInCharts` must be an integer between 1 and 100.",
     );
   }
   return value;
@@ -196,19 +240,20 @@ export const resolveConfig = (raw: unknown): ResolvedConfig => {
   if (!isPlainObject(raw)) {
     throw configError("the default export must be an object.");
   }
-  const authors = prop(raw, "authors");
-  if (authors !== undefined && !isPlainObject(authors)) {
-    throw configError("`authors` must be an object.");
+  const contributors = prop(raw, "contributors");
+  if (contributors !== undefined && !isPlainObject(contributors)) {
+    throw configError("`contributors` must be an object.");
   }
   const aliasMap = buildAliasMap(
-    authors === undefined ? undefined : prop(authors, "aliases"),
+    contributors === undefined ? undefined : prop(contributors, "aliases"),
   );
   const maxInCharts = parseMaxInCharts(
-    authors === undefined ? undefined : prop(authors, "maxInCharts"),
+    contributors === undefined ? undefined : prop(contributors, "maxInCharts"),
   );
 
   return {
-    resolveAuthor: (email) => bareResolveAuthor(aliasMap, email),
+    resolveContributor: (email, name) =>
+      bareResolveContributor(aliasMap, email, name),
     maxInCharts,
   };
 };

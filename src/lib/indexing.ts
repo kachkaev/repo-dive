@@ -217,19 +217,20 @@ const buildDashboardData = (
       sha: commit.sha.slice(0, 10),
       date: commit.date,
       byCohort: groupMetric(commit, "survival.lines", "cohort"),
-      byAuthor: sumByKey(
+      byContributor: sumByKey(
         groupMetric(commit, "survival.lines", "author"),
-        (email) => config.resolveAuthor(email).label,
+        (email) => config.resolveContributor(email).label,
       ),
       byExtension: groupMetric(commit, "survival.lines", "extension"),
     }));
 
-  const authorMap = new Map<
+  const contributorMap = new Map<
     string,
     {
       email: string;
       name: string;
       url: string | undefined;
+      kind: string;
       commits: number;
       added: number;
       deleted: number;
@@ -241,12 +242,16 @@ const buildDashboardData = (
       continue;
     }
     // Resolve first so aliases of one person land in a single bucket.
-    const resolved = config.resolveAuthor(commit.authorEmail);
+    const resolved = config.resolveContributor(
+      commit.authorEmail,
+      commit.authorName,
+    );
     const key = resolved.canonicalEmail.toLowerCase();
-    const bucket = authorMap.get(key) ?? {
+    const bucket = contributorMap.get(key) ?? {
       email: resolved.canonicalEmail,
       name: resolved.label,
       url: resolved.url,
+      kind: resolved.kind,
       commits: 0,
       added: 0,
       deleted: 0,
@@ -256,9 +261,9 @@ const buildDashboardData = (
     bucket.commits += 1;
     bucket.added += row.added;
     bucket.deleted += row.deleted;
-    authorMap.set(key, bucket);
+    contributorMap.set(key, bucket);
   }
-  const authors = [...authorMap.values()]
+  const contributors = [...contributorMap.values()]
     .toSorted((left, right) => right.commits - left.commits)
     .slice(0, 25);
 
@@ -275,12 +280,12 @@ const buildDashboardData = (
   return {
     generatedAt: new Date().toISOString(),
     config: {
-      authors: { maxInCharts: config.maxInCharts },
+      contributors: { maxInCharts: config.maxInCharts },
     },
     repo: {
       name: path.basename(repoRoot),
       commitCount: commits.length,
-      authorCount: authorMap.size,
+      contributorCount: contributorMap.size,
       firstCommitDate: commits.at(0)?.date,
       lastCommitDate: commits.at(-1)?.date,
     },
@@ -291,7 +296,7 @@ const buildDashboardData = (
     directives,
     topRules,
     survival,
-    authors,
+    contributors,
     aiIdentities,
   };
 };
