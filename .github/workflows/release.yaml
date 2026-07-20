@@ -52,15 +52,12 @@ jobs:
       - name: Verify tests
         run: pnpm test
 
-      - name: Create release pull request or prepare publish
+      - name: Create release pull request or publish to npm
         id: changesets
         uses: changesets/action@c48e67d110a68bc90ccf1098e9646092baacaa87 # v1.6.0
         with:
           title: Version packages
           version: pnpm changesets:version
+          publish: pnpm changesets:publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish to npm
-        if: steps.changesets.outputs.hasChangesets == 'false'
-        run: pnpm changesets:publish
