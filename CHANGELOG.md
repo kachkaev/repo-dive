@@ -1,5 +1,12 @@
 # repo-insighter
 
+## 0.1.1
+
+### Patch Changes
+
+- 0ec82a1: Declare the true Node floor: `node:sqlite` (used by index/query/mcp) requires Node ≥ 22.13, and `engines` now says so instead of promising 22.0.
+- 0ec82a1: Large-repo scan performance: log-strategy collectors (commit-meta, churn) batch the whole history into one `git log` pass, and content-scanning collectors (directives, todo-comments) cache results per blob (`git cat-file --batch` + SQLite blob cache + in-process memo) so only never-seen file contents are scanned. Survival sampling defaults to quarterly, and `engines.node` honestly reflects the `node:sqlite` floor (≥ 22.13).
+
 ## 0.1.0
 
 ### Minor Changes
