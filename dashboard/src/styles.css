@@ -17,6 +17,18 @@
   --series-6: #e34948;
   --series-7: #e87ba4;
   --series-8: #eb6834;
+  --series-9: #8569e8;
+  --series-10: #958400;
+  --series-11: #a92172;
+  --series-12: #925001;
+  --series-13: #00b8bf;
+  --series-14: #59bc42;
+  --series-15: #df71d7;
+  --series-16: #8339b0;
+  --series-17: #5b6c00;
+  --series-18: #006a9e;
+  --series-19: #b51b34;
+  --series-20: #3d54cb;
   --diverge-pos: #2a78d6;
   --diverge-neg: #e34948;
   --seq-100: #cde2fb;
@@ -45,6 +57,18 @@
     --series-6: #e66767;
     --series-7: #d55181;
     --series-8: #d95926;
+    --series-9: #8164e3;
+    --series-10: #907f03;
+    --series-11: #b02978;
+    --series-12: #9b5400;
+    --series-13: #03a5ab;
+    --series-14: #47aa2d;
+    --series-15: #cd5fc5;
+    --series-16: #893fb6;
+    --series-17: #607201;
+    --series-18: #0070a6;
+    --series-19: #bc2539;
+    --series-20: #425ad1;
     --diverge-pos: #3987e5;
     --diverge-neg: #e66767;
   }

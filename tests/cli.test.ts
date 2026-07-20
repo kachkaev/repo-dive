@@ -12,6 +12,8 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { arrayAt, numberAt, recordAt, stringAt } from "../src/lib/json.ts";
+
 const rootDirectory = fileURLToPath(new URL("../", import.meta.url));
 
 function runCli(...args: readonly string[]) {
@@ -276,6 +278,76 @@ void test("report exports a self-contained HTML file", (testContext) => {
     assert.match(reportHtml, /"commitCount":2/);
     assert.doesNotMatch(reportHtml, /src="\/assets/);
     assert.doesNotMatch(reportHtml, /<link rel="stylesheet"/);
+  } finally {
+    rmSync(repoPath, { force: true, recursive: true });
+  }
+});
+
+void test("index merges author aliases from repo-insighter.config.ts", () => {
+  const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-insighter-alias-"));
+  runGit(repoPath, "init", "-b", "main");
+
+  function commitAs(email: string, name: string, subject: string) {
+    for (const [key, value] of Object.entries({
+      ...commitEnvironment,
+      GIT_AUTHOR_EMAIL: email,
+      GIT_AUTHOR_NAME: name,
+      GIT_COMMITTER_EMAIL: email,
+      GIT_COMMITTER_NAME: name,
+    })) {
+      process.env[key] = value;
+    }
+    writeFileSync(path.join(repoPath, "file.txt"), `${subject}\n`);
+    runGit(repoPath, "add", ".");
+    runGit(repoPath, "commit", "-m", subject);
+  }
+
+  try {
+    commitAs("alice@work.example", "Alice", "first");
+    commitAs("alice@personal.example", "Alice", "second");
+
+    // A .ts config (exercises Node's type stripping through the real CLI). The
+    // `defineConfig` import is covered by unit tests — a temp repo has no
+    // node_modules to resolve `repo-insighter/config` from, so use a typed
+    // plain object here.
+    writeFileSync(
+      path.join(repoPath, "repo-insighter.config.ts"),
+      [
+        "const config = {",
+        "  authors: {",
+        "    aliases: [",
+        "      {",
+        '        emails: ["alice@work.example", "alice@personal.example"],',
+        '        displayName: "Alice A.",',
+        '        url: "https://github.com/alice",',
+        "      },",
+        "    ],",
+        "  },",
+        "};",
+        "export default config;",
+        "",
+      ].join("\n"),
+    );
+
+    runCli("scan", "--repo", repoPath, "--collectors", "commit-meta,churn");
+    const indexRun = runCli("index", "--repo", repoPath);
+    assert.equal(indexRun.status, 0, indexRun.stderr);
+
+    const dashboard: unknown = JSON.parse(
+      readFileSync(
+        path.join(repoPath, ".repo-insighter", "index", "dashboard.json"),
+        "utf8",
+      ),
+    );
+    const authorCount = numberAt(recordAt(dashboard, "repo"), "authorCount");
+    assert.equal(authorCount, 1, "aliases should collapse to 1 author");
+
+    const authors = arrayAt(dashboard, "authors");
+    assert.equal(authors.length, 1);
+    assert.equal(stringAt(authors[0], "email"), "alice@work.example");
+    assert.equal(stringAt(authors[0], "name"), "Alice A.");
+    assert.equal(stringAt(authors[0], "url"), "https://github.com/alice");
+    assert.equal(numberAt(authors[0], "commits"), 2);
   } finally {
     rmSync(repoPath, { force: true, recursive: true });
   }

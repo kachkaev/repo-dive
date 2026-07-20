@@ -75,7 +75,7 @@ export function DataTable({
 }: {
   caption: string;
   header: string[];
-  rows: Array<Array<string | number>>;
+  rows: ReactNode[][];
 }) {
   return (
     <details className="mt-3 text-xs text-(--text-secondary)">

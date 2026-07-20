@@ -5,7 +5,7 @@ export function BarList({
   items,
   color = "var(--series-1)",
 }: {
-  items: Array<{ label: string; value: number }>;
+  items: Array<{ label: string; value: number; href?: string | undefined }>;
   color?: string;
 }) {
   if (items.length === 0) {
@@ -22,7 +22,18 @@ export function BarList({
             className="w-56 truncate text-right font-mono text-xs text-(--text-secondary)"
             title={item.label}
           >
-            {item.label}
+            {item.href ? (
+              <a
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-(--text-primary) hover:underline"
+              >
+                {item.label}
+              </a>
+            ) : (
+              item.label
+            )}
           </span>
           <span className="relative h-4 flex-1 rounded-xs bg-(--surface-2)">
             <span

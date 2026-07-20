@@ -15,16 +15,10 @@ import {
   formatPercent,
 } from "./format.ts";
 
-const categoricalColors = [
-  "var(--series-1)",
-  "var(--series-2)",
-  "var(--series-3)",
-  "var(--series-4)",
-  "var(--series-5)",
-  "var(--series-6)",
-  "var(--series-7)",
-  "var(--series-8)",
-];
+const categoricalColors = Array.from(
+  { length: 20 },
+  (_, index) => `var(--series-${index + 1})`,
+);
 const otherColor = "var(--text-muted)";
 const cohortRamp = [
   "var(--seq-700)",
@@ -89,12 +83,19 @@ function shapeStacked(
 
   const seriesKeys = hasOther ? [...kept, "Other"] : kept;
   const colors = seriesKeys.map((key, index) =>
-    key === "Other" ? otherColor : (categoricalColors[index] ?? otherColor),
+    key === "Other"
+      ? otherColor
+      : (categoricalColors[index % categoricalColors.length] ?? otherColor),
   );
   return { points, seriesKeys, colors };
 }
 
+/** Falls back when serving a dashboard.json written before configurable caps. */
+const defaultMaxAuthorsInCharts = 10;
+
 export function App({ data }: { data: DashboardData }) {
+  const maxAuthorsInCharts =
+    data.config?.authors.maxInCharts ?? defaultMaxAuthorsInCharts;
   const latestLanguages = data.languages.at(-1);
   const latestDirectives = data.directives.at(-1);
   const latestFileTypes = data.fileTypes.at(-1);
@@ -199,9 +200,9 @@ export function App({ data }: { data: DashboardData }) {
     }
     return shapeStacked(
       data.survival.map((row) => ({ date: row.date, values: row.byAuthor })),
-      6,
+      maxAuthorsInCharts,
     );
-  }, [data.survival]);
+  }, [data.survival, maxAuthorsInCharts]);
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
@@ -367,17 +368,36 @@ export function App({ data }: { data: DashboardData }) {
           caption={`All ${data.authors.length} listed authors`}
           header={["author", "commits", "added", "deleted"]}
           rows={data.authors.map((author) => [
-            `${author.name} <${author.email}>`,
+            <>
+              {author.url ? (
+                <a
+                  href={author.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium hover:underline"
+                >
+                  {author.name}
+                </a>
+              ) : (
+                author.name
+              )}{" "}
+              <span className="text-(--text-muted)">
+                &lt;{author.email}&gt;
+              </span>
+            </>,
             author.commits,
             formatCount(author.added),
             formatCount(author.deleted),
           ])}
         />
         <BarList
-          items={data.authors.slice(0, 10).map((author) => ({
-            label: author.name || author.email,
-            value: author.commits,
-          }))}
+          items={data.authors
+            .slice(0, maxAuthorsInCharts * 2)
+            .map((author) => ({
+              label: author.name || author.email,
+              value: author.commits,
+              href: author.url,
+            }))}
         />
       </Section>
     </main>

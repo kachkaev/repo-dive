@@ -1,6 +1,6 @@
 # Plan: `repo-insighter.config.ts`
 
-_Task for a future session. Not started._
+_Implemented. See [docs/specs/07-config.md](../specs/07-config.md) for the shipped behavior; this file is kept as the original design note._
 
 Let users drop a `repo-insighter.config.ts` at the root of the **analyzed** repository (knip-style) to alter how the tool works. Everything must keep working with zero config.
 

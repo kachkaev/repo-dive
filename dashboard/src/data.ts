@@ -53,6 +53,8 @@ type SurvivalRow = {
 type AuthorRow = {
   email: string;
   name: string;
+  /** Optional profile URL from the config's author aliases. */
+  url?: string;
   commits: number;
   added: number;
   deleted: number;
@@ -60,6 +62,13 @@ type AuthorRow = {
 
 export type DashboardData = {
   generatedAt: string;
+  /** Optional: absent in dashboard.json written before configurable caps landed. */
+  config?: {
+    authors: {
+      /** How many authors per-author charts keep before folding into "Other". */
+      maxInCharts: number;
+    };
+  };
   repo: {
     name: string;
     commitCount: number;

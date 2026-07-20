@@ -30,6 +30,13 @@
     "url": "https://en.kachkaev.ru"
   },
   "type": "module",
+  "exports": {
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
     "repo-insighter": "./dist/cli.js"
   },
@@ -39,8 +46,9 @@
     "dist/"
   ],
   "scripts": {
-    "build": "npm-run-all build:cli build:dashboard",
+    "build": "npm-run-all build:cli build:config build:dashboard",
     "build:cli": "vite build",
+    "build:config": "tsc -p tsconfig.config.json",
     "build:dashboard": "vite build --config dashboard/vite.config.ts",
     "changesets:publish": "changeset publish",
     "changesets:version": "changeset version && pnpm install --lockfile-only --no-frozen-lockfile",

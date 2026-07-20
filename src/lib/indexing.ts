@@ -7,6 +7,7 @@ import { Console, Effect } from "effect";
 import { catalogDirName } from "./catalog.ts";
 import { builtInCollectors } from "./collectors/roster.ts";
 import type { Fact } from "./collectors/types.ts";
+import { loadConfig, type ResolvedConfig } from "./config.ts";
 import { listCommits, resolveRepoRoot } from "./scan.ts";
 
 const toError = (error: unknown) =>
@@ -90,9 +91,23 @@ const hasMetric = (commit: CommitFacts, metric: string): boolean =>
     facts.some((fact) => fact.metric === metric),
   );
 
+/** Re-keys a numeric record, summing values whose new keys collide. */
+const sumByKey = (
+  record: Record<string, number>,
+  keyOf: (key: string) => string,
+): Record<string, number> => {
+  const merged: Record<string, number> = {};
+  for (const [key, value] of Object.entries(record)) {
+    const newKey = keyOf(key);
+    merged[newKey] = (merged[newKey] ?? 0) + value;
+  }
+  return merged;
+};
+
 const buildDashboardData = (
   repoRoot: string,
   commits: readonly CommitFacts[], // oldest first
+  config: ResolvedConfig,
 ) => {
   const aiCoAuthorsOf = (commit: CommitFacts): string[] =>
     [...commit.factsByCollector.values()]
@@ -202,42 +217,50 @@ const buildDashboardData = (
       sha: commit.sha.slice(0, 10),
       date: commit.date,
       byCohort: groupMetric(commit, "survival.lines", "cohort"),
-      byAuthor: Object.fromEntries(
-        Object.entries(groupMetric(commit, "survival.lines", "author")).map(
-          ([author, lines]) => [prettifyAuthorEmail(author), lines],
-        ),
+      byAuthor: sumByKey(
+        groupMetric(commit, "survival.lines", "author"),
+        (email) => config.resolveAuthor(email).label,
       ),
       byExtension: groupMetric(commit, "survival.lines", "extension"),
     }));
 
   const authorMap = new Map<
     string,
-    { name: string; commits: number; added: number; deleted: number }
+    {
+      email: string;
+      name: string;
+      url: string | undefined;
+      commits: number;
+      added: number;
+      deleted: number;
+    }
   >();
   for (const [index, commit] of commits.entries()) {
     const row = commitRows[index];
     if (!row) {
       continue;
     }
-    const bucket = authorMap.get(commit.authorEmail) ?? {
-      name: commit.authorName,
+    // Resolve first so aliases of one person land in a single bucket.
+    const resolved = config.resolveAuthor(commit.authorEmail);
+    const key = resolved.canonicalEmail.toLowerCase();
+    const bucket = authorMap.get(key) ?? {
+      email: resolved.canonicalEmail,
+      name: resolved.label,
+      url: resolved.url,
       commits: 0,
       added: 0,
       deleted: 0,
     };
-    bucket.name = commit.authorName || bucket.name;
+    // A configured displayName wins; otherwise keep the latest non-empty name.
+    bucket.name = resolved.displayName ?? (commit.authorName || bucket.name);
     bucket.commits += 1;
     bucket.added += row.added;
     bucket.deleted += row.deleted;
-    authorMap.set(commit.authorEmail, bucket);
+    authorMap.set(key, bucket);
   }
-  const authors = [...authorMap.entries()]
-    .toSorted(([, left], [, right]) => right.commits - left.commits)
-    .slice(0, 25)
-    .map(([email, bucket]) => ({
-      email: prettifyAuthorEmail(email),
-      ...bucket,
-    }));
+  const authors = [...authorMap.values()]
+    .toSorted((left, right) => right.commits - left.commits)
+    .slice(0, 25);
 
   const aiIdentityMap = new Map<string, number>();
   for (const commit of commits) {
@@ -251,6 +274,9 @@ const buildDashboardData = (
 
   return {
     generatedAt: new Date().toISOString(),
+    config: {
+      authors: { maxInCharts: config.maxInCharts },
+    },
     repo: {
       name: path.basename(repoRoot),
       commitCount: commits.length,
@@ -339,6 +365,7 @@ export const runIndex = ({
 }): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
+    const config = yield* loadConfig(repoRoot);
     const catalogPath = path.join(repoRoot, catalogDirName);
     const commitsPath = path.join(catalogPath, "commits");
     const registry = new Map(
@@ -428,7 +455,7 @@ export const runIndex = ({
       catch: toError,
     });
 
-    const dashboardData = buildDashboardData(repoRoot, commitFacts);
+    const dashboardData = buildDashboardData(repoRoot, commitFacts, config);
     const dashboardPath = path.join(indexDir, "dashboard.json");
     yield* Effect.tryPromise({
       try: () =>

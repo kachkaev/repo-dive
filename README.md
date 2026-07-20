@@ -53,6 +53,33 @@ npx repo-insighter gc  # clean up the catalog interactively
 
 `index` normalizes raw snapshots into `.repo-insighter/index/metrics.sqlite` (a facts-by-categories cube, rebuildable at any time) plus `dashboard.json`, and `dashboard` serves a local React app with interactive charts: languages over time, monthly commits with AI-assisted share, churn, lint-suppression trends, code survival by cohort and author, and more.
 
+## Configuration
+
+Everything works with zero config. To refine it, drop a `repo-insighter.config.ts` at the root of the repository you analyze (`.mjs`/`.js` also work):
+
+```ts
+import { defineConfig } from "repo-insighter/config";
+
+export default defineConfig({
+  authors: {
+    aliases: [
+      // Shorthand: emails only, the first is canonical.
+      ["alice@work.example", "alice@personal.example"],
+      // Rich form: a display name and a profile link.
+      {
+        emails: ["bob@work.example", "12345+bob@users.noreply.github.com"],
+        displayName: "Bob",
+        url: "https://github.com/bob",
+      },
+    ],
+    // How many authors charts keep before folding the rest into "Other" (default 10).
+    maxInCharts: 10,
+  },
+});
+```
+
+`authors.aliases` merges the multiple identities one person commits under (work + personal email, GitHub noreply, name variants) so attribution, the authors table and code-survival-by-author count them once; a group can also carry a `displayName` and a profile `url`. The config is read by `index`. See [docs/specs/07-config.md](docs/specs/07-config.md) for details.
+
 ## Development
 
 The project is written in TypeScript with [Effect](https://effect.website) v4 (beta) and its built-in CLI toolkit (`effect/unstable/cli`).
