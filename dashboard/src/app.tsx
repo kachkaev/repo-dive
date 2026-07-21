@@ -265,7 +265,7 @@ export function App({ data }: { data: DashboardData }) {
   const latestFileTypes = data.fileTypes.at(-1);
   const dependencies = data.dependencies;
   const latestDependencies = dependencies.at(-1);
-  const [shadeContributorsByYear, setShadeContributorsByYear] = useState(true);
+  const [shadeContributorsByYear, setShadeContributorsByYear] = useState(false);
 
   const aiShareRecent = useMemo(() => {
     const cutoff = Date.now() - 90 * 86_400_000;
@@ -585,20 +585,22 @@ export function App({ data }: { data: DashboardData }) {
         <Section
           title="Code survival by contributor"
           subtitle="who wrote the lines that are still alive"
+          controls={
+            survivalHasYearData ? (
+              <label className="mb-3 flex w-fit items-center gap-2 text-xs text-(--text-secondary) select-none">
+                <input
+                  type="checkbox"
+                  checked={shadeContributorsByYear}
+                  onChange={(event) => {
+                    setShadeContributorsByYear(event.target.checked);
+                  }}
+                  className="size-3.5 accent-(--series-1)"
+                />
+                Shade by year written
+              </label>
+            ) : undefined
+          }
         >
-          {survivalHasYearData && (
-            <label className="mb-3 flex items-center justify-end gap-2 text-xs text-(--text-secondary) select-none">
-              <input
-                type="checkbox"
-                checked={shadeContributorsByYear}
-                onChange={(event) => {
-                  setShadeContributorsByYear(event.target.checked);
-                }}
-                className="size-3.5 accent-(--series-1)"
-              />
-              Shade by year written
-            </label>
-          )}
           <TimeSeriesChart mode="area" {...survivalAuthorChart} />
         </Section>
       )}
