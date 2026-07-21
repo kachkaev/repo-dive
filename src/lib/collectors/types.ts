@@ -76,6 +76,17 @@ export type Collector = {
   readonly normalize: (raw: unknown) => readonly Fact[];
 };
 
+/**
+ * Whether a collector describes the *state of the tree* at a commit rather than
+ * facts about the commit itself. Such snapshots are only meaningful on the
+ * first-parent chain: a commit that lives on a side branch — or that arrived
+ * with a foreign history absorbed by an unrelated-histories merge — carries a
+ * tree that was never the repository's state, so charting it puts a cliff into
+ * every timeline.
+ */
+export const describesTreeState = (collector: Collector): boolean =>
+  collector.strategy !== "log";
+
 /** File extension used as a category key, e.g. ".ts"; files without one map to "(none)". */
 export const extensionOf = (filePath: string): string => {
   const basename = filePath.split("/").at(-1) ?? "";
