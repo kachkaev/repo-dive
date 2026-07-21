@@ -101,6 +101,7 @@ type StackedChart = {
   colors: string[];
   legendItems?: Array<{ label: string; color: string }>;
   tooltipGroups?: Array<{ label: string; color: string; keys: string[] }>;
+  separateGroups?: boolean;
 };
 
 /** Separates a contributor from its year within a composite stack key. */
@@ -170,7 +171,14 @@ function shapeContributorYearBands(
     return { dateMs: new Date(row.date).getTime(), values };
   });
 
-  return { points, seriesKeys, colors, legendItems, tooltipGroups };
+  return {
+    points,
+    seriesKeys,
+    colors,
+    legendItems,
+    tooltipGroups,
+    separateGroups: true,
+  };
 }
 
 /** Keeps every nth row so dense per-commit series stay light to render. */

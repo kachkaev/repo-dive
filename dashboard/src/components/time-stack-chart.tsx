@@ -45,6 +45,7 @@ export function TimeSeriesChart({
   valueFormat = formatCount,
   legendItems,
   tooltipGroups,
+  separateGroups,
 }: {
   points: TimePoint[];
   seriesKeys: string[];
@@ -55,6 +56,12 @@ export function TimeSeriesChart({
   legendItems?: LegendItem[];
   /** When set, the tooltip sums each group's sub-series into one row. */
   tooltipGroups?: SeriesGroup[];
+  /**
+   * Area mode only: fade the strokes between a group's stacked sub-series and
+   * draw a crisp line only where one `tooltipGroups` group meets the next, so
+   * primary categories stay separated while their inner bands blend.
+   */
+  separateGroups?: boolean;
 }) {
   const [containerRef, width] = useMeasuredWidth<HTMLDivElement>();
   const [hoverIndex, setHoverIndex] = useState<number | undefined>();
@@ -113,6 +120,22 @@ export function TimeSeriesChart({
     [],
   );
 
+  // The topmost sub-series of every group but the last — where a crisp divider
+  // is drawn between adjacent primary categories.
+  const groupBoundaryKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (!separateGroups || !tooltipGroups) {
+      return keys;
+    }
+    for (const group of tooltipGroups.slice(0, -1)) {
+      const top = group.keys.at(-1);
+      if (top !== undefined) {
+        keys.add(top);
+      }
+    }
+    return keys;
+  }, [separateGroups, tooltipGroups]);
+
   const handleMove = (event: React.MouseEvent<SVGRectElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - bounds.left;
@@ -162,17 +185,33 @@ export function TimeSeriesChart({
                 y1={(datum) => yScale(datum[1])}
                 curve={curveMonotoneX}
               >
-                {({ stacks, path }) =>
-                  stacks.map((stack) => (
-                    <path
-                      key={stack.key}
-                      d={path(stack) ?? ""}
-                      fill={colors[seriesKeys.indexOf(stack.key)]}
-                      stroke="var(--surface-1)"
-                      strokeWidth={1}
-                    />
-                  ))
-                }
+                {({ stacks, path }) => (
+                  <>
+                    {stacks.map((stack) => (
+                      <path
+                        key={stack.key}
+                        d={path(stack) ?? ""}
+                        fill={colors[seriesKeys.indexOf(stack.key)]}
+                        stroke="var(--surface-1)"
+                        strokeWidth={separateGroups ? 0.5 : 1}
+                        strokeOpacity={separateGroups ? 0.35 : 1}
+                      />
+                    ))}
+                    {stacks
+                      .filter((stack) => groupBoundaryKeys.has(stack.key))
+                      .map((stack) => (
+                        <LinePath
+                          key={`boundary-${stack.key}`}
+                          data={stack}
+                          x={(point) => xScale(point.data["dateMs"] ?? 0)}
+                          y={(point) => yScale(point[1])}
+                          stroke="var(--surface-1)"
+                          strokeWidth={1}
+                          curve={curveMonotoneX}
+                        />
+                      ))}
+                  </>
+                )}
               </AreaStack>
             )}
             {mode === "bar" && (
