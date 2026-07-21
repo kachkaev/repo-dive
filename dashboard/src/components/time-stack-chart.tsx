@@ -16,6 +16,14 @@ export type TimePoint = {
   values: Record<string, number>;
 };
 
+export type LegendItem = { label: string; color: string };
+
+/**
+ * Collapses several stacked sub-series (e.g. one contributor's per-year bands)
+ * into a single legend + tooltip row summing the listed `keys`.
+ */
+export type SeriesGroup = { label: string; color: string; keys: string[] };
+
 const margin = { top: 8, right: 12, bottom: 24, left: 44 };
 const height = 260;
 
@@ -35,12 +43,18 @@ export function TimeSeriesChart({
   colors,
   mode,
   valueFormat = formatCount,
+  legendItems,
+  tooltipGroups,
 }: {
   points: TimePoint[];
   seriesKeys: string[];
   colors: string[];
   mode: "area" | "bar" | "line";
   valueFormat?: (value: number) => string;
+  /** Overrides the per-series legend — e.g. one swatch per contributor. */
+  legendItems?: LegendItem[];
+  /** When set, the tooltip sums each group's sub-series into one row. */
+  tooltipGroups?: SeriesGroup[];
 }) {
   const [containerRef, width] = useMeasuredWidth<HTMLDivElement>();
   const [hoverIndex, setHoverIndex] = useState<number | undefined>();
@@ -122,10 +136,13 @@ export function TimeSeriesChart({
   return (
     <div>
       <Legend
-        items={seriesKeys.map((key, index) => ({
-          label: key,
-          color: colors[index] ?? "var(--series-1)",
-        }))}
+        items={
+          legendItems ??
+          seriesKeys.map((key, index) => ({
+            label: key,
+            color: colors[index] ?? "var(--series-1)",
+          }))
+        }
       />
       <div ref={containerRef} className="relative">
         <svg width={width} height={height} role="img">
@@ -281,15 +298,28 @@ export function TimeSeriesChart({
             <div className="mb-1 font-medium text-(--text-secondary)">
               {formatDate(new Date(hovered["dateMs"] ?? 0).toISOString())}
             </div>
-            {seriesKeys
-              .map((key, index) => ({ key, index, value: hovered[key] ?? 0 }))
+            {(tooltipGroups
+              ? tooltipGroups.map((group) => ({
+                  key: group.label,
+                  color: group.color,
+                  value: group.keys.reduce(
+                    (sum, key) => sum + (hovered[key] ?? 0),
+                    0,
+                  ),
+                }))
+              : seriesKeys.map((key, index) => ({
+                  key,
+                  color: colors[index] ?? "var(--series-1)",
+                  value: hovered[key] ?? 0,
+                }))
+            )
               .filter((entry) => entry.value !== 0 || seriesKeys.length <= 3)
               .slice(0, 10)
               .map((entry) => (
                 <div key={entry.key} className="flex items-center gap-1.5">
                   <span
                     className="inline-block size-2 rounded-xs"
-                    style={{ background: colors[entry.index] }}
+                    style={{ background: entry.color }}
                   />
                   <span className="text-(--text-secondary)">{entry.key}</span>
                   <span className="ml-auto pl-3 font-medium tabular-nums">
