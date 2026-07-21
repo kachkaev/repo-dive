@@ -16,6 +16,14 @@ export type TimePoint = {
   values: Record<string, number>;
 };
 
+export type LegendItem = { label: string; color: string };
+
+/**
+ * Collapses several stacked sub-series (e.g. one contributor's per-year bands)
+ * into a single legend + tooltip row summing the listed `keys`.
+ */
+export type SeriesGroup = { label: string; color: string; keys: string[] };
+
 const margin = { top: 8, right: 12, bottom: 24, left: 44 };
 const height = 260;
 
@@ -35,12 +43,25 @@ export function TimeSeriesChart({
   colors,
   mode,
   valueFormat = formatCount,
+  legendItems,
+  tooltipGroups,
+  separateGroups,
 }: {
   points: TimePoint[];
   seriesKeys: string[];
   colors: string[];
   mode: "area" | "bar" | "line";
   valueFormat?: (value: number) => string;
+  /** Overrides the per-series legend — e.g. one swatch per contributor. */
+  legendItems?: LegendItem[];
+  /** When set, the tooltip sums each group's sub-series into one row. */
+  tooltipGroups?: SeriesGroup[];
+  /**
+   * Area mode only: fade the strokes between a group's stacked sub-series and
+   * draw a crisp line only where one `tooltipGroups` group meets the next, so
+   * primary categories stay separated while their inner bands blend.
+   */
+  separateGroups?: boolean;
 }) {
   const [containerRef, width] = useMeasuredWidth<HTMLDivElement>();
   const [hoverIndex, setHoverIndex] = useState<number | undefined>();
@@ -99,6 +120,22 @@ export function TimeSeriesChart({
     [],
   );
 
+  // The topmost sub-series of every group but the last — where a crisp divider
+  // is drawn between adjacent primary categories.
+  const groupBoundaryKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (!separateGroups || !tooltipGroups) {
+      return keys;
+    }
+    for (const group of tooltipGroups.slice(0, -1)) {
+      const top = group.keys.at(-1);
+      if (top !== undefined) {
+        keys.add(top);
+      }
+    }
+    return keys;
+  }, [separateGroups, tooltipGroups]);
+
   const handleMove = (event: React.MouseEvent<SVGRectElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - bounds.left;
@@ -122,10 +159,13 @@ export function TimeSeriesChart({
   return (
     <div>
       <Legend
-        items={seriesKeys.map((key, index) => ({
-          label: key,
-          color: colors[index] ?? "var(--series-1)",
-        }))}
+        items={
+          legendItems ??
+          seriesKeys.map((key, index) => ({
+            label: key,
+            color: colors[index] ?? "var(--series-1)",
+          }))
+        }
       />
       <div ref={containerRef} className="relative">
         <svg width={width} height={height} role="img">
@@ -145,17 +185,33 @@ export function TimeSeriesChart({
                 y1={(datum) => yScale(datum[1])}
                 curve={curveMonotoneX}
               >
-                {({ stacks, path }) =>
-                  stacks.map((stack) => (
-                    <path
-                      key={stack.key}
-                      d={path(stack) ?? ""}
-                      fill={colors[seriesKeys.indexOf(stack.key)]}
-                      stroke="var(--surface-1)"
-                      strokeWidth={1}
-                    />
-                  ))
-                }
+                {({ stacks, path }) => (
+                  <>
+                    {stacks.map((stack) => (
+                      <path
+                        key={stack.key}
+                        d={path(stack) ?? ""}
+                        fill={colors[seriesKeys.indexOf(stack.key)]}
+                        stroke="var(--surface-1)"
+                        strokeWidth={separateGroups ? 0.5 : 1}
+                        strokeOpacity={separateGroups ? 0.35 : 1}
+                      />
+                    ))}
+                    {stacks
+                      .filter((stack) => groupBoundaryKeys.has(stack.key))
+                      .map((stack) => (
+                        <LinePath
+                          key={`boundary-${stack.key}`}
+                          data={stack}
+                          x={(point) => xScale(point.data["dateMs"] ?? 0)}
+                          y={(point) => yScale(point[1])}
+                          stroke="var(--surface-1)"
+                          strokeWidth={1}
+                          curve={curveMonotoneX}
+                        />
+                      ))}
+                  </>
+                )}
               </AreaStack>
             )}
             {mode === "bar" && (
@@ -281,15 +337,28 @@ export function TimeSeriesChart({
             <div className="mb-1 font-medium text-(--text-secondary)">
               {formatDate(new Date(hovered["dateMs"] ?? 0).toISOString())}
             </div>
-            {seriesKeys
-              .map((key, index) => ({ key, index, value: hovered[key] ?? 0 }))
+            {(tooltipGroups
+              ? tooltipGroups.map((group) => ({
+                  key: group.label,
+                  color: group.color,
+                  value: group.keys.reduce(
+                    (sum, key) => sum + (hovered[key] ?? 0),
+                    0,
+                  ),
+                }))
+              : seriesKeys.map((key, index) => ({
+                  key,
+                  color: colors[index] ?? "var(--series-1)",
+                  value: hovered[key] ?? 0,
+                }))
+            )
               .filter((entry) => entry.value !== 0 || seriesKeys.length <= 3)
               .slice(0, 10)
               .map((entry) => (
                 <div key={entry.key} className="flex items-center gap-1.5">
                   <span
                     className="inline-block size-2 rounded-xs"
-                    style={{ background: colors[entry.index] }}
+                    style={{ background: entry.color }}
                   />
                   <span className="text-(--text-secondary)">{entry.key}</span>
                   <span className="ml-auto pl-3 font-medium tabular-nums">

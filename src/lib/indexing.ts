@@ -232,16 +232,35 @@ const buildDashboardData = (
 
   const survival = commits
     .filter((commit) => hasMetric(commit, "survival.lines"))
-    .map((commit) => ({
-      sha: commit.sha.slice(0, 10),
-      date: commit.date,
-      byCohort: groupMetric(commit, "survival.lines", "cohort"),
-      byContributor: sumByKey(
-        groupMetric(commit, "survival.lines", "author"),
-        (email) => config.resolveContributor(email).label,
-      ),
-      byExtension: groupMetric(commit, "survival.lines", "extension"),
-    }));
+    .map((commit) => {
+      // Living lines cross-tabulated by contributor and the year each line was
+      // authored — the dashboard splits each contributor's area into year bands.
+      const byContributorYear: Record<string, Record<string, number>> = {};
+      for (const facts of commit.factsByCollector.values()) {
+        for (const fact of facts) {
+          if (fact.metric !== "survival.lines") {
+            continue;
+          }
+          const label = config.resolveContributor(
+            fact.categories?.["author"] ?? "",
+          ).label;
+          const year = (fact.categories?.["cohort"] ?? "").slice(0, 4) || "?";
+          const byYear = (byContributorYear[label] ??= {});
+          byYear[year] = (byYear[year] ?? 0) + fact.value;
+        }
+      }
+      return {
+        sha: commit.sha.slice(0, 10),
+        date: commit.date,
+        byCohort: groupMetric(commit, "survival.lines", "cohort"),
+        byContributor: sumByKey(
+          groupMetric(commit, "survival.lines", "author"),
+          (email) => config.resolveContributor(email).label,
+        ),
+        byContributorYear,
+        byExtension: groupMetric(commit, "survival.lines", "extension"),
+      };
+    });
 
   const contributorMap = new Map<
     string,

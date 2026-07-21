@@ -59,6 +59,11 @@ type SurvivalRow = {
   date: string;
   byCohort: Record<string, number>;
   byContributor: Record<string, number>;
+  /**
+   * Living lines per contributor, split by the year each line was authored.
+   * Optional: absent in dashboard.json written before per-year survival landed.
+   */
+  byContributorYear?: Record<string, Record<string, number>>;
   byExtension: Record<string, number>;
 };
 

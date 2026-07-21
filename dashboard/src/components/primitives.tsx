@@ -3,10 +3,13 @@ import type { ReactNode } from "react";
 export function Section({
   title,
   subtitle,
+  controls,
   children,
 }: {
   title: string;
   subtitle?: string | undefined;
+  /** Optional controls rendered between the subtitle and the chart card. */
+  controls?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -19,6 +22,7 @@ export function Section({
       ) : (
         <div className="mb-3" />
       )}
+      {controls}
       <div className="rounded-lg border border-(--grid-line) bg-(--surface-1) p-4">
         {children}
       </div>

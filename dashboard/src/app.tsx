@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { BarList } from "./components/bar-list.tsx";
 import { DivergingBars } from "./components/diverging-bars.tsx";
@@ -20,14 +20,166 @@ const categoricalColors = Array.from(
   (_, index) => `var(--series-${index + 1})`,
 );
 const otherColor = "var(--text-muted)";
-const cohortRamp = [
-  "var(--seq-700)",
-  "var(--seq-600)",
-  "var(--seq-500)",
-  "var(--seq-400)",
-  "var(--seq-300)",
-  "var(--seq-200)",
-];
+
+/**
+ * How many age bands the survival charts distinguish before folding the oldest
+ * years together. The actual count is the repo's age in years capped at this,
+ * kept constant across every survival chart so a given year reads the same
+ * shade everywhere. (Intended to become a config option.)
+ */
+const maxYearShades = 10;
+
+/** How far the oldest band fades toward the surface; newest stays full color. */
+const maxYearFade = 70;
+
+/**
+ * A per-year lightness band of a category's base color: the newest year keeps
+ * the full color, older years mix progressively toward the surface so they
+ * recede. Theme-aware — "paler" means closer to the background in either theme.
+ */
+function yearBandColor(
+  baseColor: string,
+  ageFromNewest: number,
+  shadeCount: number,
+): string {
+  if (shadeCount <= 1 || ageFromNewest <= 0) {
+    return baseColor;
+  }
+  const fade = Math.round((ageFromNewest / (shadeCount - 1)) * maxYearFade);
+  return `color-mix(in oklab, ${baseColor} ${100 - fade}%, var(--surface-1))`;
+}
+
+type YearScale = {
+  /** Age buckets, oldest first; the oldest may be a folded `≤YYYY` label. */
+  buckets: string[];
+  /** Maps a cohort year to its bucket (folding years past the window). */
+  bucketOf: (year: string) => string;
+  /** The shade of `baseColor` for a bucket — full for newest, palest for oldest. */
+  colorOf: (baseColor: string, bucket: string) => string;
+};
+
+/**
+ * Builds a repo-wide age scale from the years present in the survival data.
+ * The number of shades stays constant across charts so colors stay comparable;
+ * years older than the window fold into a single `≤YYYY` bucket.
+ */
+function makeYearScale(years: Iterable<string>): YearScale {
+  const sorted = [...new Set(years)].filter((year) => /^\d{4}$/.test(year));
+  sorted.sort();
+
+  let buckets: string[];
+  let foldBelow: number | undefined;
+  let foldLabel: string | undefined;
+  if (sorted.length <= maxYearShades) {
+    buckets = sorted;
+  } else {
+    const keptNewest = sorted.slice(-(maxYearShades - 1));
+    const oldestKept = Number(keptNewest[0]);
+    foldBelow = oldestKept;
+    foldLabel = `≤${oldestKept - 1}`;
+    buckets = [foldLabel, ...keptNewest];
+  }
+
+  const shadeCount = Math.max(1, buckets.length);
+  const bucketOf = (year: string) =>
+    foldLabel !== undefined && Number(year) < (foldBelow ?? 0)
+      ? foldLabel
+      : year;
+  const colorOf = (baseColor: string, bucket: string) => {
+    const index = buckets.indexOf(bucket);
+    const ageFromNewest =
+      index === -1 ? shadeCount - 1 : shadeCount - 1 - index;
+    return yearBandColor(baseColor, ageFromNewest, shadeCount);
+  };
+
+  return { buckets, bucketOf, colorOf };
+}
+
+type StackedChart = {
+  points: TimePoint[];
+  seriesKeys: string[];
+  colors: string[];
+  legendItems?: Array<{ label: string; color: string }>;
+  tooltipGroups?: Array<{ label: string; color: string; keys: string[] }>;
+  separateGroups?: boolean;
+};
+
+/** Separates a contributor from its year within a composite stack key. */
+const yearBandSeparator = "";
+
+/** Sum of a contributor's living lines across all their year bands. */
+function sumYears(byYear: Record<string, number>): number {
+  return Object.values(byYear).reduce((total, lines) => total + lines, 0);
+}
+
+/**
+ * Shapes survival-by-contributor into year-banded stacks: each contributor is
+ * a contiguous run of sub-series (oldest→newest), colored as lightness bands of
+ * the contributor's base color. Top contributors are kept; the rest fold into
+ * "Other". The legend and tooltip collapse the bands back to one row each.
+ */
+function shapeContributorYearBands(
+  rows: ReadonlyArray<{
+    date: string;
+    byContributorYear: Record<string, Record<string, number>>;
+  }>,
+  maxSeries: number,
+  yearScale: YearScale,
+): StackedChart {
+  const latest = rows.at(-1)?.byContributorYear ?? {};
+  const ranked = Object.entries(latest)
+    .toSorted(([, left], [, right]) => sumYears(right) - sumYears(left))
+    .map(([name]) => name);
+  const kept = ranked.slice(0, maxSeries);
+  const hasOther =
+    ranked.length > maxSeries ||
+    rows.some((row) =>
+      Object.keys(row.byContributorYear).some((name) => !kept.includes(name)),
+    );
+  const groups = hasOther ? [...kept, "Other"] : kept;
+
+  const seriesKeys: string[] = [];
+  const colors: string[] = [];
+  const legendItems: Array<{ label: string; color: string }> = [];
+  const tooltipGroups: Array<{ label: string; color: string; keys: string[] }> =
+    [];
+  for (const [index, name] of groups.entries()) {
+    const baseColor =
+      name === "Other"
+        ? otherColor
+        : (categoricalColors[index % categoricalColors.length] ?? otherColor);
+    const keys: string[] = [];
+    for (const bucket of yearScale.buckets) {
+      const key = `${name}${yearBandSeparator}${bucket}`;
+      keys.push(key);
+      seriesKeys.push(key);
+      colors.push(yearScale.colorOf(baseColor, bucket));
+    }
+    legendItems.push({ label: name, color: baseColor });
+    tooltipGroups.push({ label: name, color: baseColor, keys });
+  }
+
+  const points = rows.map((row) => {
+    const values: Record<string, number> = {};
+    for (const [name, byYear] of Object.entries(row.byContributorYear)) {
+      const group = kept.includes(name) ? name : "Other";
+      for (const [year, lines] of Object.entries(byYear)) {
+        const key = `${group}${yearBandSeparator}${yearScale.bucketOf(year)}`;
+        values[key] = (values[key] ?? 0) + lines;
+      }
+    }
+    return { dateMs: new Date(row.date).getTime(), values };
+  });
+
+  return {
+    points,
+    seriesKeys,
+    colors,
+    legendItems,
+    tooltipGroups,
+    separateGroups: true,
+  };
+}
 
 /** Keeps every nth row so dense per-commit series stay light to render. */
 function decimate<T>(rows: readonly T[], maxPoints: number): T[] {
@@ -113,6 +265,7 @@ export function App({ data }: { data: DashboardData }) {
   const latestFileTypes = data.fileTypes.at(-1);
   const dependencies = data.dependencies;
   const latestDependencies = dependencies.at(-1);
+  const [shadeContributorsByYear, setShadeContributorsByYear] = useState(false);
 
   const aiShareRecent = useMemo(() => {
     const cutoff = Date.now() - 90 * 86_400_000;
@@ -189,55 +342,78 @@ export function App({ data }: { data: DashboardData }) {
       latestDependencies.directOptional
     : 0;
 
+  // One age scale shared by every survival chart, so a given year reads the
+  // same lightness band whether it's split by cohort or by contributor.
+  const survivalYearScale = useMemo(
+    () =>
+      makeYearScale(
+        data.survival.flatMap((row) =>
+          Object.keys(row.byCohort).map((cohortMonth) =>
+            cohortMonth.slice(0, 4),
+          ),
+        ),
+      ),
+    [data.survival],
+  );
+
   const survivalCohortChart = useMemo(() => {
     if (data.survival.length === 0) {
       return;
     }
-    const rows = data.survival.map((row) => {
-      const byYear: Record<string, number> = {};
-      for (const [cohortMonth, lines] of Object.entries(row.byCohort)) {
-        const year = cohortMonth.slice(0, 4);
-        byYear[year] = (byYear[year] ?? 0) + lines;
-      }
-      return { date: row.date, byYear };
-    });
-    const years = [
-      ...new Set(rows.flatMap((row) => Object.keys(row.byYear))),
-    ].toSorted();
-    // Fold the oldest years together so the ramp never runs out of steps.
-    const overflow = Math.max(0, years.length - cohortRamp.length);
-    const bucketOf = (year: string) =>
-      overflow > 0 && years.indexOf(year) <= overflow
-        ? `≤${years[overflow] ?? ""}`
-        : year;
-    const buckets = [...new Set(years.map(bucketOf))];
-    const points = rows.map((row) => {
+    const points = data.survival.map((row) => {
       const values: Record<string, number> = {};
-      for (const [year, lines] of Object.entries(row.byYear)) {
-        const bucket = bucketOf(year);
+      for (const [cohortMonth, lines] of Object.entries(row.byCohort)) {
+        const bucket = survivalYearScale.bucketOf(cohortMonth.slice(0, 4));
         values[bucket] = (values[bucket] ?? 0) + lines;
       }
       return { dateMs: new Date(row.date).getTime(), values };
     });
+    // Newest year at full color, oldest palest — matching the contributor chart.
+    const cohortBaseColor = "var(--series-1)";
     return {
       points,
-      seriesKeys: buckets,
-      colors: buckets.map((_, index) => cohortRamp[index] ?? "var(--seq-200)"),
+      seriesKeys: survivalYearScale.buckets,
+      colors: survivalYearScale.buckets.map((bucket) =>
+        survivalYearScale.colorOf(cohortBaseColor, bucket),
+      ),
     };
-  }, [data.survival]);
+  }, [data.survival, survivalYearScale]);
 
-  const survivalAuthorChart = useMemo(() => {
+  const survivalHasYearData = useMemo(
+    () => data.survival.some((row) => row.byContributorYear !== undefined),
+    [data.survival],
+  );
+
+  const survivalAuthorChart = useMemo((): StackedChart | undefined => {
     if (data.survival.length === 0) {
       return;
     }
-    return shapeStacked(
+    // Flat one-color-per-contributor stack when age shading is off, or when a
+    // pre-per-year dashboard.json has no byContributorYear to shade with.
+    if (!shadeContributorsByYear || !survivalHasYearData) {
+      return shapeStacked(
+        data.survival.map((row) => ({
+          date: row.date,
+          values: row.byContributor,
+        })),
+        maxContributorsInCharts,
+      );
+    }
+    return shapeContributorYearBands(
       data.survival.map((row) => ({
         date: row.date,
-        values: row.byContributor,
+        byContributorYear: row.byContributorYear ?? {},
       })),
       maxContributorsInCharts,
+      survivalYearScale,
     );
-  }, [data.survival, maxContributorsInCharts]);
+  }, [
+    data.survival,
+    shadeContributorsByYear,
+    survivalHasYearData,
+    maxContributorsInCharts,
+    survivalYearScale,
+  ]);
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
@@ -409,6 +585,21 @@ export function App({ data }: { data: DashboardData }) {
         <Section
           title="Code survival by contributor"
           subtitle="who wrote the lines that are still alive"
+          controls={
+            survivalHasYearData ? (
+              <label className="mb-3 flex w-fit items-center gap-2 text-xs text-(--text-secondary) select-none">
+                <input
+                  type="checkbox"
+                  checked={shadeContributorsByYear}
+                  onChange={(event) => {
+                    setShadeContributorsByYear(event.target.checked);
+                  }}
+                  className="size-3.5 accent-(--series-1)"
+                />
+                Shade by year written
+              </label>
+            ) : undefined
+          }
         >
           <TimeSeriesChart mode="area" {...survivalAuthorChart} />
         </Section>
