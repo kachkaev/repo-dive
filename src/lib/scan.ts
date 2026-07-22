@@ -8,7 +8,7 @@ import {
 } from "./catalog.ts";
 import { collectorCacheKey } from "./collectors/cache-key.ts";
 import { resolveCollectors } from "./collectors/roster.ts";
-import type { Collector } from "./collectors/types.ts";
+import { type Collector, describesTreeState } from "./collectors/types.ts";
 import { loadConfig } from "./config.ts";
 import { GitCommandError, runGit } from "./git.ts";
 import {
@@ -80,6 +80,24 @@ export const listCommits = (
         : Effect.fail(error),
     ),
     Effect.map(parseGitLog),
+  );
+
+/**
+ * Shas on HEAD's first-parent chain, i.e. the states the repository actually
+ * passed through. See {@link describesTreeState} for why snapshot collectors
+ * are restricted to them.
+ */
+export const listFirstParentShas = (
+  repoRoot: string,
+): Effect.Effect<Set<string>, Error> =>
+  runGit(["-C", repoRoot, "log", "--first-parent", "--format=%H"]).pipe(
+    Effect.catch((error) =>
+      error instanceof GitCommandError &&
+      error.stderr.includes("does not have any commits yet")
+        ? Effect.succeed("")
+        : Effect.fail(error),
+    ),
+    Effect.map((stdout) => new Set(stdout.split("\n").filter(Boolean))),
   );
 
 export type RepoSummary = {
@@ -279,13 +297,18 @@ export const runScan = ({
     const cacheKeyOf = (collector: Collector): string =>
       cacheKeys.get(collector.name) ?? collectorCacheKey(collector, config);
 
+    const firstParentShas = yield* listFirstParentShas(repoRoot);
+
     const plans = collectors.map((collector) => {
       const policy = sampleOverride ?? collector.defaultSampling;
+      const candidates = describesTreeState(collector)
+        ? selected.filter((commit) => firstParentShas.has(commit.hash))
+        : selected;
       return {
         collector,
         policy,
         shas: new Set(
-          sampleCommits(selected, policy).map((commit) => commit.hash),
+          sampleCommits(candidates, policy).map((commit) => commit.hash),
         ),
       };
     });

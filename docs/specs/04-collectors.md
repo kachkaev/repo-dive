@@ -48,6 +48,8 @@ Every-commit collection is the semantic default, but `worktree` collectors need 
 
 The cube records which commits were sampled so charts can interpolate honestly rather than pretending to be continuous.
 
+`tree` and `worktree` collectors sample the **first-parent chain only**. Their output describes the state of the tree, and only first-parent commits are states the repository actually passed through: a commit on a merged side branch — or one that arrived with a foreign history absorbed by an unrelated-histories merge — carries a tree that was never HEAD, so sampling it puts a cliff into the timeline. `log` collectors see every commit, since a commit's own authorship and diff are facts wherever it sits in the graph.
+
 ## Incrementality
 
 The unit of work is **(commit, collector, cache fingerprint)** — the fingerprint being a short hash of the collector version and the config it depends on. Before running, the scanner diffs the plan against `collector.json` sidecars already in the catalog and only schedules the gap. Interrupting a scan loses at most the in-flight commits; re-running continues where it stopped. Effect's structured concurrency handles parallelism (several collectors per commit, several commits in flight) with clean cancellation.

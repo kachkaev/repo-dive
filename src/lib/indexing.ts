@@ -6,9 +6,9 @@ import { Console, Effect } from "effect";
 
 import { catalogDirName } from "./catalog.ts";
 import { builtInCollectors } from "./collectors/roster.ts";
-import type { Fact } from "./collectors/types.ts";
+import { describesTreeState, type Fact } from "./collectors/types.ts";
 import { loadConfig, type ResolvedConfig } from "./config.ts";
-import { listCommits, resolveRepoRoot } from "./scan.ts";
+import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
 const toError = (error: unknown) =>
   error instanceof Error ? error : new Error(String(error));
@@ -417,6 +417,7 @@ export const runIndex = ({
     );
 
     const gitCommits = yield* listCommits(repoRoot);
+    const firstParentShas = yield* listFirstParentShas(repoRoot);
     const catalogShas = new Set(
       yield* Effect.tryPromise({
         try: async () => {
@@ -444,6 +445,7 @@ export const runIndex = ({
     }
 
     let unknownCollectorDirs = 0;
+    let offMainlineSnapshots = 0;
 
     const commitFacts: CommitFacts[] = [];
     yield* Effect.forEach(
@@ -452,11 +454,20 @@ export const runIndex = ({
         Effect.tryPromise({
           try: async (): Promise<CommitFacts> => {
             const commitDir = path.join(commitsPath, commit.hash);
+            const onMainline = firstParentShas.has(commit.hash);
             const factsByCollector = new Map<string, readonly Fact[]>();
             for (const collectorName of await readdir(commitDir)) {
               const collector = registry.get(collectorName);
               if (!collector) {
                 unknownCollectorDirs += 1;
+                continue;
+              }
+              // Snapshots taken off the mainline (by an older version of this
+              // tool, or before a rebase moved the commit aside) would show up
+              // as cliffs in every timeline. Leave them in the catalog but out
+              // of the cube.
+              if (!onMainline && describesTreeState(collector)) {
+                offMainlineSnapshots += 1;
                 continue;
               }
               const raw: unknown = JSON.parse(
@@ -515,6 +526,11 @@ export const runIndex = ({
         ...(unknownCollectorDirs > 0
           ? [
               `Skipped ${unknownCollectorDirs} outputs from unknown collectors (see \`gc --stale\`).`,
+            ]
+          : []),
+        ...(offMainlineSnapshots > 0
+          ? [
+              `Skipped ${offMainlineSnapshots} tree snapshots taken off HEAD's first-parent chain.`,
             ]
           : []),
       ].join("\n"),
