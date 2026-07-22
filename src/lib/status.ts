@@ -11,9 +11,10 @@ import {
 } from "./catalog.ts";
 import { collectorCacheKey } from "./collectors/cache-key.ts";
 import { builtInCollectors } from "./collectors/roster.ts";
+import { describesTreeState } from "./collectors/types.ts";
 import { loadConfig } from "./config.ts";
 import { sampleCommits, samplingLabel } from "./sampling.ts";
-import { listCommits, resolveRepoRoot } from "./scan.ts";
+import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
 const exists = (filePath: string) =>
   Effect.promise(() =>
@@ -31,6 +32,7 @@ export const runStatus = ({
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
     const commits = yield* listCommits(repoRoot);
+    const firstParentShas = yield* listFirstParentShas(repoRoot);
     const config = yield* loadConfig(repoRoot);
     const catalogPath = path.join(repoRoot, catalogDirName);
 
@@ -58,8 +60,16 @@ export const runStatus = ({
     for (const collector of builtInCollectors) {
       // Count against what the collector is actually meant to cover: a monthly
       // collector on a busy repo is complete at a handful of commits, and
-      // reporting it as `1/45` reads as barely started.
-      const target = sampleCommits(commits, collector.defaultSampling);
+      // reporting it as `1/45` reads as barely started. Snapshot collectors
+      // are only ever scanned on the first-parent chain, so counting them
+      // against off-mainline commits too would keep them short of their target
+      // however often `scan` is run.
+      const target = sampleCommits(
+        describesTreeState(collector)
+          ? commits.filter((commit) => firstParentShas.has(commit.hash))
+          : commits,
+        collector.defaultSampling,
+      );
       let collected = 0;
       const cacheKey = collectorCacheKey(collector, config);
       yield* Effect.forEach(

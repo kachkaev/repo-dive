@@ -171,6 +171,41 @@ test("status reports catalog coverage", () => {
   }
 });
 
+test("status counts snapshot collectors against the mainline only", () => {
+  const repoPath = createFixtureRepo();
+
+  try {
+    // A foreign history absorbed by an unrelated-histories merge: three commits
+    // in the log, but only the two on the first-parent chain are ever scanned
+    // for snapshots.
+    runGit(repoPath, "checkout", "--orphan", "foreign");
+    runGit(repoPath, "rm", "-rf", ".");
+    writeFileSync(path.join(repoPath, "foreign.txt"), "foreign\n");
+    runGit(repoPath, "add", ".");
+    runGit(repoPath, "commit", "-m", "Add foreign");
+    runGit(repoPath, "checkout", "main");
+    runGit(
+      repoPath,
+      "merge",
+      "--no-ff",
+      "--allow-unrelated-histories",
+      "foreign",
+    );
+
+    runCli("scan", "--repo", repoPath, "--collectors", "file-types");
+
+    const afterScan = runCli("status", "--repo", repoPath);
+    expect(afterScan.status, afterScan.stderr).toBe(0);
+    expect(afterScan.stdout).toMatch(/Commits: 4/);
+    // file-types is a tree collector, so its target is the mainline; commit-meta
+    // reads the commit itself and stays counted against the whole log.
+    expect(afterScan.stdout).toMatch(/file-types: 3\/3 commits collected/);
+    expect(afterScan.stdout).toMatch(/commit-meta: 0\/4 commits collected/);
+  } finally {
+    rmSync(repoPath, { force: true, recursive: true });
+  }
+});
+
 test("scan rejects unknown collectors", () => {
   const repoPath = createFixtureRepo();
 

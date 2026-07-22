@@ -9,3 +9,5 @@ Take tree snapshots only on HEAD's first-parent chain, removing the cliffs that 
 Collectors whose output describes the tree at a commit (`tree` and `worktree` strategies — languages, survival, file-types, directives, dependencies, todo-comments) are now sampled from the first-parent chain only. `log` collectors (commit metadata, churn) are unaffected and still see every commit, since a commit's own authorship and diff are facts wherever it sits in the graph.
 
 Existing catalogs heal without a re-scan: `index` leaves off-mainline snapshots out of the cube and reports how many it skipped. Run `scan` again afterwards to fill the periods whose sample had been landing off the mainline.
+
+`status` counts those collectors against the mainline too, so a snapshot collector that has captured everything `scan` will ever give it reads as complete rather than stalling a few commits short.
