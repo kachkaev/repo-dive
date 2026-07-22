@@ -15,6 +15,7 @@
 ## Misc
 .DS_Store
 .husky/_/
+.env
 .env*.local
 *.log
 *.pem

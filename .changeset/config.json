@@ -4,7 +4,7 @@
   "baseBranch": "main",
   "changelog": [
     "@changesets/changelog-github",
-    { "repo": "kachkaev/repo-dive" }
+    { "repo": "kachkaev/repo-dive", "disableThanks": true }
   ],
   "commit": false,
   "fixed": [],
