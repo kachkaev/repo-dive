@@ -15,9 +15,14 @@ export const gcCommand = Command.make("gc", {
       "Remove data for commits no longer reachable from HEAD",
     ),
   ),
+  offMainline: Flag.boolean("off-mainline").pipe(
+    Flag.withDescription(
+      "Remove tree snapshots stored under commits that are not on HEAD's first-parent chain",
+    ),
+  ),
   stale: Flag.boolean("stale").pipe(
     Flag.withDescription(
-      "Remove outputs written by old collector versions or by collectors that no longer exist",
+      "Remove catalog outputs and blob-cache entries written by old collector versions or by collectors that no longer exist",
     ),
   ),
   collectorNames: Flag.optional(
@@ -36,12 +41,13 @@ export const gcCommand = Command.make("gc", {
   ),
 }).pipe(
   Command.withDescription(
-    "Garbage-collect the catalog: unreachable commits, stale versions or whole collectors (interactive without flags)",
+    "Garbage-collect the catalog: unreachable commits, off-mainline snapshots, stale versions or whole collectors (interactive without flags)",
   ),
   Command.withHandler((config) =>
     runGc({
       repoPath: config.repoPath,
       unreachable: config.unreachable,
+      offMainline: config.offMainline,
       stale: config.stale,
       collectorNames: Option.getOrUndefined(config.collectorNames),
       dryRun: config.dryRun,
