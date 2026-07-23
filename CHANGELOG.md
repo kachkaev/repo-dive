@@ -1,10 +1,47 @@
 # repo-dive
 
+## 0.4.3
+
+### Patch Changes
+
+- [#42](https://github.com/kachkaev/repo-dive/pull/42) [`72d8d7b`](https://github.com/kachkaev/repo-dive/commit/72d8d7b6418e6fcfe1630416e46bdf36a05f7b3d) - Keep bar-chart bars inside the plot area. Bars are centred on their data point, so with the first and last points pinned to the chart edges the outermost bars spilled halfway past the left and right sides. Bar charts now inset the time scale by half a bucket slot, so every bar sits fully within the plot while areas and lines — which want their points on the edges — keep the full width. The commits-per-month and churn-per-month charts are the ones affected.
+
+  The inset lives on the shared x scale, so any marks overlaid on a bar chart later (e.g. a trend line) line up with the bars automatically.
+
+- [#41](https://github.com/kachkaev/repo-dive/pull/41) [`16d232b`](https://github.com/kachkaev/repo-dive/commit/16d232b178a61f6fe71ec8dd6518b7a6bc3fe1ea) - Show the dependencies chart against the repo's full timeline, and tell "no dependencies" apart from "not scanned".
+
+  The "Dependencies over time" chart used to begin at the first commit that carried a lockfile — often long after the repository started — because a commit only produced a dependency fact once a parseable lockfile existed in its tree. The chart now shares the repo's full timeline like every other time-series chart: its axis starts at the first commit and the area begins where the first lockfile appears, an honest step up rather than a chart that looks like the project itself began mid-history.
+
+  The hover crosshair now tracks the cursor across the whole axis instead of snapping to the nearest data point, so the empty early stretch is inspectable too. A genuinely unscanned instant reads "No data"; a commit that was scanned and simply had no lockfile reads "No lockfile". To make that distinction real rather than assumed, the dependencies collector now records a `dependencies.scanned` marker for a scanned tree that holds no lockfile, so indexing can keep those commits as explicit zeros. The collector version is bumped, so run `scan` again to backfill the pre-lockfile commits.
+
+- [#38](https://github.com/kachkaev/repo-dive/pull/38) [`57f238a`](https://github.com/kachkaev/repo-dive/commit/57f238a235145415b221c20d89eb47b57689e270) - Bring "Shade by year written" to the lines-by-language chart, mirroring the toggle the code-survival-by-contributor chart already had. The survival collector's raw snapshots always recorded each living line's extension and authoring cohort, so `index` now cross-tabulates them into a per-extension-per-year breakdown — existing catalogs pick it up on the next `repo-dive index`, no re-scan needed.
+
+  Because tokei snapshots carry no per-line age, shading switches the chart to the blame-based data: languages are approximated from file extensions (mapped to tokei's names), only scannable source files are counted, and the chart's subtitle changes to say so. Languages shared with the tokei view keep its colors, so toggling never recolors the stack. Composes with percent mode — the normalized, year-shaded view shows old cohorts thinning inside each language's share.
+
+- [#43](https://github.com/kachkaev/repo-dive/pull/43) [`b85be0f`](https://github.com/kachkaev/repo-dive/commit/b85be0fca7c67c0fd25d0746e7d2f84094665cd1) - Drop the redundant `[bot]` suffix from auto-derived contributor names. Bots and AI agents already carry a kind badge (🤖 / ✨) in the dashboard, so a name like `🤖 renovate[bot]` labelled the same thing twice. Names are now tidied when derived: the trailing `[bot]` is stripped and the leading letter capitalized, so Renovate shows as `🤖 Renovate` and Dependabot as `🤖 Dependabot`.
+
+  Only auto-derived names change — an explicit `displayName` in your config is still used verbatim. Existing catalogs heal on the next `repo-dive index` (no re-scan needed).
+
+- [#37](https://github.com/kachkaev/repo-dive/pull/37) [`cfc01d3`](https://github.com/kachkaev/repo-dive/commit/cfc01d3239cd95ea917f4f1409d668c595c7619b) - Add a percent mode to stacked time-series charts. Every stacked dashboard chart with more than one series — lines by language, dependencies over time, commits per month, both code-survival views — gains a `#`/`%` toggle next to its legend. Percent mode renormalizes each date to its total, turning the chart into a composition view where shifts in share stay readable even while absolute volume grows.
+
+  Tooltips on these charts now show the absolute value and the share side by side for every series, with the active mode's column emphasized. Line charts are unchanged — their series are not parts of a whole.
+
+## 0.4.2
+
+### Patch Changes
+
+- [#33](https://github.com/kachkaev/repo-dive/pull/33) [`733e681`](https://github.com/kachkaev/repo-dive/commit/733e68112a7a9151fbbc3164edec5947d639fc13) - Teach `gc` to reclaim the two kinds of dead weight it could not reach before: the per-blob cache, and tree snapshots taken off HEAD's first-parent chain.
+
+  - **`gc --stale` now prunes the blob cache** (`.repo-dive/cache/blob-cache.sqlite`) as well as the catalog. Cached per-blob results are namespaced by `(collector, fingerprint)`, and that pair is exactly what a lookup keys on — so once a collector's version or the config it depends on changes, every entry under the old fingerprint is unreachable by construction and can go. Entries under a fingerprint some registered collector still computes are always kept, so this never costs a re-scan of live data. The file is `VACUUM`ed afterwards, and `gc` reports how much it shrank by.
+  - **`gc --off-mainline` removes snapshots that the cube already ignores.** Since 0.4.1, `tree` and `worktree` collectors only ever run on HEAD's first-parent chain, but catalogs written by earlier versions are full of snapshots stored under commits that sit on side branches or arrived through an unrelated-histories merge. `--unreachable` could not clear them — those commits are still perfectly reachable from HEAD — so on a repo like react roughly 27k outputs had no way out. The new flag drops them, and only them: `log` outputs (commit metadata, churn) are left alone at every commit, because a commit's own authorship and diff are facts wherever it sits in the graph.
+
+  Both are separate, explicit flags rather than a widening of `--unreachable`, whose established meaning is "the commit itself is gone". Running `gc` with no flags still lists everything it found and asks, and `--dry-run` reports the full plan without touching anything.
+
 ## 0.4.1
 
 ### Patch Changes
 
-- a196adf: Take tree snapshots only on HEAD's first-parent chain, removing the cliffs that appeared in every "state over time" chart.
+- [#24](https://github.com/kachkaev/repo-dive/pull/24) [`a196adf`](https://github.com/kachkaev/repo-dive/commit/a196adf81ed4fac06cb443589a79a605f360cf76) - Take tree snapshots only on HEAD's first-parent chain, removing the cliffs that appeared in every "state over time" chart.
 
   `scan` enumerates commits with a full `git log`, which walks every parent. Sampling a period then picked whichever commit was newest in that walk — often one that lives on a side branch, or one that arrived with a foreign history absorbed by an unrelated-histories merge. Such a commit's tree was never the repository's state, so charting it produced a sheer drop and recovery. React is a good example: its `compiler/` directory came from a separate repository, and monthly sampling kept landing on commits whose entire tree is that one directory — the lines-by-language and code-survival charts dropped by 90% at those points.
 
@@ -14,7 +51,7 @@
 
   `status` counts those collectors against the mainline too, so a snapshot collector that has captured everything `scan` will ever give it reads as complete rather than stalling a few commits short.
 
-- a72fc66: Report `status` progress against each collector's sampling target rather than the repository's full commit count. Sampled collectors previously looked barely started once a repo grew — a monthly collector that had captured everything it will ever capture still read as `languages: 1/45 commits collected`. It now reads `languages: 1/1 commits collected (monthly sample of 45)`, so a complete collector looks complete and the policy behind the smaller target is visible.
+- [#26](https://github.com/kachkaev/repo-dive/pull/26) [`a72fc66`](https://github.com/kachkaev/repo-dive/commit/a72fc66f254c7f829f7948a9917b941ec1130262) - Report `status` progress against each collector's sampling target rather than the repository's full commit count. Sampled collectors previously looked barely started once a repo grew — a monthly collector that had captured everything it will ever capture still read as `languages: 1/45 commits collected`. It now reads `languages: 1/1 commits collected (monthly sample of 45)`, so a complete collector looks complete and the policy behind the smaller target is visible.
 
 ## 0.4.0
 
@@ -35,7 +72,7 @@
 
 ### Minor Changes
 
-- 8d88562: Add a `dependencies` collector that counts a repository's packages from its package-manager lockfiles.
+- [#7](https://github.com/kachkaev/repo-dive/pull/7) [`8d88562`](https://github.com/kachkaev/repo-dive/commit/8d88562b3b9717828378c6dd3dc8996695704280) - Add a `dependencies` collector that counts a repository's packages from its package-manager lockfiles.
 
   - **Total resolved packages** — the full set of `name@version` a lockfile resolves (attributed to its package manager), tracked at every commit so you can see the dependency graph grow over the repo's history.
   - **Direct and dev dependencies** — counted per workspace importer and summed, so a monorepo's duplicates add up and distinct versions of the same package count separately (React 19 in one package + React 18 in another = two direct dependencies).
@@ -43,7 +80,7 @@
 
   The dashboard gains a **Dependencies** stat tile and a **Dependencies over time** chart (resolved packages split by package manager, with a direct/dev/optional breakdown table).
 
-- d74a129: Break the code-survival charts down by the year each surviving line was authored.
+- [#21](https://github.com/kachkaev/repo-dive/pull/21) [`d74a129`](https://github.com/kachkaev/repo-dive/commit/d74a129880f18bfa0a529439afd6f6e0a4d31e82) - Break the code-survival charts down by the year each surviving line was authored.
 
   - **Survival by contributor** starts as one flat color per contributor; a **"Shade by year written"** checkbox splits every contributor's area into per-year age bands. Each band is a lightness shade of the contributor's base color — the newest year at full color, older years fading toward the surface — so you can see, within one person's contribution, how much is fresh versus long-lived. The legend and hover tooltip stay one row per contributor either way.
   - **Survival by cohort** flips its ramp for consistency: the newest year is now the fullest color and the oldest the palest (previously reversed).
@@ -53,19 +90,19 @@
 
 ### Patch Changes
 
-- b93c771: Key each collector's cached output by a **fingerprint** instead of its bare version. The fingerprint is a short hash (sha256, 12 hex) of the collector's `version` and the slice of config it declares a dependency on via the new optional `Collector.cacheConfig`. It is written into the `collector.json` sidecar and used as the per-blob cache namespace, so a collector re-collects whenever its version is bumped **or** the config it depends on changes — and only that collector re-collects. Config that solely affects `normalize` (contributor aliases, chart caps) is deliberately excluded, since `index` re-normalizes on every run.
+- [#20](https://github.com/kachkaev/repo-dive/pull/20) [`b93c771`](https://github.com/kachkaev/repo-dive/commit/b93c7716175d156fdce4756566f7dea72c9b4d38) - Key each collector's cached output by a **fingerprint** instead of its bare version. The fingerprint is a short hash (sha256, 12 hex) of the collector's `version` and the slice of config it declares a dependency on via the new optional `Collector.cacheConfig`. It is written into the `collector.json` sidecar and used as the per-blob cache namespace, so a collector re-collects whenever its version is bumped **or** the config it depends on changes — and only that collector re-collects. Config that solely affects `normalize` (contributor aliases, chart caps) is deliberately excluded, since `index` re-normalizes on every run.
 
   This is a generic mechanism: collectors with no config dependency (all of them today) behave exactly as before — their fingerprint tracks the version alone. It closes the gap where the version-only key could not notice config changes, which was fine when config did not exist yet.
 
   Upgrading resets the catalog's blob cache and sidecar keys, so the next `scan` re-collects everything once (cheap, resumable). No user-facing config changes.
 
-- 27d2342: Fix the `todo-comments` collector reporting 0 TODO/FIXME/HACK/XXX comments in existing catalogs. An early build of the collector recorded zeros for every commit, and because the scan is resumable and its per-blob cache is version-keyed, those stale zeros survived every subsequent re-scan. Bumping the collector version invalidates the old outputs so the next `scan` re-collects them correctly (no `--force` needed). The marker matching itself was already correct — it counts markers wherever they appear on a line, including ones tucked after a `--` suppression rationale and inside JSX/block comments; regression tests now cover those shapes.
+- [#11](https://github.com/kachkaev/repo-dive/pull/11) [`27d2342`](https://github.com/kachkaev/repo-dive/commit/27d23428903cc0d0c8d628100ea7f20b4a875770) - Fix the `todo-comments` collector reporting 0 TODO/FIXME/HACK/XXX comments in existing catalogs. An early build of the collector recorded zeros for every commit, and because the scan is resumable and its per-blob cache is version-keyed, those stale zeros survived every subsequent re-scan. Bumping the collector version invalidates the old outputs so the next `scan` re-collects them correctly (no `--force` needed). The marker matching itself was already correct — it counts markers wherever they appear on a line, including ones tucked after a `--` suppression rationale and inside JSX/block comments; regression tests now cover those shapes.
 
 ## 0.2.0
 
 ### Minor Changes
 
-- 2ad06f6: Add an optional `repo-insighter.config.ts` at the root of the analyzed repository (knip-style; `.mjs`/`.js` also accepted). Everything keeps working with zero config.
+- [`2ad06f6`](https://github.com/kachkaev/repo-dive/commit/2ad06f64e76e00026631a6395197d5d937e73be9) - Add an optional `repo-insighter.config.ts` at the root of the analyzed repository (knip-style; `.mjs`/`.js` also accepted). Everything keeps working with zero config.
 
   - **Contributor aliases** — `contributors.aliases` declares groups of email identities that belong to one person (work + personal email, GitHub noreply, name variants); the first entry of each group is canonical. A group can be a plain array of emails or a rich object that also sets a `displayName` (shown in charts and the contributors table), a `url` (the name links to it, e.g. a GitHub profile) and a `kind`. Emails match either the raw commit email or its prettified noreply handle, so you can list the handle you see in the report. The `index` step merges them before building the cube's dashboard data, so commit/churn attribution, the contributors table, and code-survival-by-contributor all count each person once.
   - **Contributor kinds** — each contributor is a `human` (default), `bot`, or `ai` agent. `kind` can be set explicitly per alias group or is auto-derived from the commit author's name/email (automation bots and known AI coding agents are recognized). The dashboard badges non-humans with an icon and lists bots & AI agents separately from human contributors.
@@ -79,26 +116,26 @@
 
 ### Patch Changes
 
-- 0ec82a1: Declare the true Node floor: `node:sqlite` (used by index/query/mcp) requires Node ≥ 22.13, and `engines` now says so instead of promising 22.0.
-- 0ec82a1: Large-repo scan performance: log-strategy collectors (commit-meta, churn) batch the whole history into one `git log` pass, and content-scanning collectors (directives, todo-comments) cache results per blob (`git cat-file --batch` + SQLite blob cache + in-process memo) so only never-seen file contents are scanned. Survival sampling defaults to quarterly, and `engines.node` honestly reflects the `node:sqlite` floor (≥ 22.13).
+- [`0ec82a1`](https://github.com/kachkaev/repo-dive/commit/0ec82a18ac89fc4d9adc50dca160f52cd61c062c) - Declare the true Node floor: `node:sqlite` (used by index/query/mcp) requires Node ≥ 22.13, and `engines` now says so instead of promising 22.0.
+- [`0ec82a1`](https://github.com/kachkaev/repo-dive/commit/0ec82a18ac89fc4d9adc50dca160f52cd61c062c) - Large-repo scan performance: log-strategy collectors (commit-meta, churn) batch the whole history into one `git log` pass, and content-scanning collectors (directives, todo-comments) cache results per blob (`git cat-file --batch` + SQLite blob cache + in-process memo) so only never-seen file contents are scanned. Survival sampling defaults to quarterly, and `engines.node` honestly reflects the `node:sqlite` floor (≥ 22.13).
 
 ## 0.1.0
 
 ### Minor Changes
 
-- 17ad1f1: Ask the repository questions: new `query` command runs read-only SQL against the metrics cube, and `repo-insighter mcp` serves the cube over the Model Context Protocol (stdio) with `schema` and `query` tools for AI agents.
+- [`17ad1f1`](https://github.com/kachkaev/repo-dive/commit/17ad1f1922f87c0b2c0a7182179656b1a67ad925) - Ask the repository questions: new `query` command runs read-only SQL against the metrics cube, and `repo-insighter mcp` serves the cube over the Model Context Protocol (stdio) with `schema` and `query` tools for AI agents.
 
 ## 0.0.3
 
 ### Patch Changes
 
-- 4181c5b: New `report` command: exports the dashboard as one self-contained HTML file (charts, data and styles inlined) that opens anywhere without installing anything.
+- [`4181c5b`](https://github.com/kachkaev/repo-dive/commit/4181c5b5ce35e2500b864248121a1505d27a1483) - New `report` command: exports the dashboard as one self-contained HTML file (charts, data and styles inlined) that opens anywhere without installing anything.
 
 ## 0.0.2
 
 ### Patch Changes
 
-- 69bfbe4: Bare `npx repo-insighter` now runs the whole pipeline — scan, index and dashboard (with browser auto-open) — and scan progress includes a rate/ETA estimate.
+- [`69bfbe4`](https://github.com/kachkaev/repo-dive/commit/69bfbe4d765b710c0e7ddd7d9c94172533f17f46) - Bare `npx repo-insighter` now runs the whole pipeline — scan, index and dashboard (with browser auto-open) — and scan progress includes a rate/ETA estimate.
 
 ## 0.0.1
 

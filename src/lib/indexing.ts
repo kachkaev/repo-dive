@@ -7,7 +7,11 @@ import { Console, Effect } from "effect";
 import { catalogDirName } from "./catalog.ts";
 import { builtInCollectors } from "./collectors/roster.ts";
 import { describesTreeState, type Fact } from "./collectors/types.ts";
-import { loadConfig, type ResolvedConfig } from "./config.ts";
+import {
+  loadConfig,
+  normalizeContributorName,
+  type ResolvedConfig,
+} from "./config.ts";
 import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
 const toError = (error: unknown) =>
@@ -200,7 +204,14 @@ const buildDashboardData = (
     });
 
   const dependencies = commits
-    .filter((commit) => hasMetric(commit, "dependencies.resolved"))
+    .filter(
+      (commit) =>
+        // A commit the collector scanned but found no lockfile in carries only
+        // `dependencies.scanned`; it still belongs on the chart as a zero, so
+        // "collected, no dependencies" stays distinct from an unscanned gap.
+        hasMetric(commit, "dependencies.resolved") ||
+        hasMetric(commit, "dependencies.scanned"),
+    )
     .map((commit) => {
       const byKind = groupMetric(commit, "dependencies.direct", "kind");
       return {
@@ -233,9 +244,11 @@ const buildDashboardData = (
   const survival = commits
     .filter((commit) => hasMetric(commit, "survival.lines"))
     .map((commit) => {
-      // Living lines cross-tabulated by contributor and the year each line was
-      // authored — the dashboard splits each contributor's area into year bands.
+      // Living lines cross-tabulated by contributor (and by extension) and the
+      // year each line was authored — the dashboard splits each contributor's
+      // or language's area into year bands.
       const byContributorYear: Record<string, Record<string, number>> = {};
+      const byExtensionYear: Record<string, Record<string, number>> = {};
       for (const facts of commit.factsByCollector.values()) {
         for (const fact of facts) {
           if (fact.metric !== "survival.lines") {
@@ -247,6 +260,9 @@ const buildDashboardData = (
           const year = (fact.categories?.["cohort"] ?? "").slice(0, 4) || "?";
           const byYear = (byContributorYear[label] ??= {});
           byYear[year] = (byYear[year] ?? 0) + fact.value;
+          const extension = fact.categories?.["extension"] ?? "";
+          const extensionYears = (byExtensionYear[extension] ??= {});
+          extensionYears[year] = (extensionYears[year] ?? 0) + fact.value;
         }
       }
       return {
@@ -259,6 +275,7 @@ const buildDashboardData = (
         ),
         byContributorYear,
         byExtension: groupMetric(commit, "survival.lines", "extension"),
+        byExtensionYear,
       };
     });
 
@@ -294,8 +311,13 @@ const buildDashboardData = (
       added: 0,
       deleted: 0,
     };
-    // A configured displayName wins; otherwise keep the latest non-empty name.
-    bucket.name = resolved.displayName ?? (commit.authorName || bucket.name);
+    // A configured displayName wins; otherwise keep the latest non-empty name,
+    // tidied so a bot's `[bot]` suffix doesn't double up with its kind badge.
+    bucket.name =
+      resolved.displayName ??
+      (commit.authorName
+        ? normalizeContributorName(commit.authorName)
+        : bucket.name);
     bucket.commits += 1;
     bucket.added += row.added;
     bucket.deleted += row.deleted;

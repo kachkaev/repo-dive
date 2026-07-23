@@ -25,6 +25,7 @@ Grimoire
 hotspots
 incrementality
 insighter
+inspectable
 jdrouet
 JVM
 Kachkaev
@@ -35,11 +36,13 @@ maat
 matplotlib
 MCP
 mergestat
+mousemove
 msgpackr
 mts
 npmjs
 numstat
 onefetch
+oxc
 Picci
 Pijul
 pnp
@@ -51,6 +54,7 @@ repoinsights
 rollups
 scc
 scriptable
+shm
 Sigstore
 simonw
 smol
@@ -63,6 +67,7 @@ treemap
 tsc
 uncazzy
 undashed
+unscanned
 VCS
 VCSs
 visx

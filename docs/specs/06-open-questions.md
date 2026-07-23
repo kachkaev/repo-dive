@@ -4,7 +4,7 @@ Decisions still to make, roughly ordered by how soon they bite.
 
 ## Naming
 
-~~What to call the tool~~ — answered 2026-07-22: **`repo-dive`**, replacing the working title `repo-insighter` ("insighter" is not a word, and it showed: hard to say, easy to misspell). The dashed form is canonical everywhere — npm package, CLI command, catalog folder (`.repo-dive/`) and config file (`repo-dive.config.ts`) — with `repodive` held on npm as a placeholder pointing at it.
+~~What to call the tool~~ — answered 2026-07-22: **`repo-dive`**, replacing the working title `repo-insighter` ("insighter" is not a word, and it showed: hard to say, easy to misspell). The dashed form is canonical everywhere — npm package, CLI command, catalog folder (`.repo-dive/`) and config file (`repo-dive.config.ts`). An undashed `repodive` placeholder was intended alongside it; npm turned out to forbid one, which is covered below.
 
 Checked before committing to the name: `repo-dive` and `repodive` are free on npm, crates.io and PyPI; [gitext-rs/git-dive](https://github.com/gitext-rs/git-dive) and [wagoodman/dive](https://github.com/wagoodman/dive) share the verb but not the name; CMS's [repodive-tools](https://github.com/DSACMS/repodive-tools) uses "repodiving" as a generic practice term rather than a product name. `repo-insights` on npm remains taken by a [real but dormant tool](../research/prior-art.md#name-collision-on-npm). The trade accepted: a crowded lexical neighborhood (search results are polluted by "deep dive" course repos) in exchange for a name people can say and spell.
 
@@ -12,8 +12,9 @@ Checked before committing to the name: `repo-dive` and `repodive` are free on np
 
 ## Catalog
 
-- Self-ignoring catalog (`.repo-dive/.gitignore` containing `*`) vs appending to the repo's `.gitignore` — leaning self-ignoring.
-- When to introduce sha sharding and tree-level deduplication (measure first).
+- ~~Self-ignoring catalog vs appending to the repo's `.gitignore`~~ — answered: self-ignoring. Creating the catalog writes `.repo-dive/.gitignore` containing `*` and never touches the analyzed repo's own files.
+- When to introduce sha sharding and tree-level deduplication of catalog outputs (measure first). Blob-level deduplication is done — see the [blob cache](03-catalog.md#blob-cache).
+- Pruning the blob cache past dead fingerprints: `gc --stale` now drops namespaces whose collector fingerprint no longer matches any registered collector, which is the part that grows without bound. Entries under a _live_ fingerprint whose blob has left the repository still stay forever. Proving such a blob dead means a full `rev-list --objects` walk, and a wrong answer costs a long re-scan — so this is worth doing only if that residue turns out to matter in practice.
 - Lock mechanism for concurrent runs.
 
 ## Collectors
@@ -36,7 +37,7 @@ Checked before committing to the name: `repo-dive` and `repodive` are free on np
 
 ## Scope
 
-- Branch handling: walk first-parent history of the default branch only (simplest, likely v1) vs all branches/merges.
+- ~~Branch handling: first-parent history only vs everything reachable~~ — answered by strategy rather than globally: `log` collectors see every commit reachable from HEAD, while `tree` and `worktree` collectors are restricted to HEAD's first-parent chain, since only those trees are states the repository passed through (see [collectors](04-collectors.md#sampling)). Still open: whether anything should walk branches other than HEAD's.
 - Shallow clones and partial clones: detect and warn, or attempt to unshallow?
 - Monorepos: per-directory scoping (`--path`) as a first-class filter?
 - Other VCSs: git-only for now and for the foreseeable future, but a very distant Mercurial/Jujutsu/Pijul future shouldn't be structurally impossible — the catalog manifest records the VCS, and git-specific code stays behind the collector/runner seam rather than leaking into the cube model.
