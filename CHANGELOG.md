@@ -1,5 +1,31 @@
 # repo-dive
 
+## 0.4.3
+
+### Patch Changes
+
+- [#42](https://github.com/kachkaev/repo-dive/pull/42) [`72d8d7b`](https://github.com/kachkaev/repo-dive/commit/72d8d7b6418e6fcfe1630416e46bdf36a05f7b3d) - Keep bar-chart bars inside the plot area. Bars are centred on their data point, so with the first and last points pinned to the chart edges the outermost bars spilled halfway past the left and right sides. Bar charts now inset the time scale by half a bucket slot, so every bar sits fully within the plot while areas and lines — which want their points on the edges — keep the full width. The commits-per-month and churn-per-month charts are the ones affected.
+
+  The inset lives on the shared x scale, so any marks overlaid on a bar chart later (e.g. a trend line) line up with the bars automatically.
+
+- [#41](https://github.com/kachkaev/repo-dive/pull/41) [`16d232b`](https://github.com/kachkaev/repo-dive/commit/16d232b178a61f6fe71ec8dd6518b7a6bc3fe1ea) - Show the dependencies chart against the repo's full timeline, and tell "no dependencies" apart from "not scanned".
+
+  The "Dependencies over time" chart used to begin at the first commit that carried a lockfile — often long after the repository started — because a commit only produced a dependency fact once a parseable lockfile existed in its tree. The chart now shares the repo's full timeline like every other time-series chart: its axis starts at the first commit and the area begins where the first lockfile appears, an honest step up rather than a chart that looks like the project itself began mid-history.
+
+  The hover crosshair now tracks the cursor across the whole axis instead of snapping to the nearest data point, so the empty early stretch is inspectable too. A genuinely unscanned instant reads "No data"; a commit that was scanned and simply had no lockfile reads "No lockfile". To make that distinction real rather than assumed, the dependencies collector now records a `dependencies.scanned` marker for a scanned tree that holds no lockfile, so indexing can keep those commits as explicit zeros. The collector version is bumped, so run `scan` again to backfill the pre-lockfile commits.
+
+- [#38](https://github.com/kachkaev/repo-dive/pull/38) [`57f238a`](https://github.com/kachkaev/repo-dive/commit/57f238a235145415b221c20d89eb47b57689e270) - Bring "Shade by year written" to the lines-by-language chart, mirroring the toggle the code-survival-by-contributor chart already had. The survival collector's raw snapshots always recorded each living line's extension and authoring cohort, so `index` now cross-tabulates them into a per-extension-per-year breakdown — existing catalogs pick it up on the next `repo-dive index`, no re-scan needed.
+
+  Because tokei snapshots carry no per-line age, shading switches the chart to the blame-based data: languages are approximated from file extensions (mapped to tokei's names), only scannable source files are counted, and the chart's subtitle changes to say so. Languages shared with the tokei view keep its colors, so toggling never recolors the stack. Composes with percent mode — the normalized, year-shaded view shows old cohorts thinning inside each language's share.
+
+- [#43](https://github.com/kachkaev/repo-dive/pull/43) [`b85be0f`](https://github.com/kachkaev/repo-dive/commit/b85be0fca7c67c0fd25d0746e7d2f84094665cd1) - Drop the redundant `[bot]` suffix from auto-derived contributor names. Bots and AI agents already carry a kind badge (🤖 / ✨) in the dashboard, so a name like `🤖 renovate[bot]` labelled the same thing twice. Names are now tidied when derived: the trailing `[bot]` is stripped and the leading letter capitalized, so Renovate shows as `🤖 Renovate` and Dependabot as `🤖 Dependabot`.
+
+  Only auto-derived names change — an explicit `displayName` in your config is still used verbatim. Existing catalogs heal on the next `repo-dive index` (no re-scan needed).
+
+- [#37](https://github.com/kachkaev/repo-dive/pull/37) [`cfc01d3`](https://github.com/kachkaev/repo-dive/commit/cfc01d3239cd95ea917f4f1409d668c595c7619b) - Add a percent mode to stacked time-series charts. Every stacked dashboard chart with more than one series — lines by language, dependencies over time, commits per month, both code-survival views — gains a `#`/`%` toggle next to its legend. Percent mode renormalizes each date to its total, turning the chart into a composition view where shifts in share stay readable even while absolute volume grows.
+
+  Tooltips on these charts now show the absolute value and the share side by side for every series, with the active mode's column emphasized. Line charts are unchanged — their series are not parts of a whole.
+
 ## 0.4.2
 
 ### Patch Changes
