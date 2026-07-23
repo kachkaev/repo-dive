@@ -5,7 +5,13 @@ export function BarList({
   items,
   color = "var(--series-1)",
 }: {
-  items: Array<{ label: string; value: number; href?: string | undefined }>;
+  items: Array<{
+    label: string;
+    value: number;
+    href?: string | undefined;
+    /** Stable unique key; falls back to the index when a label repeats. */
+    id?: string | undefined;
+  }>;
   color?: string;
 }) {
   if (items.length === 0) {
@@ -18,7 +24,7 @@ export function BarList({
     <ul className="space-y-1.5">
       {items.map((item, index) => (
         <li
-          key={`${index}-${item.label}`}
+          key={item.id ?? `${index}-${item.label}`}
           className="group flex items-center gap-3 text-sm"
         >
           <span

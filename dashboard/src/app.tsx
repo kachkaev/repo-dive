@@ -662,6 +662,7 @@ export function App({ data }: { data: DashboardData }) {
           items={humanContributors
             .slice(0, maxContributorsInCharts * 2)
             .map((contributor) => ({
+              id: contributor.email,
               label: contributor.name || contributor.email,
               value: contributor.commits,
               href: contributor.url,
@@ -675,6 +676,7 @@ export function App({ data }: { data: DashboardData }) {
             <BarList
               color="var(--series-9)"
               items={nonHumanContributors.map((contributor) => ({
+                id: contributor.email,
                 label: `${kindBadge[contributor.kind === "ai" ? "ai" : "bot"].icon} ${contributor.name || contributor.email}`,
                 value: contributor.commits,
                 href: contributor.url,
