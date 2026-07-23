@@ -92,6 +92,7 @@
     "@types/node": "26.1.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
+    "@typescript/native": "npm:typescript@7.0.2",
     "@visx/axis": "4.0.0",
     "@visx/curve": "4.0.0",
     "@visx/grid": "4.0.0",
@@ -113,7 +114,6 @@
     "react-dom": "19.2.8",
     "tailwindcss": "4.3.3",
     "typescript": "npm:@typescript/typescript6@6.0.2",
-    "typescript-7": "npm:typescript@7.0.2",
     "vite": "8.1.5",
     "vitest": "4.1.10",
     "yaml": "2.9.0"
