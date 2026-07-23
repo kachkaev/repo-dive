@@ -6,11 +6,11 @@ export function BarList({
   color = "var(--series-1)",
 }: {
   items: Array<{
+    /** Stable unique key — labels aren't unique (e.g. two contributors named "Alex"). */
+    id: string;
     label: string;
     value: number;
     href?: string | undefined;
-    /** Stable unique key; falls back to the index when a label repeats. */
-    id?: string | undefined;
   }>;
   color?: string;
 }) {
@@ -22,11 +22,8 @@ export function BarList({
 
   return (
     <ul className="space-y-1.5">
-      {items.map((item, index) => (
-        <li
-          key={item.id ?? `${index}-${item.label}`}
-          className="group flex items-center gap-3 text-sm"
-        >
+      {items.map((item) => (
+        <li key={item.id} className="group flex items-center gap-3 text-sm">
           <span
             className="w-56 truncate text-right font-mono text-xs text-(--text-secondary)"
             title={item.label}

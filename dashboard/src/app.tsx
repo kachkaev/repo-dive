@@ -640,6 +640,7 @@ export function App({ data }: { data: DashboardData }) {
         >
           <BarList
             items={data.topRules.map((row) => ({
+              id: row.rule,
               label: row.rule,
               value: row.count,
             }))}
@@ -681,6 +682,7 @@ export function App({ data }: { data: DashboardData }) {
         >
           <BarList
             items={data.aiIdentities.map((row) => ({
+              id: row.identity,
               label: row.identity,
               value: row.commits,
             }))}
