@@ -613,28 +613,6 @@ export function App({ data }: { data: DashboardData }) {
         </Section>
       )}
 
-      {dependenciesChart.points.length > 0 && (
-        <Section
-          title="Dependencies over time"
-          subtitle="resolved packages in the lockfile at each commit, split by package manager"
-        >
-          <TimeSeriesChart
-            mode="area"
-            {...dependenciesChart}
-            domainStartMs={repoStartMs}
-            zeroLabel="No lockfile"
-          />
-          <DataTable
-            caption="View data"
-            header={["date", "resolved"]}
-            rows={dependencies.map((row) => [
-              formatDate(row.date),
-              row.resolved,
-            ])}
-          />
-        </Section>
-      )}
-
       {hasManifestData && (
         <Section
           title="Direct dependencies over time"
@@ -661,6 +639,28 @@ export function App({ data }: { data: DashboardData }) {
               row.directProd,
               row.directDev,
               row.directOptional,
+            ])}
+          />
+        </Section>
+      )}
+
+      {dependenciesChart.points.length > 0 && (
+        <Section
+          title="Dependencies over time"
+          subtitle="resolved packages in the lockfile at each commit, split by package manager"
+        >
+          <TimeSeriesChart
+            mode="area"
+            {...dependenciesChart}
+            domainStartMs={repoStartMs}
+            zeroLabel="No lockfile"
+          />
+          <DataTable
+            caption="View data"
+            header={["date", "resolved"]}
+            rows={dependencies.map((row) => [
+              formatDate(row.date),
+              row.resolved,
             ])}
           />
         </Section>
