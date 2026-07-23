@@ -42,7 +42,7 @@ export function TimeSeriesChart({
   seriesKeys,
   colors,
   mode,
-  valueFormat = formatCount,
+  valueFormat,
   legendItems,
   tooltipGroups,
   separateGroups,
@@ -87,6 +87,11 @@ export function TimeSeriesChart({
   // crosshair reaches the whole domain, including stretches with no data point.
   const [hoverMs, setHoverMs] = useState<number | undefined>();
   const [percentMode, setPercentMode] = useState(false);
+
+  // Resolved here rather than as a destructuring default: React Compiler bails
+  // on a default value inside a typed destructured parameter (see editing-react
+  // skill), which would leave this whole chart un-memoized.
+  const formatValue = valueFormat ?? formatCount;
 
   // Lines aren't parts of a whole, and a single series is always 100%.
   const supportsPercent = mode !== "line" && seriesKeys.length > 1;
@@ -478,7 +483,7 @@ export function TimeSeriesChart({
                         showPercent ? "text-(--text-muted)" : "font-medium"
                       }`}
                     >
-                      {valueFormat(entry.value)}
+                      {formatValue(entry.value)}
                     </span>
                     {supportsPercent && (
                       <span

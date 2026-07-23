@@ -3,7 +3,7 @@ import { formatCount } from "../format.ts";
 /** Horizontal labeled bars for ranked categories (top rules, AI identities). */
 export function BarList({
   items,
-  color = "var(--series-1)",
+  color,
 }: {
   items: Array<{ label: string; value: number; href?: string | undefined }>;
   color?: string;
@@ -12,6 +12,10 @@ export function BarList({
     return <p className="text-sm text-(--text-muted)">Nothing to show.</p>;
   }
 
+  // Resolved here rather than as a destructuring default: React Compiler bails
+  // on a default value inside a typed destructured parameter (see editing-react
+  // skill).
+  const barColor = color ?? "var(--series-1)";
   const max = Math.max(...items.map((item) => item.value), 1);
 
   return (
@@ -40,7 +44,7 @@ export function BarList({
               className="absolute inset-y-0 left-0 rounded-xs opacity-90 group-hover:opacity-100"
               style={{
                 width: `${Math.max(0.5, (item.value / max) * 100)}%`,
-                background: color,
+                background: barColor,
               }}
             />
           </span>
