@@ -22,6 +22,9 @@
  *     ],
  *     maxInCharts: 10,
  *   },
+ *   charts: {
+ *     weekStartsOn: "monday",
+ *   },
  * });
  * ```
  */
@@ -67,8 +70,20 @@ export type ContributorsConfig = {
   readonly maxInCharts?: number;
 };
 
+/** First day of the week in calendar-shaped charts. */
+export type WeekStart = "monday" | "sunday";
+
+export type ChartsConfig = {
+  /**
+   * Which day calendar-shaped dashboard charts (e.g. the commit calendar)
+   * start the week on. Defaults to `"monday"`.
+   */
+  readonly weekStartsOn?: WeekStart;
+};
+
 export type RepoDiveConfig = {
   readonly contributors?: ContributorsConfig;
+  readonly charts?: ChartsConfig;
 };
 
 /**

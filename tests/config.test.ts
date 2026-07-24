@@ -8,6 +8,7 @@ import { expect, test } from "vitest";
 import { defineConfig } from "../src/config.ts";
 import {
   defaultMaxInCharts,
+  defaultWeekStartsOn,
   deriveContributorKind,
   loadConfig,
   normalizeContributorName,
@@ -191,6 +192,29 @@ test("resolveConfig rejects malformed config", () => {
   );
   expect(() => resolveConfig({ contributors: { maxInCharts: 3.5 } })).toThrow(
     /must be an integer between 1 and 100/,
+  );
+});
+
+test("resolveConfig defaults charts.weekStartsOn to monday", () => {
+  expect(resolveConfig({}).weekStartsOn).toBe(defaultWeekStartsOn);
+  expect(resolveConfig({ charts: {} }).weekStartsOn).toBe("monday");
+});
+
+test("resolveConfig accepts charts.weekStartsOn", () => {
+  expect(
+    resolveConfig({ charts: { weekStartsOn: "sunday" } }).weekStartsOn,
+  ).toBe("sunday");
+  expect(
+    resolveConfig({ charts: { weekStartsOn: "monday" } }).weekStartsOn,
+  ).toBe("monday");
+});
+
+test("resolveConfig rejects invalid charts config", () => {
+  expect(() => resolveConfig({ charts: [] })).toThrow(
+    /`charts` must be an object/,
+  );
+  expect(() => resolveConfig({ charts: { weekStartsOn: "saturday" } })).toThrow(
+    /`charts.weekStartsOn` must be "monday" or "sunday"/,
   );
 });
 

@@ -345,6 +345,7 @@ const buildDashboardData = (
     generatedAt: new Date().toISOString(),
     config: {
       contributors: { maxInCharts: config.maxInCharts },
+      charts: { weekStartsOn: config.weekStartsOn },
     },
     repo: {
       name: path.basename(repoRoot),

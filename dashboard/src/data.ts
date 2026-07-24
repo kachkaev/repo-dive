@@ -101,6 +101,11 @@ export type DashboardData = {
       /** How many contributors per-contributor charts keep before folding into "Other". */
       maxInCharts: number;
     };
+    /** Optional: absent in dashboard.json written before chart config landed. */
+    charts?: {
+      /** Which day calendar-shaped charts start the week on. */
+      weekStartsOn: "monday" | "sunday";
+    };
   };
   repo: {
     name: string;

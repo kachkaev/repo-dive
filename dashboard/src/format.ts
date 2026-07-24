@@ -24,23 +24,24 @@ export const formatBytes = (value: number): string => {
   return `${value} B`;
 };
 
+export const monthShortNames = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
 export const formatMonth = (isoMonth: string): string => {
   const [year, month] = isoMonth.split("-");
-  const monthNames = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  return `${monthNames[Number(month) - 1] ?? month} ${year}`;
+  return `${monthShortNames[Number(month) - 1] ?? month} ${year}`;
 };
 
 export const formatDate = (isoDate: string): string => isoDate.slice(0, 10);

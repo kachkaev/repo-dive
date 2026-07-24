@@ -1,5 +1,9 @@
 import { useState } from "react";
 
+import {
+  type CalendarRange,
+  CommitCalendar,
+} from "./components/activity-calendar.tsx";
 import { BarList } from "./components/bar-list.tsx";
 import { DivergingBars } from "./components/diverging-bars.tsx";
 import { DataTable, Section, StatTile } from "./components/primitives.tsx";
@@ -309,6 +313,8 @@ export function App({ data }: { data: DashboardData }) {
   const latestDependencies = dependencies.at(-1);
   const [shadeContributorsByYear, setShadeContributorsByYear] = useState(false);
   const [shadeLanguagesByYear, setShadeLanguagesByYear] = useState(false);
+  const [calendarRange, setCalendarRange] =
+    useState<CalendarRange>("last-12-months");
 
   // Repo inception, used to anchor charts whose series start mid-history (e.g.
   // dependencies, tracked only once a lockfile exists) to the full timeline.
@@ -665,6 +671,55 @@ export function App({ data }: { data: DashboardData }) {
               formatDate(row.date),
               row.resolved,
             ])}
+          />
+        </Section>
+      )}
+
+      {data.repo.firstCommitDate !== undefined && data.commits.length > 0 && (
+        <Section
+          title="Commit calendar"
+          subtitle="commits per day; days bucketed by the author's local date"
+          controls={
+            <label className="mb-3 flex w-fit items-center gap-2 text-xs text-(--text-secondary)">
+              Range
+              <select
+                value={calendarRange}
+                onChange={(event) => {
+                  setCalendarRange(event.target.value as CalendarRange);
+                }}
+                className="rounded-md border border-(--grid-line) bg-(--surface-1) px-2 py-1"
+              >
+                <option value="last-12-months">Last 12 months</option>
+                <option value="this-year">This year</option>
+                <option value="last-3-years">Last 3 years</option>
+                <option value="all-years">All years</option>
+                {Array.from(
+                  {
+                    length:
+                      Number(data.generatedAt.slice(0, 4)) -
+                      Number(data.repo.firstCommitDate.slice(0, 4)) +
+                      1,
+                  },
+                  (_, index) => Number(data.generatedAt.slice(0, 4)) - index,
+                ).map((year) => (
+                  <option key={year} value={`year-${year}`}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </label>
+          }
+        >
+          <CommitCalendar
+            // Remount on range change so a hovered day from the previous range
+            // is not reported over the new one (mouseleave never fires when the
+            // strips under the cursor are swapped).
+            key={calendarRange}
+            commits={data.commits}
+            generatedAt={data.generatedAt}
+            firstCommitDate={data.repo.firstCommitDate}
+            weekStartsOn={data.config?.charts?.weekStartsOn ?? "monday"}
+            range={calendarRange}
           />
         </Section>
       )}
