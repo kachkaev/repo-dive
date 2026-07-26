@@ -4,7 +4,6 @@ import path from "node:path";
 import { Console, Effect } from "effect";
 
 import {
-  catalogDirName,
   findLegacyCatalog,
   isCollected,
   legacyCatalogHint,
@@ -15,6 +14,7 @@ import {
   describesTreeState,
 } from "./collectors.ts";
 import { loadConfig } from "./config.ts";
+import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import { sampleCommits, samplingLabel } from "./sampling.ts";
 import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
@@ -36,7 +36,7 @@ export const runStatus = ({
     const commits = yield* listCommits(repoRoot);
     const firstParentShas = yield* listFirstParentShas(repoRoot);
     const config = yield* loadConfig(repoRoot);
-    const catalogPath = path.join(repoRoot, catalogDirName);
+    const catalogPath = config.catalogPath;
 
     if (!(yield* exists(path.join(catalogPath, "catalog.json")))) {
       const legacyRootPath = yield* findLegacyCatalog(repoRoot);
@@ -95,4 +95,5 @@ export const runStatus = ({
     }
 
     yield* Console.log(lines.join("\n"));
+    yield* warnAboutIgnoreFiles({ repoRoot, config });
   });

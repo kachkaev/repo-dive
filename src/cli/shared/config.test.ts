@@ -6,6 +6,7 @@ import { Effect } from "effect";
 import { expect, test } from "vitest";
 
 import {
+  defaultCatalogDirName,
   defaultMaxInCharts,
   defaultWeekStartsOn,
   deriveContributorKind,
@@ -15,8 +16,15 @@ import {
   resolveConfig,
 } from "./config.ts";
 
+/**
+ * Only the `catalog` cases care where the repository sits — the root is there
+ * to anchor `catalog.dir`. A fixed fake one keeps every other assertion short.
+ */
+const fakeRepoRoot = path.join(os.tmpdir(), "repo-dive-fake-repo");
+const resolveInRepo = (raw: unknown) => resolveConfig(raw, fakeRepoRoot);
+
 test("resolveConfig defaults with no contributor config", () => {
-  const resolved = resolveConfig({});
+  const resolved = resolveInRepo({});
   expect(resolved.maxInCharts).toBe(defaultMaxInCharts);
   const contributor = resolved.resolveContributor("carol@example.com", "Carol");
   expect(contributor.label).toBe("carol@example.com");
@@ -27,7 +35,7 @@ test("resolveConfig defaults with no contributor config", () => {
 });
 
 test("resolveConfig folds aliases into the first (canonical) entry", () => {
-  const resolved = resolveConfig({
+  const resolved = resolveInRepo({
     contributors: {
       aliases: [
         [
@@ -51,7 +59,7 @@ test("resolveConfig folds aliases into the first (canonical) entry", () => {
 });
 
 test("resolveConfig matches aliases case-insensitively", () => {
-  const resolved = resolveConfig({
+  const resolved = resolveInRepo({
     contributors: {
       aliases: [["Alice@Work.Example", "alice@personal.example"]],
     },
@@ -62,14 +70,14 @@ test("resolveConfig matches aliases case-insensitively", () => {
 });
 
 test("resolveConfig still prettifies a canonical noreply address", () => {
-  const resolved = resolveConfig({});
+  const resolved = resolveInRepo({});
   expect(
     resolved.resolveContributor("12345+bob@users.noreply.github.com").label,
   ).toBe("bob");
 });
 
 test("resolveConfig applies displayName, url and kind from a rich alias group", () => {
-  const resolved = resolveConfig({
+  const resolved = resolveInRepo({
     contributors: {
       aliases: [
         {
@@ -93,7 +101,7 @@ test("resolveConfig applies displayName, url and kind from a rich alias group", 
 test("resolveConfig matches an alias by its prettified noreply handle", () => {
   // Config lists the handle a user sees in the report; the raw commit email is
   // the full GitHub noreply address.
-  const resolved = resolveConfig({
+  const resolved = resolveInRepo({
     contributors: {
       aliases: [{ emails: ["ziggy"], displayName: "Ziggy" }],
     },
@@ -142,7 +150,7 @@ test("normalizeContributorName leaves ordinary names untouched", () => {
 });
 
 test("resolveContributor normalizes a bot's auto-derived label", () => {
-  const resolved = resolveConfig({});
+  const resolved = resolveInRepo({});
   const contributor = resolved.resolveContributor(
     "29139614+renovate[bot]@users.noreply.github.com",
     "renovate[bot]",
@@ -152,7 +160,7 @@ test("resolveContributor normalizes a bot's auto-derived label", () => {
 });
 
 test("resolveConfig derives kind when the config omits it", () => {
-  const resolved = resolveConfig({
+  const resolved = resolveInRepo({
     contributors: {
       aliases: [{ emails: ["Copilot"], displayName: "Copilot" }],
     },
@@ -165,57 +173,57 @@ test("resolveConfig derives kind when the config omits it", () => {
 });
 
 test("resolveConfig rejects malformed config", () => {
-  expect(() => resolveConfig({ contributors: "nope" })).toThrow(
+  expect(() => resolveInRepo({ contributors: "nope" })).toThrow(
     /`contributors` must be an object/,
   );
-  expect(() => resolveConfig({ contributors: { aliases: "nope" } })).toThrow(
+  expect(() => resolveInRepo({ contributors: { aliases: "nope" } })).toThrow(
     /`contributors.aliases` must be an array/,
   );
-  expect(() => resolveConfig({ contributors: { aliases: [[]] } })).toThrow(
+  expect(() => resolveInRepo({ contributors: { aliases: [[]] } })).toThrow(
     /must be a non-empty array/,
   );
-  expect(() => resolveConfig({ contributors: { aliases: [[""]] } })).toThrow(
+  expect(() => resolveInRepo({ contributors: { aliases: [[""]] } })).toThrow(
     /must be a non-empty string/,
   );
   expect(() =>
-    resolveConfig({
+    resolveInRepo({
       contributors: { aliases: [{ emails: ["a@x"], kind: "robot" }] },
     }),
   ).toThrow(/must be one of "human", "bot" or "ai"/);
-  expect(() => resolveConfig({ contributors: { maxInCharts: 0 } })).toThrow(
+  expect(() => resolveInRepo({ contributors: { maxInCharts: 0 } })).toThrow(
     /must be an integer between 1 and 100/,
   );
-  expect(() => resolveConfig({ contributors: { maxInCharts: 3.5 } })).toThrow(
+  expect(() => resolveInRepo({ contributors: { maxInCharts: 3.5 } })).toThrow(
     /must be an integer between 1 and 100/,
   );
 });
 
 test("resolveConfig defaults charts.weekStartsOn to monday", () => {
-  expect(resolveConfig({}).weekStartsOn).toBe(defaultWeekStartsOn);
-  expect(resolveConfig({ charts: {} }).weekStartsOn).toBe("monday");
+  expect(resolveInRepo({}).weekStartsOn).toBe(defaultWeekStartsOn);
+  expect(resolveInRepo({ charts: {} }).weekStartsOn).toBe("monday");
 });
 
 test("resolveConfig accepts charts.weekStartsOn", () => {
   expect(
-    resolveConfig({ charts: { weekStartsOn: "sunday" } }).weekStartsOn,
+    resolveInRepo({ charts: { weekStartsOn: "sunday" } }).weekStartsOn,
   ).toBe("sunday");
   expect(
-    resolveConfig({ charts: { weekStartsOn: "monday" } }).weekStartsOn,
+    resolveInRepo({ charts: { weekStartsOn: "monday" } }).weekStartsOn,
   ).toBe("monday");
 });
 
 test("resolveConfig rejects invalid charts config", () => {
-  expect(() => resolveConfig({ charts: [] })).toThrow(
+  expect(() => resolveInRepo({ charts: [] })).toThrow(
     /`charts` must be an object/,
   );
-  expect(() => resolveConfig({ charts: { weekStartsOn: "saturday" } })).toThrow(
+  expect(() => resolveInRepo({ charts: { weekStartsOn: "saturday" } })).toThrow(
     /`charts.weekStartsOn` must be "monday" or "sunday"/,
   );
 });
 
 test("resolveConfig rejects an email shared across alias groups", () => {
   expect(() =>
-    resolveConfig({
+    resolveInRepo({
       contributors: {
         aliases: [
           ["alice@work.example", "shared@example.com"],
@@ -224,6 +232,63 @@ test("resolveConfig rejects an email shared across alias groups", () => {
       },
     }),
   ).toThrow(/appears in more than one alias group/);
+});
+
+test("resolveConfig puts the catalog inside the repo by default", () => {
+  const resolved = resolveInRepo({});
+  expect(resolved.catalogPath).toBe(
+    path.join(fakeRepoRoot, defaultCatalogDirName),
+  );
+  expect(resolved.catalogRelativePath).toBe(defaultCatalogDirName);
+  expect(resolved.checkIgnoreFiles).toBe(true);
+});
+
+test("resolveConfig resolves a relative catalog.dir against the repo root", () => {
+  const resolved = resolveInRepo({ catalog: { dir: "tmp/dive-cache" } });
+  expect(resolved.catalogPath).toBe(
+    path.join(fakeRepoRoot, "tmp", "dive-cache"),
+  );
+  // Posix-shaped, because that is what ignore files speak.
+  expect(resolved.catalogRelativePath).toBe("tmp/dive-cache");
+});
+
+test("resolveConfig reports a catalog outside the repo as having no relative path", () => {
+  const outside = resolveInRepo({ catalog: { dir: "../shared-catalog" } });
+  expect(outside.catalogRelativePath).toBeUndefined();
+
+  const absolute = resolveInRepo({
+    catalog: { dir: path.join(os.tmpdir(), "elsewhere") },
+  });
+  expect(absolute.catalogPath).toBe(path.join(os.tmpdir(), "elsewhere"));
+  expect(absolute.catalogRelativePath).toBeUndefined();
+});
+
+test("resolveConfig accepts catalog.checkIgnoreFiles", () => {
+  expect(
+    resolveInRepo({ catalog: { checkIgnoreFiles: false } }).checkIgnoreFiles,
+  ).toBe(false);
+});
+
+test("resolveConfig rejects invalid catalog config", () => {
+  expect(() => resolveInRepo({ catalog: "nope" })).toThrow(
+    /`catalog` must be an object/,
+  );
+  expect(() => resolveInRepo({ catalog: { dir: "  " } })).toThrow(
+    /`catalog.dir` must be a non-empty string/,
+  );
+  // Both of these would put `gc` in charge of deleting the repository itself.
+  expect(() => resolveInRepo({ catalog: { dir: "." } })).toThrow(
+    /must not be the repository root/,
+  );
+  expect(() => resolveInRepo({ catalog: { dir: fakeRepoRoot } })).toThrow(
+    /must not be the repository root/,
+  );
+  expect(() => resolveInRepo({ catalog: { dir: ".git/dive" } })).toThrow(
+    /must not be inside `.git`/,
+  );
+  expect(() => resolveInRepo({ catalog: { checkIgnoreFiles: "yes" } })).toThrow(
+    /`catalog.checkIgnoreFiles` must be a boolean/,
+  );
 });
 
 test("loadConfig returns defaults when no config file exists", async () => {

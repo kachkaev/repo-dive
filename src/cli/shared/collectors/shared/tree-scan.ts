@@ -92,12 +92,14 @@ const parsedMemoCapacity = 400_000;
  */
 export const scanTreeWithBlobCache = ({
   repoRoot,
+  catalogPath,
   sha,
   collectorName,
   cacheKey,
   scanContent,
 }: {
   readonly repoRoot: string;
+  readonly catalogPath: string;
   readonly sha: string;
   readonly collectorName: string;
   /** The collector's cache fingerprint (see {@link CollectContext.cacheKey}). */
@@ -107,7 +109,7 @@ export const scanTreeWithBlobCache = ({
 }): Effect.Effect<Array<{ filePath: string; result: unknown }>, Error> =>
   Effect.gen(function* () {
     const blobs = yield* listSourceBlobs(repoRoot, sha);
-    const cache = getBlobCache(repoRoot);
+    const cache = getBlobCache(catalogPath);
 
     const memoKey = (blobSha: string) =>
       `${collectorName}:${cacheKey}:${blobSha}`;

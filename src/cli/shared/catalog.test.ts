@@ -11,7 +11,8 @@ import path from "node:path";
 import { Effect } from "effect";
 import { expect, test } from "vitest";
 
-import { catalogDirName, openCatalog } from "./catalog.ts";
+import { openCatalog } from "./catalog.ts";
+import { defaultCatalogDirName } from "./config.ts";
 
 const legacyCatalogDirName = ".repo-insighter";
 
@@ -34,9 +35,14 @@ test("openCatalog scaffolds a self-ignoring catalog", async () => {
   const repoRoot = makeRepoRoot();
 
   try {
-    const catalog = await Effect.runPromise(openCatalog(repoRoot));
+    const catalog = await Effect.runPromise(
+      openCatalog({
+        repoRoot,
+        catalogPath: path.join(repoRoot, defaultCatalogDirName),
+      }),
+    );
 
-    expect(catalog.rootPath).toBe(path.join(repoRoot, catalogDirName));
+    expect(catalog.rootPath).toBe(path.join(repoRoot, defaultCatalogDirName));
     expect(existsSync(path.join(catalog.rootPath, "catalog.json"))).toBe(true);
     expect(existsSync(path.join(catalog.rootPath, ".gitignore"))).toBe(true);
   } finally {
@@ -50,11 +56,16 @@ test("openCatalog points at a catalog left by the former name", async () => {
   try {
     writeCatalogManifest(repoRoot, legacyCatalogDirName);
 
-    await expect(Effect.runPromise(openCatalog(repoRoot))).rejects.toThrow(
-      /left by repo-insighter/,
-    );
+    await expect(
+      Effect.runPromise(
+        openCatalog({
+          repoRoot,
+          catalogPath: path.join(repoRoot, defaultCatalogDirName),
+        }),
+      ),
+    ).rejects.toThrow(/left by repo-insighter/);
     // Bailing out must not leave a half-made catalog that hides the old one.
-    expect(existsSync(path.join(repoRoot, catalogDirName))).toBe(false);
+    expect(existsSync(path.join(repoRoot, defaultCatalogDirName))).toBe(false);
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
   }
@@ -65,10 +76,15 @@ test("openCatalog ignores the former name once the catalog is renamed", async ()
 
   try {
     writeCatalogManifest(repoRoot, legacyCatalogDirName);
-    writeCatalogManifest(repoRoot, catalogDirName);
+    writeCatalogManifest(repoRoot, defaultCatalogDirName);
 
-    const catalog = await Effect.runPromise(openCatalog(repoRoot));
-    expect(catalog.rootPath).toBe(path.join(repoRoot, catalogDirName));
+    const catalog = await Effect.runPromise(
+      openCatalog({
+        repoRoot,
+        catalogPath: path.join(repoRoot, defaultCatalogDirName),
+      }),
+    );
+    expect(catalog.rootPath).toBe(path.join(repoRoot, defaultCatalogDirName));
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
   }

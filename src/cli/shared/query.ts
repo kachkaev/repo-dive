@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import { Console, Effect } from "effect";
 
-import { catalogDirName } from "./catalog.ts";
+import { loadConfig } from "./config.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
 const toError = (error: unknown) =>
@@ -22,11 +22,11 @@ export type QueryResult = {
  * accepted, so the cube can never be mutated through this path.
  */
 export const executeQuery = (
-  repoRoot: string,
+  catalogPath: string,
   sql: string,
   maxRows = 1000,
 ): QueryResult => {
-  const dbPath = path.join(repoRoot, catalogDirName, "index", "metrics.sqlite");
+  const dbPath = path.join(catalogPath, "index", "metrics.sqlite");
   if (!existsSync(dbPath)) {
     throw new Error(
       `No metrics cube at ${dbPath} — run \`repo-dive scan\` and \`repo-dive index\` first.`,
@@ -107,8 +107,9 @@ export const runQuery = ({
 }): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
+    const config = yield* loadConfig(repoRoot);
     const result = yield* Effect.try({
-      try: () => executeQuery(repoRoot, sql),
+      try: () => executeQuery(config.catalogPath, sql),
       catch: toError,
     });
     yield* Console.log(

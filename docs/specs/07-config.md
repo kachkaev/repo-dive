@@ -29,6 +29,12 @@ export default defineConfig({
     // First day of the week in calendar-shaped charts.
     weekStartsOn: "monday",
   },
+  catalog: {
+    // Where snapshots, caches and the cube are kept.
+    dir: ".repo-dive",
+    // Warn when the repo's ignore files don't cover the catalog.
+    checkIgnoreFiles: true,
+  },
 });
 ```
 
@@ -40,7 +46,8 @@ repo-dive derives its metrics from each commit's git **author** (not the committ
 
 ## Loading
 
-The config is read by the **`index`** step (the map phase stays raw — the catalog is never rewritten).
+`catalog` is read by every command — it decides where the catalog is.
+The rest is read by the **`index`** step (the map phase stays raw — the catalog is never rewritten).
 `.ts` config relies on Node's built-in type stripping, unflagged since Node 22.18 / 23.6; on older runtimes use a `.mjs`/`.js` config.
 Malformed config fails `index` with a friendly message rather than silently degrading.
 
@@ -82,3 +89,28 @@ Which day calendar-shaped dashboard charts (currently the commit calendar) start
 One of `"monday"` (the default) or `"sunday"`.
 The value is not specific to any single chart — future calendar-shaped charts are expected to honor it too.
 It flows into `dashboard.json` under `config.charts.weekStartsOn`, so the dashboard renders without re-reading the config file.
+
+## `catalog`
+
+### `catalog.dir`
+
+Where the catalog of raw snapshots, content caches and the metrics cube lives.
+Defaults to `.repo-dive`; relative paths resolve against the repository root, absolute ones are taken as they are.
+Two placements are refused outright, because `gc` deletes whole subtrees under this path: the repository root itself, and anything inside `.git`.
+
+Pointing it outside the repository (`"../repo-dive-catalogs/my-repo"`, `"/var/cache/repo-dive/my-repo"`) keeps the analyzed working tree completely untouched, and makes the ignore-file question below moot.
+Moving an existing catalog is a `mv` — nothing inside it records its own location.
+
+### `catalog.checkIgnoreFiles`
+
+The catalog hides itself from git by writing a nested `.gitignore` holding `*`.
+That trick is git's alone: prettier, markdownlint, cspell, eslint, `docker build` and `npm pack` each read a single ignore file at the **root** of the repository and know nothing about nested ones.
+Unless the catalog is listed there too, its thousands of small files quietly become their input.
+
+So `scan`, `index` and `status` check every root ignore file — anything matching `.*ignore` — and warn on stderr about the ones that do not cover the catalog, pointing at [`repo-dive ignore-catalog`](02-cli.md), which appends the entry.
+Set `checkIgnoreFiles` to `false` to silence the warning.
+The check is skipped entirely when the catalog sits outside the repository, where nothing walking the repo can reach it.
+
+Coverage is decided by reading the patterns, not by running each tool: the forms people write (`.repo-dive`, `/.repo-dive/`, `**/.repo-dive`, an ancestor directory, a catch-all `*`, a later `!` re-include) are recognized, and anything ambiguous counts as covered.
+A warning that nags about an entry already sitting in the file is worse than one that never appears.
+Only the repository root is searched; ignore files deeper in the tree govern their own subtree.

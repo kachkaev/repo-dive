@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { Console, Effect } from "effect";
 
-import { catalogDirName } from "./catalog.ts";
+import { loadConfig } from "./config.ts";
 import { openInBrowser, resolveAssetsDir } from "./dashboard-server.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
@@ -27,12 +27,8 @@ export const runReport = ({
 }): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
-    const dataPath = path.join(
-      repoRoot,
-      catalogDirName,
-      "index",
-      "dashboard.json",
-    );
+    const config = yield* loadConfig(repoRoot);
+    const dataPath = path.join(config.catalogPath, "index", "dashboard.json");
     if (!existsSync(dataPath)) {
       return yield* Effect.fail(
         new Error(
@@ -100,7 +96,7 @@ export const runReport = ({
     });
 
     const resolvedOutPath =
-      outPath ?? path.join(repoRoot, catalogDirName, "index", "report.html");
+      outPath ?? path.join(config.catalogPath, "index", "report.html");
     yield* Effect.tryPromise({
       try: () => writeFile(resolvedOutPath, html, "utf8"),
       catch: toError,

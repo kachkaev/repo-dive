@@ -10,7 +10,7 @@ import {
   listBlobCacheNamespaces,
   pruneBlobCacheNamespaces,
 } from "./blob-cache.ts";
-import { catalogDirName, readCollectorCacheKey } from "./catalog.ts";
+import { readCollectorCacheKey } from "./catalog.ts";
 import {
   builtInCollectors,
   collectorCacheKey,
@@ -70,7 +70,8 @@ type GcPlan = {
 
 const buildPlan = (repoRoot: string): Effect.Effect<GcPlan, Error> =>
   Effect.gen(function* () {
-    const catalogPath = path.join(repoRoot, catalogDirName);
+    const config = yield* loadConfig(repoRoot);
+    const catalogPath = config.catalogPath;
     const commitsPath = path.join(catalogPath, "commits");
     const catalogShas = yield* readdirIfExists(commitsPath);
 
@@ -81,7 +82,6 @@ const buildPlan = (repoRoot: string): Effect.Effect<GcPlan, Error> =>
     );
     const firstParentShas = yield* listFirstParentShas(repoRoot);
 
-    const config = yield* loadConfig(repoRoot);
     const currentCacheKeys = new Map(
       builtInCollectors.map((collector) => [
         collector.name,
@@ -154,7 +154,7 @@ const buildPlan = (repoRoot: string): Effect.Effect<GcPlan, Error> =>
       ),
     );
     const staleCacheNamespaces = (yield* Effect.try({
-      try: () => listBlobCacheNamespaces(repoRoot),
+      try: () => listBlobCacheNamespaces(catalogPath),
       catch: toError,
     })).filter(
       (namespace) =>
@@ -417,7 +417,10 @@ export const runGc = ({
     const cacheBytesReclaimed = pruneCacheNamespaces
       ? yield* Effect.try({
           try: () =>
-            pruneBlobCacheNamespaces(repoRoot, plan.staleCacheNamespaces),
+            pruneBlobCacheNamespaces(
+              plan.catalogPath,
+              plan.staleCacheNamespaces,
+            ),
           catch: toError,
         })
       : 0;

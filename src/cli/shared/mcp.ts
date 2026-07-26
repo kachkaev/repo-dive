@@ -3,6 +3,7 @@ import { Effect, Layer, Logger, Schema } from "effect";
 import { McpServer, Tool, Toolkit } from "effect/unstable/ai";
 
 import packageJson from "../../../package.json" with { type: "json" };
+import { loadConfig } from "./config.ts";
 import { executeQuery } from "./query.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
@@ -28,19 +29,19 @@ const schemaTool = Tool.make("schema", {
   .annotate(Tool.Readonly, true)
   .annotate(Tool.Destructive, false);
 
-const buildSchemaDescription = (repoRoot: string): unknown => {
+const buildSchemaDescription = (catalogPath: string): unknown => {
   const metrics = executeQuery(
-    repoRoot,
+    catalogPath,
     `SELECT metric, count(*) AS facts, min(value) AS min_value, max(value) AS max_value
      FROM facts GROUP BY metric ORDER BY metric`,
   );
   const categorySamples = executeQuery(
-    repoRoot,
+    catalogPath,
     `SELECT metric, categories FROM facts
      WHERE id IN (SELECT min(id) FROM facts GROUP BY metric)`,
   );
   const commitRange = executeQuery(
-    repoRoot,
+    catalogPath,
     "SELECT count(*) AS commits, min(authored_at) AS first, max(authored_at) AS last FROM commits",
   );
 
@@ -78,10 +79,11 @@ export const buildMcpLayer = (
 ): Effect.Effect<Layer.Layer<never, Error>, Error> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
+    const { catalogPath } = yield* loadConfig(repoRoot);
 
     // Fail fast (before the protocol starts) if the cube is missing.
     yield* Effect.try({
-      try: () => executeQuery(repoRoot, "SELECT 1"),
+      try: () => executeQuery(catalogPath, "SELECT 1"),
       catch: (error) =>
         error instanceof Error ? error : new Error(String(error)),
     });
@@ -90,7 +92,7 @@ export const buildMcpLayer = (
       query: ({ sql }) =>
         Effect.try({
           try: (): unknown => {
-            const result = executeQuery(repoRoot, sql, 200);
+            const result = executeQuery(catalogPath, sql, 200);
             return {
               columns: result.columns,
               rows: result.rows,
@@ -106,7 +108,7 @@ export const buildMcpLayer = (
         ),
       schema: () =>
         Effect.try({
-          try: (): unknown => buildSchemaDescription(repoRoot),
+          try: (): unknown => buildSchemaDescription(catalogPath),
           catch: (error) =>
             error instanceof Error ? error : new Error(String(error)),
         }).pipe(

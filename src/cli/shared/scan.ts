@@ -14,6 +14,7 @@ import {
 } from "./collectors.ts";
 import { loadConfig } from "./config.ts";
 import { GitCommandError, runGit } from "./git.ts";
+import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import {
   parseSamplingPolicy,
   sampleCommits,
@@ -143,7 +144,13 @@ const runCollector = ({
   Effect.gen(function* () {
     const startedAt = Date.now();
     const output = yield* collector
-      .collect({ repoRoot: catalog.repoRoot, sha, cacheKey, worktreePath })
+      .collect({
+        repoRoot: catalog.repoRoot,
+        catalogPath: catalog.rootPath,
+        sha,
+        cacheKey,
+        worktreePath,
+      })
       .pipe(
         Effect.mapError(
           (error) =>
@@ -285,12 +292,16 @@ export const runScan = ({
     const selected =
       maxCommits === undefined ? commits : commits.slice(0, maxCommits);
 
-    const catalog = yield* openCatalog(repoRoot);
-    const summary = summarizeCommits(commits);
-
     // One fingerprint per collector for the whole run: the config it depends on
     // is fixed, so this decides re-collection uniformly across every commit.
     const config = yield* loadConfig(repoRoot);
+
+    const catalog = yield* openCatalog({
+      repoRoot,
+      catalogPath: config.catalogPath,
+    });
+    const summary = summarizeCommits(commits);
+
     const cacheKeys = new Map(
       collectors.map((collector) => [
         collector.name,
@@ -470,4 +481,6 @@ export const runScan = ({
         ].join("\n"),
       );
     }
+
+    yield* warnAboutIgnoreFiles({ repoRoot, config });
   });

@@ -40,6 +40,7 @@ test("scanTreeFilesWithBlobCache caches an undefined scan result without failing
     const scan = Effect.runPromise(
       scanTreeFilesWithBlobCache({
         repoRoot: repoPath,
+        catalogPath: path.join(repoPath, ".repo-dive"),
         sha,
         collectorName: "test",
         cacheKey: "v1",

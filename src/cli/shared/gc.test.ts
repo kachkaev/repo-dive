@@ -80,8 +80,11 @@ async function seedOutput(
   const collector = collectorNamed(collectorName);
   await Effect.runPromise(
     Effect.gen(function* () {
-      const catalog = yield* openCatalog(repoRoot);
       const config = yield* loadConfig(repoRoot);
+      const catalog = yield* openCatalog({
+        repoRoot,
+        catalogPath: config.catalogPath,
+      });
       yield* writeCollectorOutput({
         catalog,
         sha,
@@ -168,7 +171,8 @@ test("gc --stale drops blob-cache namespaces no collector can look up", async ()
     const collector = collectorNamed("directives");
     const config = await Effect.runPromise(loadConfig(repoPath));
     const liveCacheKey = collectorCacheKey(collector, config);
-    const cache = getBlobCache(repoPath);
+    const { catalogPath } = config;
+    const cache = getBlobCache(catalogPath);
     const entries = new Map([["0".repeat(40), "[]"]]);
 
     cache.setMany(collector.name, liveCacheKey, entries);
@@ -176,19 +180,19 @@ test("gc --stale drops blob-cache namespaces no collector can look up", async ()
     cache.setMany(collector.name, "000000000000", entries);
     cache.setMany("retired-collector", liveCacheKey, entries);
 
-    expect(listBlobCacheNamespaces(repoPath)).toHaveLength(3);
+    expect(listBlobCacheNamespaces(catalogPath)).toHaveLength(3);
 
     await Effect.runPromise(
       runGc({ repoPath, stale: true, dryRun: true, yes: true }),
     );
     expect(
-      listBlobCacheNamespaces(repoPath),
+      listBlobCacheNamespaces(catalogPath),
       "--dry-run must leave the cache alone",
     ).toHaveLength(3);
 
     await Effect.runPromise(runGc({ repoPath, stale: true, yes: true }));
 
-    expect(listBlobCacheNamespaces(repoPath)).toEqual([
+    expect(listBlobCacheNamespaces(catalogPath)).toEqual([
       { collector: collector.name, cacheKey: liveCacheKey, entryCount: 1 },
     ]);
   } finally {
@@ -197,10 +201,10 @@ test("gc --stale drops blob-cache namespaces no collector can look up", async ()
 });
 
 test("pruneBlobCacheNamespaces compacts the file it prunes", () => {
-  const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-cache-"));
+  const catalogPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-cache-"));
 
   try {
-    const cache = getBlobCache(repoPath);
+    const cache = getBlobCache(catalogPath);
     const bulk = new Map(
       Array.from({ length: 2000 }, (_, index) => [
         String(index).padStart(40, "0"),
@@ -216,7 +220,7 @@ test("pruneBlobCacheNamespaces compacts the file it prunes", () => {
       new Map([["a".repeat(40), "[]"]]),
     );
 
-    const bytesReclaimed = pruneBlobCacheNamespaces(repoPath, [
+    const bytesReclaimed = pruneBlobCacheNamespaces(catalogPath, [
       { collector: "directives", cacheKey: "deadbeef0000" },
     ]);
 
@@ -224,10 +228,10 @@ test("pruneBlobCacheNamespaces compacts the file it prunes", () => {
       bytesReclaimed,
       "VACUUM should hand back the freed pages",
     ).toBeGreaterThan(0);
-    expect(listBlobCacheNamespaces(repoPath)).toEqual([
+    expect(listBlobCacheNamespaces(catalogPath)).toEqual([
       { collector: "directives", cacheKey: "cafebabe1111", entryCount: 1 },
     ]);
   } finally {
-    rmSync(repoPath, { force: true, recursive: true });
+    rmSync(catalogPath, { force: true, recursive: true });
   }
 });

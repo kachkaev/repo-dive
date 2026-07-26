@@ -8,7 +8,7 @@ import { NodeServices } from "@effect/platform-node";
 import { Console, Effect } from "effect";
 import { ChildProcess } from "effect/unstable/process";
 
-import { catalogDirName } from "./catalog.ts";
+import { loadConfig } from "./config.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
 const toError = (error: unknown) =>
@@ -68,12 +68,8 @@ export const runDashboard = ({
 }): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
-    const dataPath = path.join(
-      repoRoot,
-      catalogDirName,
-      "index",
-      "dashboard.json",
-    );
+    const config = yield* loadConfig(repoRoot);
+    const dataPath = path.join(config.catalogPath, "index", "dashboard.json");
     if (!existsSync(dataPath)) {
       return yield* Effect.fail(
         new Error(

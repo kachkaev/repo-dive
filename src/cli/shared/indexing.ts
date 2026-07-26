@@ -4,7 +4,6 @@ import { DatabaseSync } from "node:sqlite";
 
 import { Console, Effect } from "effect";
 
-import { catalogDirName } from "./catalog.ts";
 import {
   builtInCollectors,
   describesTreeState,
@@ -15,6 +14,7 @@ import {
   normalizeContributorName,
   type ResolvedConfig,
 } from "./config.ts";
+import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
 const toError = (error: unknown) =>
@@ -439,7 +439,7 @@ export const runIndex = ({
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
     const config = yield* loadConfig(repoRoot);
-    const catalogPath = path.join(repoRoot, catalogDirName);
+    const catalogPath = config.catalogPath;
     const commitsPath = path.join(catalogPath, "commits");
     const registry = new Map(
       builtInCollectors.map((collector) => [collector.name, collector]),
@@ -564,4 +564,6 @@ export const runIndex = ({
           : []),
       ].join("\n"),
     );
+
+    yield* warnAboutIgnoreFiles({ repoRoot, config });
   });
