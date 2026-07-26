@@ -78,6 +78,13 @@ type SurvivalRow = {
 
 export type ContributorKind = "human" | "bot" | "ai";
 
+/**
+ * Cross-kind collaboration counts, keyed by the *other* party's kind. Only
+ * kinds with a non-zero count are present; a contributor's own kind never is
+ * (same-kind co-authorship isn't tracked).
+ */
+type CrossKindCounts = Partial<Record<ContributorKind, number>>;
+
 type ContributorRow = {
   email: string;
   name: string;
@@ -88,6 +95,23 @@ type ContributorRow = {
   commits: number;
   added: number;
   deleted: number;
+  /**
+   * Own commits carrying at least one co-author of that other kind — the
+   * hatched tail of the "authored" bar. Counted once per commit per kind, so
+   * the per-kind counts can sum above the number of assisted commits when one
+   * commit was helped by two kinds at once.
+   *
+   * Absent in dashboard.json written before cross-kind collaboration landed.
+   */
+  assistedBy?: CrossKindCounts;
+  /**
+   * Commits by an author of that other kind that this contributor co-authored
+   * — the "assisted" bar. Each commit has one author, so these sum exactly to
+   * the bar's total.
+   *
+   * Absent in dashboard.json written before cross-kind collaboration landed.
+   */
+  assisted?: CrossKindCounts;
 };
 
 export type DashboardData = {
@@ -119,7 +143,6 @@ export type DashboardData = {
   topRules: Array<{ rule: string; count: number }>;
   survival: SurvivalRow[];
   contributors: ContributorRow[];
-  aiIdentities: Array<{ identity: string; commits: number }>;
 };
 
 /** Inlined by `repo-dive report` so the export works from a single file. */
