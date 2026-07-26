@@ -36,5 +36,5 @@ Bare `repo-dive` with no subcommand runs `scan` + `index` + `dashboard` in seque
 
 ## Implementation notes
 
-- Commands are defined with `effect/unstable/cli` (`Command.make` + `Flag`), one file per command under `src/commands/`, mirroring the s20-wifi-setup bootstrap.
-- Command handlers stay thin; the real logic lives in `src/lib/` so it can be unit-tested without spawning the CLI.
+- Commands are defined with `effect/unstable/cli` (`Command.make` + `Flag`), one file per command (`src/cli/*-command.ts`), mirroring the s20-wifi-setup bootstrap.
+- Command handlers stay thin; the real logic lives in `src/cli/shared/` so it can be unit-tested without spawning the CLI.

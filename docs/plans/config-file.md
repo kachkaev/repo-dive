@@ -41,8 +41,8 @@ Note the categorical palette has 8 slots — beyond 8, series need the sequentia
 
 - **Loading**: the config lives in the analyzed repo, not in repo-dive. Node ≥ 22.18 strips types on `import()`, so a plain dynamic `import(pathToFileURL(configPath))` of the `.ts` file should work without a bundler — verify, and fall back to also accepting `.mjs`/`.js`. Check whether Effect v4 has file-config helpers worth using (`effect/config` is env-oriented; probably not a fit — confirm against the cloned Effect source, which is the API source of truth).
 - **`defineConfig` export**: needs a `repo-dive/config` subpath export in package.json that ships types but almost no runtime (identity function). The CLI bundle currently has no secondary entry — add one to the vite config.
-- **Validation**: parse the imported object structurally (same no-assertions style as `src/lib/json.ts`) and fail with a friendly message on malformed config.
-- **Plumbing**: `runIndex` gets the config (resolved from `--repo` root); alias resolution is a `canonicalizeAuthor(email)` step applied wherever `prettifyAuthorEmail` is used today ([indexing.ts](../../src/lib/indexing.ts)). Dashboard data shape doesn't change.
+- **Validation**: parse the imported object structurally (same no-assertions style as `src/shared/json.ts`) and fail with a friendly message on malformed config.
+- **Plumbing**: `runIndex` gets the config (resolved from `--repo` root); alias resolution is a `canonicalizeAuthor(email)` step applied wherever `prettifyAuthorEmail` is used today ([indexing.ts](../../src/cli/shared/indexing.ts)). Dashboard data shape doesn't change.
 - **Docs**: README section + spec update (02-cli or a new 07-config spec). Changeset: minor.
 
 ## Testing
