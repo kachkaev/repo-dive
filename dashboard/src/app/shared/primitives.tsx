@@ -109,7 +109,9 @@ export function DataTable({
 }) {
   return (
     <details className="mt-3 text-xs text-(--text-secondary)">
-      <summary className="cursor-pointer select-none">{caption}</summary>
+      <summary className="select-none hover:text-(--text-primary)">
+        {caption}
+      </summary>
       <div className="mt-2 max-h-64 overflow-auto">
         <table className="w-full text-left tabular-nums">
           <thead>

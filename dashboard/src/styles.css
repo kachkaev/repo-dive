@@ -1,5 +1,28 @@
 @import "tailwindcss";
 
+/*
+ * shadcn-style semantic tokens (background, popover, accent, …) backed by the
+ * existing dashboard palette, so the @ui-primitive components can keep their
+ * canonical shadcn class names (bg-popover, border-input, ring-ring, …) and
+ * future shadcn components can be dropped in without restyling. Both themes
+ * come for free: the underlying palette vars flip via prefers-color-scheme.
+ */
+@theme inline {
+  --color-background: var(--surface-1);
+  --color-foreground: var(--text-primary);
+  --color-popover: var(--surface-1);
+  --color-popover-foreground: var(--text-primary);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--surface-2);
+  --color-accent-foreground: var(--text-primary);
+  --color-primary: var(--series-1);
+  --color-primary-foreground: #ffffff;
+  --color-border: var(--grid-line);
+  --color-input: var(--grid-line);
+  --color-ring: var(--series-1);
+}
+
 /* Data-viz palette (validated reference instance): series slots + surfaces. */
 :root {
   color-scheme: light;

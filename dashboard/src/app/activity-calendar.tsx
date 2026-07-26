@@ -1,6 +1,10 @@
 import { useId, useState } from "react";
 
 import type { ContributorKind } from "../data.ts";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "./shared/@ui-primitive/toggle-group.tsx";
 import { formatMonth, monthShortNames } from "./shared/format.ts";
 
 export type WeekStart = "monday" | "sunday";
@@ -640,24 +644,27 @@ export function CommitCalendar({
   return (
     <div>
       {presentKinds.size > 1 && (
-        <div
-          role="group"
+        <ToggleGroup
+          value={[kindFilter]}
+          onValueChange={(groupValue) => {
+            // Single-select semantics on an array-valued group: re-clicking the
+            // pressed chip yields [] — keep the current filter (one is always
+            // active) rather than allowing an empty selection.
+            const next = groupValue.at(-1);
+            if (typeof next === "string") {
+              onKindFilterChange(next as CalendarKindFilter);
+            }
+          }}
           aria-label="Filter calendar by contributor kind"
-          className="mb-3 flex flex-wrap gap-1.5"
+          variant="outline"
+          size="sm"
+          className="mb-3 flex-wrap gap-1.5"
         >
           {filterOptions.map((option) => (
-            <button
+            <ToggleGroupItem
               key={option}
-              type="button"
-              aria-pressed={kindFilter === option}
-              onClick={() => {
-                onKindFilterChange(option);
-              }}
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${
-                kindFilter === option
-                  ? "border-(--text-muted) bg-(--surface-2) text-(--text-primary)"
-                  : "cursor-pointer border-(--grid-line) text-(--text-secondary) hover:text-(--text-primary)"
-              }`}
+              value={option}
+              className="h-auto gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-normal text-(--text-secondary) shadow-none hover:bg-transparent hover:text-(--text-primary) data-pressed:border-(--text-muted) data-pressed:text-(--text-primary)"
             >
               <span
                 className="inline-block size-2.5 rounded-xs"
@@ -670,9 +677,9 @@ export function CommitCalendar({
                 }}
               />
               {option === "all" ? "All" : kindFilterLabels[option]}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       )}
       <div className="overflow-x-auto">
         <div className="flex w-max min-w-full flex-col gap-3">
