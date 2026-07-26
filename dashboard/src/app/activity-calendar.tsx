@@ -317,17 +317,24 @@ function CellStack({
     parts.map((part) => part.value),
     cellSize,
   );
+  const segments: Array<{ part: StackPart; partHeight: number; topY: number }> =
+    [];
   let nextTopY = y + cellSize;
-  const rects = parts
-    .map((part, index) => ({ part, partHeight: heights[index] ?? 0 }))
-    .filter(({ partHeight }) => partHeight > 0)
-    .map(({ part, partHeight }) => {
-      nextTopY -= partHeight;
-      return (
+  for (const [index, part] of parts.entries()) {
+    const partHeight = heights[index] ?? 0;
+    if (partHeight <= 0) {
+      continue;
+    }
+    nextTopY -= partHeight;
+    segments.push({ part, partHeight, topY: nextTopY });
+  }
+  return (
+    <g opacity={levelOpacities[level]} clipPath={`url(#${clipId})`}>
+      {segments.map(({ part, partHeight, topY }) => (
         <g key={`${part.kind}-${String(part.hatched)}`}>
           <rect
             x={x}
-            y={nextTopY}
+            y={topY}
             width={cellSize}
             height={partHeight}
             fill={kindColors[part.kind]}
@@ -335,18 +342,14 @@ function CellStack({
           {part.hatched && (
             <rect
               x={x}
-              y={nextTopY}
+              y={topY}
               width={cellSize}
               height={partHeight}
               fill={`url(#${hatchId})`}
             />
           )}
         </g>
-      );
-    });
-  return (
-    <g opacity={levelOpacities[level]} clipPath={`url(#${clipId})`}>
-      {rects}
+      ))}
     </g>
   );
 }
