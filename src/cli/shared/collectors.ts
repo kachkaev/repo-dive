@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { Data, Result } from "effect";
+
 import { churnCollector } from "./collectors/churn.ts";
 import { commitMetaCollector } from "./collectors/commit-meta.ts";
 import { dependenciesCollector } from "./collectors/dependencies.ts";
@@ -28,11 +30,23 @@ export const builtInCollectors: readonly Collector[] = [
   survivalCollector,
 ];
 
+export class UnknownCollectorError extends Data.TaggedError(
+  "UnknownCollectorError",
+)<{
+  readonly name: string;
+}> {
+  override get message(): string {
+    return `Unknown collector: ${this.name}. Available: ${builtInCollectors
+      .map((candidate) => candidate.name)
+      .join(", ")}`;
+  }
+}
+
 export const resolveCollectors = (
   names: string | undefined,
-): Collector[] | Error => {
+): Result.Result<Collector[], UnknownCollectorError> => {
   if (names === undefined) {
-    return [...builtInCollectors];
+    return Result.succeed([...builtInCollectors]);
   }
 
   const requested = names
@@ -46,16 +60,12 @@ export const resolveCollectors = (
       (candidate) => candidate.name === name,
     );
     if (!collector) {
-      return new Error(
-        `Unknown collector: ${name}. Available: ${builtInCollectors
-          .map((candidate) => candidate.name)
-          .join(", ")}`,
-      );
+      return Result.fail(new UnknownCollectorError({ name }));
     }
     resolved.push(collector);
   }
 
-  return resolved;
+  return Result.succeed(resolved);
 };
 
 /** Length of the hex fingerprint. 12 hex chars = 48 bits — collision-safe for

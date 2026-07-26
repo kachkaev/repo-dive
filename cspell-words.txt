@@ -13,6 +13,8 @@ DDL
 dedupe
 dsl
 EAV
+Effectful
+ENOENT
 env
 esbuild
 explorable
@@ -33,11 +35,13 @@ JVM
 Kachkaev
 knip
 libsql
+LLM
 lockfiles
 maat
 matplotlib
 MCP
 mergestat
+Millis
 mousemove
 msgpackr
 mts
@@ -81,3 +85,4 @@ worktree
 worktrees
 xdg
 xyz
+yieldable

@@ -2,7 +2,8 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { Console, Effect } from "effect";
+import { Console, Data, Effect } from "effect";
+import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import { catalogDirName } from "./catalog.ts";
 import {
@@ -17,8 +18,15 @@ import {
 } from "./config.ts";
 import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
-const toError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
+class NoCollectedCommitsError extends Data.TaggedError(
+  "NoCollectedCommitsError",
+)<{
+  readonly commitsPath: string;
+}> {
+  override get message(): string {
+    return `No collected commits found in ${this.commitsPath} — run \`repo-dive scan\` first.`;
+  }
+}
 
 /**
  * Heuristic for AI coding assistants appearing as commit co-authors.
@@ -435,7 +443,7 @@ export const runIndex = ({
   repoPath,
 }: {
   readonly repoPath: string;
-}): Effect.Effect<void, Error> =>
+}): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
     const config = yield* loadConfig(repoRoot);
@@ -448,15 +456,12 @@ export const runIndex = ({
     const gitCommits = yield* listCommits(repoRoot);
     const firstParentShas = yield* listFirstParentShas(repoRoot);
     const catalogShas = new Set(
-      yield* Effect.tryPromise({
-        try: async () => {
-          try {
-            return await readdir(commitsPath);
-          } catch {
-            return [];
-          }
-        },
-        catch: toError,
+      yield* Effect.tryPromise(async () => {
+        try {
+          return await readdir(commitsPath);
+        } catch {
+          return [];
+        }
       }),
     );
 
@@ -466,86 +471,76 @@ export const runIndex = ({
       .filter((commit) => catalogShas.has(commit.hash));
 
     if (orderedCommits.length === 0) {
-      return yield* Effect.fail(
-        new Error(
-          `No collected commits found in ${commitsPath} — run \`repo-dive scan\` first.`,
-        ),
-      );
+      return yield* new NoCollectedCommitsError({ commitsPath });
     }
 
-    let unknownCollectorDirs = 0;
-    let offMainlineSnapshots = 0;
-
-    const commitFacts: CommitFacts[] = [];
-    yield* Effect.forEach(
+    // Concurrent reads still land in input (chronological) order — forEach
+    // preserves element order in the collected results.
+    const readOutcomes = yield* Effect.forEach(
       orderedCommits,
       (commit) =>
-        Effect.tryPromise({
-          try: async (): Promise<CommitFacts> => {
-            const commitDir = path.join(commitsPath, commit.hash);
-            const onMainline = firstParentShas.has(commit.hash);
-            const factsByCollector = new Map<string, readonly Fact[]>();
-            for (const collectorName of await readdir(commitDir)) {
-              const collector = registry.get(collectorName);
-              if (!collector) {
-                unknownCollectorDirs += 1;
-                continue;
-              }
-              // Snapshots taken off the mainline (by an older version of this
-              // tool, or before a rebase moved the commit aside) would show up
-              // as cliffs in every timeline. Leave them in the catalog but out
-              // of the cube.
-              if (!onMainline && describesTreeState(collector)) {
-                offMainlineSnapshots += 1;
-                continue;
-              }
-              const raw: unknown = JSON.parse(
-                await readFile(
-                  path.join(commitDir, collectorName, "output.json"),
-                  "utf8",
-                ),
-              );
-              factsByCollector.set(collectorName, collector.normalize(raw));
+        Effect.tryPromise(async () => {
+          const commitDir = path.join(commitsPath, commit.hash);
+          const onMainline = firstParentShas.has(commit.hash);
+          const factsByCollector = new Map<string, readonly Fact[]>();
+          let unknownCollectorDirs = 0;
+          let offMainlineSnapshots = 0;
+          for (const collectorName of await readdir(commitDir)) {
+            const collector = registry.get(collectorName);
+            if (!collector) {
+              unknownCollectorDirs += 1;
+              continue;
             }
-            return {
-              sha: commit.hash,
-              date: commit.authorDate,
-              authorEmail: commit.authorEmail,
-              authorName: commit.authorName,
-              factsByCollector,
-            };
-          },
-          catch: toError,
-        }).pipe(Effect.map((facts) => commitFacts.push(facts))),
-      { concurrency: 16, discard: true },
+            // Snapshots taken off the mainline (by an older version of this
+            // tool, or before a rebase moved the commit aside) would show up
+            // as cliffs in every timeline. Leave them in the catalog but out
+            // of the cube.
+            if (!onMainline && describesTreeState(collector)) {
+              offMainlineSnapshots += 1;
+              continue;
+            }
+            const raw: unknown = JSON.parse(
+              await readFile(
+                path.join(commitDir, collectorName, "output.json"),
+                "utf8",
+              ),
+            );
+            factsByCollector.set(collectorName, collector.normalize(raw));
+          }
+          const facts: CommitFacts = {
+            sha: commit.hash,
+            date: commit.authorDate,
+            authorEmail: commit.authorEmail,
+            authorName: commit.authorName,
+            factsByCollector,
+          };
+          return { facts, unknownCollectorDirs, offMainlineSnapshots };
+        }),
+      { concurrency: 16 },
     );
 
-    // The map above may finish out of order; restore chronology.
-    commitFacts.sort((left, right) => left.date.localeCompare(right.date));
+    const commitFacts = readOutcomes.map((outcome) => outcome.facts);
+    const unknownCollectorDirs = readOutcomes.reduce(
+      (total, outcome) => total + outcome.unknownCollectorDirs,
+      0,
+    );
+    const offMainlineSnapshots = readOutcomes.reduce(
+      (total, outcome) => total + outcome.offMainlineSnapshots,
+      0,
+    );
 
     const indexDir = path.join(catalogPath, "index");
-    yield* Effect.tryPromise({
-      try: () => mkdir(indexDir, { recursive: true }),
-      catch: toError,
-    });
+    yield* Effect.tryPromise(() => mkdir(indexDir, { recursive: true }));
 
     const dbPath = path.join(indexDir, "metrics.sqlite");
-    yield* Effect.tryPromise({
-      try: () => rm(dbPath, { force: true }),
-      catch: toError,
-    });
-    const factCount = yield* Effect.try({
-      try: () => writeSqlite(dbPath, commitFacts),
-      catch: toError,
-    });
+    yield* Effect.tryPromise(() => rm(dbPath, { force: true }));
+    const factCount = yield* Effect.try(() => writeSqlite(dbPath, commitFacts));
 
     const dashboardData = buildDashboardData(repoRoot, commitFacts, config);
     const dashboardPath = path.join(indexDir, "dashboard.json");
-    yield* Effect.tryPromise({
-      try: () =>
-        writeFile(dashboardPath, JSON.stringify(dashboardData), "utf8"),
-      catch: toError,
-    });
+    yield* Effect.tryPromise(() =>
+      writeFile(dashboardPath, JSON.stringify(dashboardData), "utf8"),
+    );
 
     yield* Console.log(
       [

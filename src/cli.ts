@@ -1,6 +1,6 @@
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Console, Effect } from "effect";
-import { Command, Flag } from "effect/unstable/cli";
+import { Console, Data, Effect, Option, Runtime } from "effect";
+import { CliError, Command, Flag } from "effect/unstable/cli";
 
 import packageJson from "../package.json" with { type: "json" };
 import { collectorsCommand } from "./cli/collectors-command.ts";
@@ -28,8 +28,11 @@ const cli = Command.make("repo-dive", {
     Flag.withDefault(defaultDashboardPort),
     Flag.withDescription("Port to serve the dashboard on"),
   ),
-  noOpen: Flag.boolean("no-open").pipe(
-    Flag.withDescription("Do not open the dashboard in the default browser"),
+  open: Flag.boolean("open").pipe(
+    Flag.optional,
+    Flag.withDescription(
+      "Open the dashboard in the default browser (default: --open; pass --no-open to disable)",
+    ),
   ),
 }).pipe(
   Command.withDescription(
@@ -46,7 +49,7 @@ const cli = Command.make("repo-dive", {
       yield* runDashboard({
         repoPath: config.repoPath,
         port: config.port,
-        open: !config.noOpen,
+        open: Option.getOrElse(config.open, () => true),
       });
     }),
   ),
@@ -63,17 +66,26 @@ const cli = Command.make("repo-dive", {
   ]),
 );
 
-const program = Command.run(cli, { version: packageJson.version }).pipe(
-  Effect.provide(NodeServices.layer),
-  Effect.catch((error) =>
-    Console.error(error.message).pipe(
-      Effect.andThen(
-        Effect.sync(() => {
-          process.exitCode = 1;
-        }),
-      ),
-    ),
-  ),
-);
+/**
+ * Failure that {@link NodeRuntime.runMain} must not log again: the message has
+ * already been printed to stderr (see `Runtime.errorReported`). The process
+ * still exits non-zero.
+ */
+class ReportedCliFailure extends Data.TaggedError("ReportedCliFailure") {
+  override readonly [Runtime.errorReported] = false;
+}
 
-NodeRuntime.runMain(program);
+Command.run(cli, { version: packageJson.version }).pipe(
+  // Domain failures print as one friendly line on stderr. CLI-internal errors
+  // (--help rendering, Ctrl-C quits) keep the framework's own handling and
+  // exit codes.
+  Effect.catchIf(
+    (error) => !CliError.isCliError(error),
+    (error) =>
+      Console.error(
+        error instanceof Error ? error.message : String(error),
+      ).pipe(Effect.andThen(Effect.fail(new ReportedCliFailure()))),
+  ),
+  Effect.provide(NodeServices.layer),
+  NodeRuntime.runMain,
+);
