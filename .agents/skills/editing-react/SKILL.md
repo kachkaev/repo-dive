@@ -29,11 +29,11 @@ For a value that needs a guard, use a ternary (a component body can't hold a bar
 const chart = data.length === 0 ? undefined : buildChart(data);
 ```
 
-`useState`, `useEffect`, `useRef`, and the custom hooks in [`dashboard/src/components`](../../../dashboard/src/components) are still used normally — only the _memoization_ hooks are unnecessary.
+`useState`, `useEffect`, `useRef`, and the custom hooks in [`dashboard/src/app/shared`](../../../dashboard/src/app/shared) are still used normally — only the _memoization_ hooks are unnecessary.
 
 ## Why this matters for the charts
 
-The charts ([`time-stack-chart.tsx`](../../../dashboard/src/components/time-stack-chart.tsx), [`diverging-bars.tsx`](../../../dashboard/src/components/diverging-bars.tsx)) track hover state that updates on every `mousemove`.
+The charts ([`time-stack-chart.tsx`](../../../dashboard/src/app/time-stack-chart.tsx), [`diverging-bars.tsx`](../../../dashboard/src/app/diverging-bars.tsx)) track hover state that updates on every `mousemove`.
 Each update re-renders the component, and the compiler makes that re-render cheap by memoizing the derived data and scales on their inputs.
 Adding a `useMemo` back doesn't help — the compiler already does it.
 But memoizing the _data_ is not enough to stop the expensive area/bar shapes from reconciling on every hover; that needed a structural split (see the last section).
@@ -80,4 +80,4 @@ So when an expensive subtree (the stacked areas/bars) lives in the same parent a
 
 The fix is structural: pull the static marks into their own component whose props are all hover-independent.
 The compiler then memoizes that element, and moving the cursor (which only touches the crosshair/tooltip) reuses it so React skips the shapes.
-This is exactly what [`ChartMarks`](../../../dashboard/src/components/time-stack-chart.tsx) does — keep hover state (`hoverMs`, crosshair, tooltip) out of its props.
+This is exactly what [`ChartMarks`](../../../dashboard/src/app/time-stack-chart.tsx) does — keep hover state (`hoverMs`, crosshair, tooltip) out of its props.

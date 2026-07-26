@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test } from "vitest";
 
-import { arrayAt, numberAt, recordAt, stringAt } from "../src/lib/json.ts";
+import { arrayAt, numberAt, recordAt, stringAt } from "../src/shared/json.ts";
 
 const rootDirectory = fileURLToPath(new URL("../", import.meta.url));
 
