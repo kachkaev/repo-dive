@@ -1,147 +1,103 @@
 import { Effect } from "effect";
 
 import { numberAt, recordAt } from "../../../shared/json.ts";
-import { runCommand } from "../git.ts";
-import type { Collector, Fact } from "./shared/types.ts";
+import { languageOfExtension } from "../languages.ts";
+import { scanTreeWithBlobCache } from "./shared/tree-scan.ts";
+import { type Collector, extensionOf, type Fact } from "./shared/types.ts";
 
-type LanguageStats = {
+type ExtensionStats = {
   files: number;
-  code: number;
-  comments: number;
-  blanks: number;
-  /** code + comments + blanks (incl. embedded children folded into the parent) */
   lines: number;
 };
 
 export type LanguagesOutput = {
-  readonly byLanguage: Record<string, LanguageStats>;
+  /**
+   * Keyed by extension rather than language so the extension → language map can
+   * be corrected by re-running `index` alone: normalization is cheap and
+   * re-runnable, collection is not.
+   */
+  readonly byExtension: Record<string, ExtensionStats>;
   readonly totalLines: number;
   readonly totalFiles: number;
 };
 
-const statsLines = (stats: {
-  code?: number;
-  comments?: number;
-  blanks?: number;
-}): number => (stats.code ?? 0) + (stats.comments ?? 0) + (stats.blanks ?? 0);
-
-const asRecord = (value: unknown): Record<string, unknown> | undefined =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-    ? Object.fromEntries(Object.entries(value))
-    : undefined;
-
-const numberField = (record: Record<string, unknown>, key: string): number => {
-  const value = record[key];
-  return typeof value === "number" ? value : 0;
+/**
+ * Physical lines in one file, counted the way `git blame` attributes them: a
+ * final line without a trailing newline still counts, an empty file has none.
+ * Matching blame is what lets the dashboard's "Lines by language" chart show
+ * the same totals with age shading on and off.
+ */
+export const countLines = (content: string): number => {
+  if (content === "") {
+    return 0;
+  }
+  const newlines = content.split("\n").length - 1;
+  return content.endsWith("\n") ? newlines : newlines + 1;
 };
 
-/**
- * Parses `tokei --output json`. Embedded languages (e.g. code fences inside
- * Markdown) appear under the parent's `children` and are folded back into the
- * parent here: a Markdown file counts as Markdown in full, per this project's
- * "count docs as a whole" policy.
- */
-export const parseTokeiJson = (stdout: string): LanguagesOutput => {
-  const parsed: unknown = JSON.parse(stdout);
-  const languages = asRecord(parsed) ?? {};
-  const byLanguage: Record<string, LanguageStats> = {};
+export const summarizeLineCounts = (
+  files: ReadonlyArray<{ filePath: string; result: unknown }>,
+): LanguagesOutput => {
+  const byExtension: Record<string, ExtensionStats> = {};
   let totalLines = 0;
   let totalFiles = 0;
 
-  for (const [language, infoRaw] of Object.entries(languages)) {
-    if (language === "Total") {
-      continue;
-    }
-    const info = asRecord(infoRaw);
-    if (!info) {
-      continue;
-    }
-
-    const reports = Array.isArray(info["reports"]) ? info["reports"] : [];
-    const files = reports.length;
-    const code = numberField(info, "code");
-    const comments = numberField(info, "comments");
-    const blanks = numberField(info, "blanks");
-    let lines = code + comments + blanks;
-
-    // Fold embedded child languages (their lines live inside this language's
-    // files) back into the parent.
-    const children = asRecord(info["children"]);
-    if (children) {
-      for (const childReports of Object.values(children)) {
-        if (!Array.isArray(childReports)) {
-          continue;
-        }
-        for (const childReportRaw of childReports) {
-          const childReport = asRecord(childReportRaw);
-          const childStats = childReport && asRecord(childReport["stats"]);
-          if (childStats) {
-            lines += statsLines({
-              code: numberField(childStats, "code"),
-              comments: numberField(childStats, "comments"),
-              blanks: numberField(childStats, "blanks"),
-            });
-          }
-        }
-      }
-    }
-
-    if (files === 0 && lines === 0) {
-      continue;
-    }
-
-    byLanguage[language] = { files, code, comments, blanks, lines };
+  for (const file of files) {
+    const lines = typeof file.result === "number" ? file.result : 0;
+    const bucket = (byExtension[extensionOf(file.filePath)] ??= {
+      files: 0,
+      lines: 0,
+    });
+    bucket.files += 1;
+    bucket.lines += lines;
+    totalFiles += 1;
     totalLines += lines;
-    totalFiles += files;
   }
 
-  return { byLanguage, totalLines, totalFiles };
+  return { byExtension, totalLines, totalFiles };
 };
 
 export const languagesCollector: Collector = {
   name: "languages",
   description:
-    "Language/LOC breakdown via tokei (requires tokei; runs on a temporary worktree; sampled monthly by default)",
-  version: "1",
-  strategy: "worktree",
-  defaultSampling: "monthly",
-  collect: ({ worktreePath }) =>
-    worktreePath === undefined
-      ? Effect.fail(
-          new Error("languages collector requires a worktree checkout"),
-        )
-      : runCommand("tokei", ["--output", "json", "."], {
-          cwd: worktreePath,
-        }).pipe(
-          Effect.map(parseTokeiJson),
-          // A missing binary surfaces as a PlatformError with a NotFound reason.
-          Effect.catchIf(
-            (error) =>
-              error._tag === "PlatformError" &&
-              error.reason._tag === "NotFound",
-            () =>
-              Effect.fail(
-                new Error(
-                  "tokei is not installed (the languages collector shells out to it). " +
-                    "Install it via `brew install tokei` or see https://github.com/XAMPPRocky/tokei.",
-                ),
-              ),
-          ),
-        ),
+    "Lines and file count per language across a commit's source files",
+  // 1 → 2: the tokei shell-out gave way to an in-process count over the same
+  // source files the blame-based survival collector scans. Outputs written by
+  // version 1 counted lockfiles, minified bundles and data blobs, so they must
+  // not survive a re-scan.
+  version: "2",
+  strategy: "tree",
+  defaultSampling: "all",
+  collect: ({ repoRoot, sha, cacheKey }) =>
+    scanTreeWithBlobCache({
+      repoRoot,
+      sha,
+      collectorName: "languages",
+      cacheKey,
+      scanContent: countLines,
+    }).pipe(Effect.map(summarizeLineCounts)),
   normalize: (raw) => {
-    const facts: Fact[] = [];
-    for (const [language, stats] of Object.entries(
-      recordAt(raw, "byLanguage"),
+    const byLanguage: Record<string, ExtensionStats> = {};
+    for (const [extension, stats] of Object.entries(
+      recordAt(raw, "byExtension"),
     )) {
+      const language = languageOfExtension(extension);
+      const bucket = (byLanguage[language] ??= { files: 0, lines: 0 });
+      bucket.files += numberAt(stats, "files");
+      bucket.lines += numberAt(stats, "lines");
+    }
+
+    const facts: Fact[] = [];
+    for (const [language, stats] of Object.entries(byLanguage)) {
       facts.push(
         {
           metric: "languages.lines",
-          value: numberAt(stats, "lines"),
+          value: stats.lines,
           categories: { language },
         },
         {
           metric: "languages.files",
-          value: numberAt(stats, "files"),
+          value: stats.files,
           categories: { language },
         },
       );
