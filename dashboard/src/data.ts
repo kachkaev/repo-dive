@@ -13,15 +13,6 @@ type CommitRow = {
   deleted: number;
 };
 
-type MonthlyRow = {
-  month: string;
-  commits: number;
-  aiCommits: number;
-  added: number;
-  deleted: number;
-  aiAdded: number;
-};
-
 type LanguagesRow = {
   sha: string;
   date: string;
@@ -121,7 +112,6 @@ export type DashboardData = {
     lastCommitDate?: string;
   };
   commits: CommitRow[];
-  monthly: MonthlyRow[];
   languages: LanguagesRow[];
   fileTypes: FileTypesRow[];
   directives: DirectivesRow[];

@@ -47,8 +47,6 @@ export const coAuthorIdentity = (coAuthor: string): string => {
   return name || coAuthor.trim();
 };
 
-const monthOf = (isoDate: string): string => isoDate.slice(0, 7);
-
 type CommitFacts = {
   readonly sha: string;
   readonly date: string;
@@ -137,37 +135,10 @@ const buildDashboardData = (
     deleted: sumMetric(commit, "churn.deleted"),
   }));
 
-  const monthlyMap = new Map<
-    string,
-    {
-      commits: number;
-      aiCommits: number;
-      added: number;
-      deleted: number;
-      aiAdded: number;
-    }
-  >();
-  for (const row of commitRows) {
-    const month = monthOf(row.date);
-    const bucket = monthlyMap.get(month) ?? {
-      commits: 0,
-      aiCommits: 0,
-      added: 0,
-      deleted: 0,
-      aiAdded: 0,
-    };
-    bucket.commits += 1;
-    bucket.added += row.added;
-    bucket.deleted += row.deleted;
-    if (row.ai) {
-      bucket.aiCommits += 1;
-      bucket.aiAdded += row.added;
-    }
-    monthlyMap.set(month, bucket);
-  }
-  const monthly = [...monthlyMap.entries()]
-    .toSorted(([left], [right]) => left.localeCompare(right))
-    .map(([month, bucket]) => ({ month, ...bucket }));
+  // No monthly rollup is written: every field of one (commits, AI-assisted
+  // commits, added, deleted) is a group-by-month sum over `commitRows`, which
+  // the dashboard already loads in full for the commit calendar. Shipping both
+  // meant two aggregations to keep in step for no data the second one added.
 
   const languages = commits
     .filter((commit) => hasMetric(commit, "languages.lines"))
@@ -387,7 +358,6 @@ const buildDashboardData = (
       lastCommitDate: commits.at(-1)?.date,
     },
     commits: commitRows,
-    monthly,
     languages,
     fileTypes,
     directives,

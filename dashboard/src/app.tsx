@@ -323,6 +323,32 @@ const humanCategoricalColors = categoricalColors.filter(
   (color) => color !== "var(--series-3)",
 );
 
+/** The commits-per-month series: author kind, with humans split by AI assistance. */
+const commitKindSeries = {
+  human: "Human",
+  humanAi: "Human · AI-assisted",
+  ai: "AI agent",
+  bot: "Bot",
+} as const;
+
+/** Reading order — humans first, bots last, matching a calendar cell top-down. */
+const commitKindOrder = ["human", "humanAi", "ai", "bot"] as const;
+
+const commitKindColorOf = (kind: keyof typeof commitKindSeries): string =>
+  kind === "humanAi" ? kindColors.human : kindColors[kind];
+
+/**
+ * A month's commit counts by kind plus its churn — everything the two monthly
+ * charts need, summed from the per-commit rows rather than shipped alongside
+ * them.
+ */
+type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
+  added: number;
+  deleted: number;
+  /** Lines added by commits carrying an AI co-author trailer. */
+  aiAdded: number;
+};
+
 // Bots and AI agents arrive pre-folded into one series per kind (indexing
 // groups them), colored with the reserved kind colors; humans take palette
 // slots by rank as before.
@@ -376,28 +402,22 @@ export function App({ data }: { data: DashboardData }) {
     7,
   );
 
-  // Monthly commit counts split by author kind, with human commits further
-  // split by AI assistance. Derived client-side from the full commit list (the
-  // per-commit `kind` field) rather than the monthly rollup, so dashboard.json
-  // written before per-commit kinds still renders — everything lands in the
-  // human series there, matching the old two-series chart.
-  const commitKindSeries = {
-    human: "Human",
-    humanAi: "Human · AI-assisted",
-    ai: "AI agent",
-    bot: "Bot",
-  } as const;
-  const monthlyByKind = new Map<
-    string,
-    Record<keyof typeof commitKindSeries, number>
-  >();
+  // One pass over the per-commit rows feeds both monthly charts. dashboard.json
+  // carries no monthly rollup of its own: every field of one is a group-by-month
+  // sum over rows the calendar already needs in full, and re-deriving here also
+  // means a file written before per-commit kinds still renders — everything
+  // lands in the human series there, matching the old two-series chart.
+  const monthlyBuckets = new Map<string, MonthlyBucket>();
   for (const commit of data.commits) {
     const month = commit.date.slice(0, 7);
-    const bucket = monthlyByKind.get(month) ?? {
+    const bucket = monthlyBuckets.get(month) ?? {
       human: 0,
       humanAi: 0,
       ai: 0,
       bot: 0,
+      added: 0,
+      deleted: 0,
+      aiAdded: 0,
     };
     const kind = commit.kind ?? "human";
     if (kind === "human") {
@@ -405,21 +425,22 @@ export function App({ data }: { data: DashboardData }) {
     } else {
       bucket[kind] += 1;
     }
-    monthlyByKind.set(month, bucket);
+    bucket.added += commit.added;
+    bucket.deleted += commit.deleted;
+    if (commit.ai) {
+      bucket.aiAdded += commit.added;
+    }
+    monthlyBuckets.set(month, bucket);
   }
-  const monthlyKindRows = [...monthlyByKind.entries()].toSorted(
+  const monthlyRows = [...monthlyBuckets.entries()].toSorted(
     ([left], [right]) => left.localeCompare(right),
   );
   // Keep only kinds that ever occur, so a bot-free repo gets no empty series.
-  // The reading order (humans, then AI agents, then bots) matches the
-  // calendar cells.
-  const commitKindKeys = (["human", "humanAi", "ai", "bot"] as const).filter(
-    (kind) => monthlyKindRows.some(([, bucket]) => bucket[kind] > 0),
+  const commitKindKeys = commitKindOrder.filter((kind) =>
+    monthlyRows.some(([, bucket]) => bucket[kind] > 0),
   );
-  const commitKindColorOf = (kind: (typeof commitKindKeys)[number]) =>
-    kind === "humanAi" ? kindColors.human : kindColors[kind];
   const commitsChart = {
-    points: monthlyKindRows.map(([month, bucket]) => ({
+    points: monthlyRows.map(([month, bucket]) => ({
       dateMs: new Date(`${month}-15`).getTime(),
       values: Object.fromEntries(
         commitKindKeys.map((kind) => [commitKindSeries[kind], bucket[kind]]),
@@ -840,11 +861,11 @@ export function App({ data }: { data: DashboardData }) {
         subtitle="lines added and deleted; hatched = lines added by AI-assisted commits"
       >
         <DivergingBars
-          points={data.monthly.map((row) => ({
-            month: row.month,
-            positive: row.added,
-            negative: row.deleted,
-            positiveSecondary: row.aiAdded,
+          points={monthlyRows.map(([month, bucket]) => ({
+            month,
+            positive: bucket.added,
+            negative: bucket.deleted,
+            positiveSecondary: bucket.aiAdded,
           }))}
           positiveLabel="added"
           negativeLabel="deleted"
