@@ -45,8 +45,8 @@ const normalizePattern = (pattern: string): string =>
   pattern
     .trim()
     .replace(/^\.?\//, "")
-    .replace(/\/\*\*$/, "")
-    .replace(/\/$/, "");
+    .replace(/\/$/, "")
+    .replace(/\/\*\*$/, "");
 
 /**
  * Whether an ignore file's `contents` plainly cover `relativePath` (a
@@ -72,11 +72,22 @@ export const coversPath = (contents: string, relativePath: string): boolean => {
     }
     const negated = trimmed.startsWith("!");
     const pattern = normalizePattern(negated ? trimmed.slice(1) : trimmed);
+    const anchored = pattern.replace(/^\*\*\//, "");
+    const wildcardIndex = anchored.search(/[*?[]/);
+    const literalPrefix = anchored.slice(0, wildcardIndex);
     if (
       pattern === "*" ||
       pattern === "**" ||
       selfOrAncestors.has(pattern) ||
-      selfOrAncestors.has(pattern.replace(/^\*\*\//, ""))
+      selfOrAncestors.has(anchored) ||
+      // A pattern with no slash matches a path component at any depth.
+      (!pattern.includes("/") && segments.includes(pattern)) ||
+      // A wildcard makes the pattern unreadable to this non-engine, so it is
+      // ambiguous; count it as covering when its literal beginning points at
+      // the path (`.repo-*` does, `*.log` claims nothing).
+      (wildcardIndex > 0 &&
+        (relativePath.startsWith(literalPrefix) ||
+          segments.some((segment) => segment.startsWith(literalPrefix))))
     ) {
       covered = !negated;
     }
@@ -168,6 +179,8 @@ const missingIgnoreFiles = ({
 /**
  * Warns, once a command has done its work, about ignore files that will send
  * their tool into the catalog. Goes to stderr so piped stdout stays clean.
+ * Best-effort: an unreadable ignore file must not fail the command whose work
+ * is already done, so any error here means no warning, nothing more.
  */
 export const warnAboutIgnoreFiles = ({
   repoRoot,
@@ -175,7 +188,7 @@ export const warnAboutIgnoreFiles = ({
 }: {
   readonly repoRoot: string;
   readonly config: ResolvedConfig;
-}): Effect.Effect<void, Error> =>
+}): Effect.Effect<void> =>
   Effect.gen(function* () {
     const { catalogRelativePath } = config;
     if (catalogRelativePath === undefined) {
@@ -193,4 +206,4 @@ export const warnAboutIgnoreFiles = ({
         "  Add the entry: npx repo-dive ignore",
       ].join("\n"),
     );
-  });
+  }).pipe(Effect.ignore);

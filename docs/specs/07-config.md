@@ -111,6 +111,6 @@ So `scan`, `index` and `status` check every root ignore file — anything matchi
 Set `checkIgnoreFiles` to `false` to silence the warning.
 The check is skipped entirely when the catalog sits outside the repository, where nothing walking the repo can reach it.
 
-Coverage is decided by reading the patterns, not by running each tool: the forms people write (`.repo-dive`, `/.repo-dive/`, `**/.repo-dive`, an ancestor directory, a catch-all `*`, a later `!` re-include) are recognized, and anything ambiguous counts as covered.
+Coverage is decided by reading the patterns, not by running each tool: the forms people write (`.repo-dive`, `/.repo-dive/`, `**/.repo-dive`, a bare name matching a path component at any depth, an ancestor directory, a catch-all `*`, a later `!` re-include) are recognized, and anything ambiguous — a wildcard pattern like `.repo-*` whose literal beginning points at the catalog — counts as covered.
 A warning that nags about an entry already sitting in the file is worse than one that never appears.
 Only the repository root is searched; ignore files deeper in the tree govern their own subtree.

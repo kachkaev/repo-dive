@@ -2,6 +2,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -54,6 +55,28 @@ it.effect("openCatalog scaffolds a self-ignoring catalog", () => {
     expect(existsSync(path.join(catalog.rootPath, ".gitignore"))).toBe(true);
   }).pipe(Effect.ensuring(cleanup(repoRoot)));
 });
+
+it.effect(
+  "openCatalog keeps a .gitignore already sitting in a configured dir",
+  () => {
+    const repoRoot = makeRepoRoot();
+
+    return Effect.gen(function* () {
+      const catalogPath = path.join(repoRoot, "existing-dir");
+      mkdirSync(catalogPath, { recursive: true });
+      writeFileSync(path.join(catalogPath, ".gitignore"), "custom\n", "utf8");
+
+      const catalog = yield* openCatalog({ repoRoot, catalogPath });
+
+      expect(existsSync(path.join(catalog.rootPath, "catalog.json"))).toBe(
+        true,
+      );
+      expect(readFileSync(path.join(catalogPath, ".gitignore"), "utf8")).toBe(
+        "custom\n",
+      );
+    }).pipe(Effect.ensuring(cleanup(repoRoot)));
+  },
+);
 
 it.effect("openCatalog points at a catalog left by the former name", () => {
   const repoRoot = makeRepoRoot();

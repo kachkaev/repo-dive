@@ -140,9 +140,23 @@ export const openCatalog = ({
     yield* Effect.tryPromise(() => mkdir(rootPath, { recursive: true }));
 
     if (manifest === undefined) {
-      yield* Effect.tryPromise(() =>
-        writeFile(path.join(rootPath, ".gitignore"), "*\n", "utf8"),
-      );
+      // `wx`: a .gitignore already sitting in a user-chosen `catalog.dir` is
+      // the user's file, not this scaffold's to overwrite.
+      yield* Effect.tryPromise(async () => {
+        try {
+          await writeFile(path.join(rootPath, ".gitignore"), "*\n", {
+            encoding: "utf8",
+            flag: "wx",
+          });
+        } catch (error) {
+          if (
+            !(error instanceof Error && "code" in error) ||
+            error.code !== "EEXIST"
+          ) {
+            throw error;
+          }
+        }
+      });
       const now = yield* DateTime.now;
       yield* writeJson(manifestPath, {
         formatVersion: catalogFormatVersion,
