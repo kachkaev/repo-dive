@@ -57,6 +57,7 @@ repoinsights
 rollups
 scc
 scriptable
+shadcn
 shm
 Sigstore
 simonw
