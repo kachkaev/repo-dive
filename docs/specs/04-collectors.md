@@ -62,7 +62,7 @@ Each collector declares a `defaultSampling`; `scan --sample POLICY` overrides it
 Policies:
 
 - `all` — every commit (the default for the cheap `log` and `tree` collectors)
-- `weekly` / `monthly` / `quarterly` — the newest commit of each period, so HEAD is always sampled (`survival` defaults to `quarterly`)
+- `weekly` / `monthly` / `quarterly` — the newest commit of each period, so HEAD is always sampled (`survival` defaults to `monthly`)
 - `every-nth:<n>` — a count-based budget, taken over the newest-first commit list
 - Tags/releases as natural sample points (future)
 
@@ -124,7 +124,7 @@ Implemented, in `src/cli/shared/collectors/` (strategy, then default sampling wh
 1.  **dependencies** (`tree`) — total resolved packages from package-manager lockfiles, per package manager (pnpm, npm, yarn; parser registry keyed by lockfile name generalizes to bun/cargo/…), plus direct/dev/optional dependencies and manifest counts read from `package.json` files (the authoritative source for what a project declares, so accurate even where a lockfile omits it). Blob-cached. Emits `dependencies.resolved`, `dependencies.direct` and `dependencies.manifest`.
 1.  **todo-comments** (`tree`) — TODO/FIXME/HACK/XXX counts in source files. Blob-cached.
 1.  **languages** (`tree`) — lines and file count per language, counted in-process over the source files of the commit's tree and labelled from the shared extension → language map. Blob-cached. It scans exactly the file set `survival` blames, so the dashboard's "Lines by language" chart shows the same totals with age shading on and off; an earlier version shelled out to `tokei`, which counted lockfiles and generated data the blame view could never account for.
-1.  **survival** (`tree`, `quarterly`) — living lines by extension, author and authoring-month cohort, via `git blame --line-porcelain` per file. The expensive one.
+1.  **survival** (`tree`, `monthly`) — living lines by extension, author and authoring-month cohort, via `git blame --line-porcelain` per file. The expensive one.
 
 Planned next:
 

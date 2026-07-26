@@ -1,36 +1,25 @@
-import { NodeServices } from "@effect/platform-node";
-import { Effect, Stream } from "effect";
-import { ChildProcess } from "effect/unstable/process";
+import { Data, Effect, type PlatformError, Stream } from "effect";
+import {
+  ChildProcess,
+  type ChildProcessSpawner,
+} from "effect/unstable/process";
 
-export class GitCommandError extends Error {
+class GitCommandError extends Data.TaggedError("GitCommandError")<{
   readonly args: readonly string[];
   readonly exitCode: number;
   readonly stderr: string;
-
-  constructor(args: readonly string[], exitCode: number, stderr: string) {
-    super(
-      `git ${args.join(" ")} exited with code ${exitCode}${
-        stderr ? `:\n${stderr.trim()}` : ""
-      }`,
-    );
-    this.name = "GitCommandError";
-    this.args = args;
-    this.exitCode = exitCode;
-    this.stderr = stderr;
+}> {
+  override get message(): string {
+    return `${this.args.join(" ")} exited with code ${this.exitCode}${
+      this.stderr ? `:\n${this.stderr.trim()}` : ""
+    }`;
   }
 }
 
-const captureStream = <E, R>(stream: Stream.Stream<Uint8Array, E, R>) =>
-  stream.pipe(
-    Stream.decodeText(),
-    Stream.runFold(
-      () => "",
-      (output, chunk) => output + chunk,
-    ),
-  );
+export type CommandError = GitCommandError | PlatformError.PlatformError;
 
-const toError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
+const captureStream = <E, R>(stream: Stream.Stream<Uint8Array, E, R>) =>
+  stream.pipe(Stream.decodeText(), Stream.mkString);
 
 /**
  * Runs a command and captures its stdout, failing on unexpected exit codes.
@@ -44,7 +33,11 @@ const runCommand = (
     /** Extra exit codes to treat as success (e.g. 1 for `git grep` with no matches). */
     readonly okExitCodes?: readonly number[];
   },
-): Effect.Effect<string, Error> =>
+): Effect.Effect<
+  string,
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
   Effect.scoped(
     Effect.gen(function* () {
       const handle = yield* ChildProcess.make(command, [...args], {
@@ -60,21 +53,26 @@ const runCommand = (
         { concurrency: "unbounded" },
       );
 
-      const code = Number(exitCode);
-      if (code !== 0 && !options?.okExitCodes?.includes(code)) {
-        return yield* Effect.fail(
-          new GitCommandError([command, ...args], code, stderr),
-        );
+      if (exitCode !== 0 && !options?.okExitCodes?.includes(exitCode)) {
+        return yield* new GitCommandError({
+          args: [command, ...args],
+          exitCode,
+          stderr,
+        });
       }
 
       return stdout;
     }),
-  ).pipe(Effect.mapError(toError), Effect.provide(NodeServices.layer));
+  );
 
 export const runGit = (
   args: readonly string[],
   options?: { readonly okExitCodes?: readonly number[] },
-): Effect.Effect<string, Error> => runCommand("git", args, options);
+): Effect.Effect<
+  string,
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> => runCommand("git", args, options);
 
 /**
  * Runs a command with `input` written to stdin and stdout captured as raw
@@ -85,7 +83,11 @@ export const runCommandBytes = (
   command: string,
   args: readonly string[],
   options: { readonly input: string },
-): Effect.Effect<Uint8Array, Error> =>
+): Effect.Effect<
+  Uint8Array,
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
   Effect.scoped(
     Effect.gen(function* () {
       const handle = yield* ChildProcess.make(command, [...args], {
@@ -106,11 +108,12 @@ export const runCommandBytes = (
         { concurrency: "unbounded" },
       );
 
-      const code = Number(exitCode);
-      if (code !== 0) {
-        return yield* Effect.fail(
-          new GitCommandError([command, ...args], code, stderr),
-        );
+      if (exitCode !== 0) {
+        return yield* new GitCommandError({
+          args: [command, ...args],
+          exitCode,
+          stderr,
+        });
       }
 
       const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -122,4 +125,4 @@ export const runCommandBytes = (
       }
       return result;
     }),
-  ).pipe(Effect.mapError(toError), Effect.provide(NodeServices.layer));
+  );

@@ -134,7 +134,7 @@ test.concurrent(
 
       expect(firstRun.status, firstRun.stderr).toBe(0);
       expect(firstRun.stdout).toMatch(/Commits: 2 \(1 authors/);
-      // 6 all-sampled collectors × 2 commits + survival on 1 quarterly sample.
+      // 6 all-sampled collectors × 2 commits + survival on 1 monthly sample.
       expect(firstRun.stdout).toMatch(
         /Collector runs: 13 new, 0 already collected/,
       );

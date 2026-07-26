@@ -2,6 +2,7 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 
 import { Console, Effect } from "effect";
+import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import {
   catalogDirName,
@@ -30,7 +31,7 @@ export const runStatus = ({
   repoPath,
 }: {
   readonly repoPath: string;
-}): Effect.Effect<void, Error> =>
+}): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
     const commits = yield* listCommits(repoRoot);
@@ -72,20 +73,13 @@ export const runStatus = ({
           : commits,
         collector.defaultSampling,
       );
-      let collected = 0;
       const cacheKey = collectorCacheKey(collector, config);
-      yield* Effect.forEach(
+      const collectedFlags = yield* Effect.forEach(
         target,
-        (commit) =>
-          isCollected(catalog, commit.hash, collector, cacheKey).pipe(
-            Effect.map((done) => {
-              if (done) {
-                collected += 1;
-              }
-            }),
-          ),
-        { concurrency: 16, discard: true },
+        (commit) => isCollected(catalog, commit.hash, collector, cacheKey),
+        { concurrency: 16 },
       );
+      const collected = collectedFlags.filter(Boolean).length;
       lines.push(
         collector.defaultSampling === "all"
           ? `  ${collector.name}: ${collected}/${target.length} commits collected`

@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { Effect } from "effect";
+import { Data, DateTime, Effect } from "effect";
 
 import type { Collector } from "./collectors.ts";
 
@@ -31,33 +31,53 @@ type CollectorSidecar = {
   readonly durationMs: number;
 };
 
-const toError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
+/** What to tell the user when only the former name's catalog is present. */
+export const legacyCatalogHint = (legacyRootPath: string) =>
+  `Found a catalog at ${legacyRootPath}, left by repo-insighter (this tool's former name). ` +
+  "Rename it to keep everything already collected:\n" +
+  `  mv ${legacyCatalogDirName} ${catalogDirName}\n` +
+  "Or delete it to collect from scratch.";
+
+class LegacyCatalogError extends Data.TaggedError("LegacyCatalogError")<{
+  readonly legacyRootPath: string;
+}> {
+  override get message(): string {
+    return legacyCatalogHint(this.legacyRootPath);
+  }
+}
+
+class CatalogFormatError extends Data.TaggedError("CatalogFormatError")<{
+  readonly rootPath: string;
+  readonly formatVersion: unknown;
+}> {
+  override get message(): string {
+    return (
+      `Catalog at ${this.rootPath} has format version ${String(this.formatVersion)}, ` +
+      `but this version of repo-dive expects ${catalogFormatVersion}. ` +
+      "Delete the folder to re-collect from scratch."
+    );
+  }
+}
 
 const writeJson = (filePath: string, value: unknown) =>
-  Effect.tryPromise({
-    try: () =>
-      writeFile(filePath, `${JSON.stringify(value, undefined, 2)}\n`, "utf8"),
-    catch: toError,
-  });
+  Effect.tryPromise(() =>
+    writeFile(filePath, `${JSON.stringify(value, undefined, 2)}\n`, "utf8"),
+  );
 
 const readJsonIfExists = (filePath: string) =>
-  Effect.tryPromise({
-    try: async (): Promise<unknown> => {
-      try {
-        return JSON.parse(await readFile(filePath, "utf8"));
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          "code" in error &&
-          error.code === "ENOENT"
-        ) {
-          return undefined;
-        }
-        throw error;
+  Effect.tryPromise(async (): Promise<unknown> => {
+    try {
+      return JSON.parse(await readFile(filePath, "utf8"));
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ) {
+        return undefined;
       }
-    },
-    catch: toError,
+      throw error;
+    }
   });
 
 const cacheKeyOf = (sidecar: unknown): unknown =>
@@ -88,13 +108,6 @@ export const findLegacyCatalog = (
   );
 };
 
-/** What to tell the user when only the former name's catalog is present. */
-export const legacyCatalogHint = (legacyRootPath: string) =>
-  `Found a catalog at ${legacyRootPath}, left by repo-insighter (this tool's former name). ` +
-  "Rename it to keep everything already collected:\n" +
-  `  mv ${legacyCatalogDirName} ${catalogDirName}\n` +
-  "Or delete it to collect from scratch.";
-
 /**
  * Opens (creating if needed) the catalog folder at the root of the analyzed
  * repository. The catalog ignores itself via its own .gitignore.
@@ -108,35 +121,26 @@ export const openCatalog = (repoRoot: string): Effect.Effect<Catalog, Error> =>
     if (manifest === undefined) {
       const legacyRootPath = yield* findLegacyCatalog(repoRoot);
       if (legacyRootPath !== undefined) {
-        return yield* Effect.fail(new Error(legacyCatalogHint(legacyRootPath)));
+        return yield* new LegacyCatalogError({ legacyRootPath });
       }
     }
 
-    yield* Effect.tryPromise({
-      try: () => mkdir(rootPath, { recursive: true }),
-      catch: toError,
-    });
+    yield* Effect.tryPromise(() => mkdir(rootPath, { recursive: true }));
 
     if (manifest === undefined) {
-      yield* Effect.tryPromise({
-        try: () => writeFile(path.join(rootPath, ".gitignore"), "*\n", "utf8"),
-        catch: toError,
-      });
+      yield* Effect.tryPromise(() =>
+        writeFile(path.join(rootPath, ".gitignore"), "*\n", "utf8"),
+      );
+      const now = yield* DateTime.now;
       yield* writeJson(manifestPath, {
         formatVersion: catalogFormatVersion,
         vcs: "git",
-        createdAt: new Date().toISOString(),
+        createdAt: DateTime.formatIso(now),
       } satisfies CatalogManifest);
     } else {
       const formatVersion = formatVersionOf(manifest);
       if (formatVersion !== catalogFormatVersion) {
-        return yield* Effect.fail(
-          new Error(
-            `Catalog at ${rootPath} has format version ${String(formatVersion)}, ` +
-              `but this version of repo-dive expects ${catalogFormatVersion}. ` +
-              "Delete the folder to re-collect from scratch.",
-          ),
-        );
+        return yield* new CatalogFormatError({ rootPath, formatVersion });
       }
     }
 
@@ -188,16 +192,14 @@ export const writeCollectorOutput = ({
 }): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     const dir = collectorDir(catalog, sha, collector.name);
-    yield* Effect.tryPromise({
-      try: () => mkdir(dir, { recursive: true }),
-      catch: toError,
-    });
+    yield* Effect.tryPromise(() => mkdir(dir, { recursive: true }));
     yield* writeJson(path.join(dir, "output.json"), output);
+    const now = yield* DateTime.now;
     yield* writeJson(path.join(dir, "collector.json"), {
       collector: collector.name,
       version: collector.version,
       cacheKey,
-      completedAt: new Date().toISOString(),
+      completedAt: DateTime.formatIso(now),
       durationMs,
     } satisfies CollectorSidecar);
   });

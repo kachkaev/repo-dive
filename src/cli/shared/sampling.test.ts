@@ -1,3 +1,4 @@
+import { Result } from "effect";
 import { expect, test } from "vitest";
 
 import {
@@ -53,8 +54,12 @@ test("samplingLabel spells out every policy shape", () => {
 });
 
 test("parseSamplingPolicy accepts known policies and rejects others", () => {
-  expect(parseSamplingPolicy("monthly")).toBe("monthly");
-  expect(parseSamplingPolicy("every-nth:5")).toStrictEqual({ everyNth: 5 });
-  expect(parseSamplingPolicy("fortnightly")).toBeInstanceOf(Error);
-  expect(parseSamplingPolicy("every-nth:0")).toBeInstanceOf(Error);
+  expect(parseSamplingPolicy("monthly")).toStrictEqual(
+    Result.succeed("monthly"),
+  );
+  expect(parseSamplingPolicy("every-nth:5")).toStrictEqual(
+    Result.succeed({ everyNth: 5 }),
+  );
+  expect(Result.isFailure(parseSamplingPolicy("fortnightly"))).toBe(true);
+  expect(Result.isFailure(parseSamplingPolicy("every-nth:0"))).toBe(true);
 });

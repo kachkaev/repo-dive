@@ -8,8 +8,8 @@ import {
 import os from "node:os";
 import path from "node:path";
 
+import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { expect, test } from "vitest";
 
 import { catalogDirName, openCatalog } from "./catalog.ts";
 
@@ -30,46 +30,47 @@ function writeCatalogManifest(repoRoot: string, dirName: string) {
   return dir;
 }
 
-test("openCatalog scaffolds a self-ignoring catalog", async () => {
+const cleanup = (repoRoot: string) =>
+  Effect.sync(() => {
+    rmSync(repoRoot, { recursive: true, force: true });
+  });
+
+it.effect("openCatalog scaffolds a self-ignoring catalog", () => {
   const repoRoot = makeRepoRoot();
 
-  try {
-    const catalog = await Effect.runPromise(openCatalog(repoRoot));
+  return Effect.gen(function* () {
+    const catalog = yield* openCatalog(repoRoot);
 
     expect(catalog.rootPath).toBe(path.join(repoRoot, catalogDirName));
     expect(existsSync(path.join(catalog.rootPath, "catalog.json"))).toBe(true);
     expect(existsSync(path.join(catalog.rootPath, ".gitignore"))).toBe(true);
-  } finally {
-    rmSync(repoRoot, { recursive: true, force: true });
-  }
+  }).pipe(Effect.ensuring(cleanup(repoRoot)));
 });
 
-test("openCatalog points at a catalog left by the former name", async () => {
+it.effect("openCatalog points at a catalog left by the former name", () => {
   const repoRoot = makeRepoRoot();
 
-  try {
+  return Effect.gen(function* () {
     writeCatalogManifest(repoRoot, legacyCatalogDirName);
 
-    await expect(Effect.runPromise(openCatalog(repoRoot))).rejects.toThrow(
-      /left by repo-insighter/,
-    );
+    const error = yield* Effect.flip(openCatalog(repoRoot));
+    expect(error.message).toMatch(/left by repo-insighter/);
     // Bailing out must not leave a half-made catalog that hides the old one.
     expect(existsSync(path.join(repoRoot, catalogDirName))).toBe(false);
-  } finally {
-    rmSync(repoRoot, { recursive: true, force: true });
-  }
+  }).pipe(Effect.ensuring(cleanup(repoRoot)));
 });
 
-test("openCatalog ignores the former name once the catalog is renamed", async () => {
-  const repoRoot = makeRepoRoot();
+it.effect(
+  "openCatalog ignores the former name once the catalog is renamed",
+  () => {
+    const repoRoot = makeRepoRoot();
 
-  try {
-    writeCatalogManifest(repoRoot, legacyCatalogDirName);
-    writeCatalogManifest(repoRoot, catalogDirName);
+    return Effect.gen(function* () {
+      writeCatalogManifest(repoRoot, legacyCatalogDirName);
+      writeCatalogManifest(repoRoot, catalogDirName);
 
-    const catalog = await Effect.runPromise(openCatalog(repoRoot));
-    expect(catalog.rootPath).toBe(path.join(repoRoot, catalogDirName));
-  } finally {
-    rmSync(repoRoot, { recursive: true, force: true });
-  }
-});
+      const catalog = yield* openCatalog(repoRoot);
+      expect(catalog.rootPath).toBe(path.join(repoRoot, catalogDirName));
+    }).pipe(Effect.ensuring(cleanup(repoRoot)));
+  },
+);
