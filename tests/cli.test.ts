@@ -113,9 +113,10 @@ test.concurrent("scan help exposes the flags", async () => {
   expect(result.stdout).toMatch(/--max-commits integer/);
 });
 
-// tokei isn't guaranteed on CI runners, so e2e scans avoid the languages collector.
-const ciSafeCollectors =
-  "commit-meta,churn,file-types,directives,todo-comments,survival";
+// Every collector except `dependencies`, which the fixture repo has no
+// lockfile or manifest for.
+const e2eCollectors =
+  "commit-meta,churn,file-types,directives,todo-comments,languages,survival";
 
 test.concurrent(
   "scan collects snapshots into the catalog and is resumable",
@@ -128,14 +129,14 @@ test.concurrent(
         "--repo",
         repoPath,
         "--collectors",
-        ciSafeCollectors,
+        e2eCollectors,
       );
 
       expect(firstRun.status, firstRun.stderr).toBe(0);
       expect(firstRun.stdout).toMatch(/Commits: 2 \(1 authors/);
-      // 5 all-sampled collectors × 2 commits + survival on 1 monthly sample.
+      // 6 all-sampled collectors × 2 commits + survival on 1 quarterly sample.
       expect(firstRun.stdout).toMatch(
-        /Collector runs: 11 new, 0 already collected/,
+        /Collector runs: 13 new, 0 already collected/,
       );
 
       const headSha = runGit(repoPath, "rev-parse", "HEAD").trim();
@@ -175,11 +176,11 @@ test.concurrent(
         "--repo",
         repoPath,
         "--collectors",
-        ciSafeCollectors,
+        e2eCollectors,
       );
       expect(secondRun.status, secondRun.stderr).toBe(0);
       expect(secondRun.stdout).toMatch(
-        /Collector runs: 0 new, 11 already collected/,
+        /Collector runs: 0 new, 13 already collected/,
       );
     } finally {
       rmSync(repoPath, { force: true, recursive: true });

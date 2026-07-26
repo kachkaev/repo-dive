@@ -34,23 +34,21 @@ const toError = (error: unknown) =>
 
 /**
  * Runs a command and captures its stdout, failing on unexpected exit codes.
- * For git, the repo path is passed via `git -C` instead of a working directory
- * to keep the invocation explicit.
+ * The repo path is passed via `git -C` rather than a working directory to keep
+ * the invocation explicit.
  */
-export const runCommand = (
+const runCommand = (
   command: string,
   args: readonly string[],
   options?: {
     /** Extra exit codes to treat as success (e.g. 1 for `git grep` with no matches). */
     readonly okExitCodes?: readonly number[];
-    readonly cwd?: string;
   },
 ): Effect.Effect<string, Error> =>
   Effect.scoped(
     Effect.gen(function* () {
       const handle = yield* ChildProcess.make(command, [...args], {
         stdin: "ignore",
-        ...(options?.cwd === undefined ? {} : { cwd: options.cwd }),
       });
 
       const { stdout, stderr, exitCode } = yield* Effect.all(

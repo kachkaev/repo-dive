@@ -1,8 +1,13 @@
 /**
- * The language tokei reports for each extension the survival collector scans,
- * so the blame-based year-shaded view of "Lines by language" lines up with the
- * tokei-based one. Mapping extensions is an approximation — tokei classifies
- * whole files, so names can only match where the extension is unambiguous.
+ * The language repo-dive attributes each source extension to. One map serves
+ * every language-shaped view: the `languages` collector labels its per-file
+ * line counts with it, `indexing` relabels the blame-based survival breakdown
+ * with it, and its key set is what content-level collectors treat as source
+ * (see `isScannableSourceFile`).
+ *
+ * Classifying by extension is an approximation — a real classifier reads the
+ * file — but it is the same approximation everywhere, so every view of a repo
+ * describes one file universe rather than each picking its own.
  */
 const languageByExtension: Record<string, string> = {
   ".astro": "Astro",
@@ -42,6 +47,15 @@ const languageByExtension: Record<string, string> = {
   ".yaml": "YAML",
   ".yml": "YAML",
 };
+
+/**
+ * Extensions considered source-like. Binaries, lockfiles and data formats are
+ * deliberately absent: a chart that counts them is a chart about generated
+ * bytes, and no per-line history can be told about them anyway.
+ */
+export const sourceExtensions: ReadonlySet<string> = new Set(
+  Object.keys(languageByExtension),
+);
 
 /** Unknown extensions show up as themselves rather than disappearing. */
 export const languageOfExtension = (extension: string): string =>
