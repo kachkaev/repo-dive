@@ -29,7 +29,7 @@ export function BarList({
   return (
     <ul className="space-y-1.5">
       {items.map((item) => (
-        <li key={item.id} className="group flex items-center gap-3 text-sm">
+        <li key={item.id} className="flex items-center gap-3 text-sm">
           <span
             className="w-56 truncate text-right font-mono text-xs text-(--text-secondary)"
             title={item.label}
@@ -49,7 +49,7 @@ export function BarList({
           </span>
           <span className="relative h-4 flex-1 rounded-xs bg-(--surface-2)">
             <span
-              className="absolute inset-y-0 left-0 rounded-xs opacity-90 group-hover:opacity-100"
+              className="absolute inset-y-0 left-0 rounded-xs opacity-90"
               style={{
                 width: `${Math.max(0.5, (item.value / max) * 100)}%`,
                 background: item.color ?? barColor,

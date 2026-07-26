@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import {
   type CalendarKindFilter,
@@ -7,6 +7,15 @@ import {
 } from "./app/activity-calendar.tsx";
 import { BarList } from "./app/bar-list.tsx";
 import { DivergingBars } from "./app/diverging-bars.tsx";
+import { Checkbox } from "./app/shared/@ui-primitive/checkbox.tsx";
+import { Label } from "./app/shared/@ui-primitive/label.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./app/shared/@ui-primitive/select.tsx";
 import {
   formatBytes,
   formatCount,
@@ -270,18 +279,24 @@ function YearShadeToggle({
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  const id = useId();
   return (
-    <label className="mb-3 flex w-fit items-center gap-2 text-xs text-(--text-secondary) select-none">
-      <input
-        type="checkbox"
+    <div className="mb-3 flex w-fit items-center gap-2">
+      <Checkbox
+        id={id}
         checked={checked}
-        onChange={(event) => {
-          onChange(event.target.checked);
+        onCheckedChange={(value) => {
+          onChange(value);
         }}
-        className="size-3.5 accent-(--series-1)"
+        className="size-3.5"
       />
-      Shade by year written
-    </label>
+      <Label
+        htmlFor={id}
+        className="text-xs font-normal text-(--text-secondary)"
+      >
+        Shade by year written
+      </Label>
+    </div>
   );
 }
 
@@ -377,6 +392,29 @@ export function App({ data }: { data: DashboardData }) {
   // Lifted out of CommitCalendar so it survives the remount on range change.
   const [calendarKindFilter, setCalendarKindFilter] =
     useState<CalendarKindFilter>("all");
+  const calendarRangeSelectId = useId();
+
+  // Fixed ranges first, then one entry per year of history, newest first.
+  const calendarRangeItems: Array<{ value: CalendarRange; label: string }> = [
+    { value: "last-12-months", label: "Last 12 months" },
+    { value: "this-year", label: "This year" },
+    { value: "last-3-years", label: "Last 3 years" },
+    { value: "all-years", label: "All years" },
+    ...(data.repo.firstCommitDate
+      ? Array.from(
+          {
+            length:
+              Number(data.generatedAt.slice(0, 4)) -
+              Number(data.repo.firstCommitDate.slice(0, 4)) +
+              1,
+          },
+          (_, index) => Number(data.generatedAt.slice(0, 4)) - index,
+        ).map((year) => ({
+          value: `year-${year}` as const,
+          label: `${year}`,
+        }))
+      : []),
+  ];
 
   // Repo inception, used to anchor charts whose series start mid-history (e.g.
   // dependencies, tracked only once a lockfile exists) to the full timeline.
@@ -791,34 +829,45 @@ export function App({ data }: { data: DashboardData }) {
           title="Commit calendar"
           subtitle="commits per day; days bucketed by the author's local date"
           controls={
-            <label className="mb-3 flex w-fit items-center gap-2 text-xs text-(--text-secondary)">
-              Range
-              <select
-                value={calendarRange}
-                onChange={(event) => {
-                  setCalendarRange(event.target.value as CalendarRange);
-                }}
-                className="rounded-md border border-(--grid-line) bg-(--surface-1) px-2 py-1"
+            <div className="mb-3 flex w-fit items-center gap-2">
+              <Label
+                htmlFor={calendarRangeSelectId}
+                className="text-xs font-normal text-(--text-secondary)"
               >
-                <option value="last-12-months">Last 12 months</option>
-                <option value="this-year">This year</option>
-                <option value="last-3-years">Last 3 years</option>
-                <option value="all-years">All years</option>
-                {Array.from(
-                  {
-                    length:
-                      Number(data.generatedAt.slice(0, 4)) -
-                      Number(data.repo.firstCommitDate.slice(0, 4)) +
-                      1,
-                  },
-                  (_, index) => Number(data.generatedAt.slice(0, 4)) - index,
-                ).map((year) => (
-                  <option key={year} value={`year-${year}`}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </label>
+                Range
+              </Label>
+              <Select
+                value={calendarRange}
+                onValueChange={(value) => {
+                  // null is the "cleared" value; the range select always has one.
+                  if (value !== null) {
+                    setCalendarRange(value);
+                  }
+                }}
+                items={calendarRangeItems}
+              >
+                <SelectTrigger
+                  id={calendarRangeSelectId}
+                  size="sm"
+                  // No height override: the sm variant's data-[size=sm]:h-8
+                  // out-specifies any bare h-* utility passed here.
+                  className="px-2 py-1 text-xs"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {calendarRangeItems.map((item) => (
+                    <SelectItem
+                      key={item.value}
+                      value={item.value}
+                      className="text-xs"
+                    >
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           }
         >
           <CommitCalendar
