@@ -115,7 +115,7 @@ The scan function must be pure and its result JSON-serializable — it is the va
 
 ## Built-in roster
 
-Implemented, in `src/lib/collectors/` (strategy, then default sampling where it is not `all`):
+Implemented, in `src/cli/shared/collectors/` (strategy, then default sampling where it is not `all`):
 
 1.  **commit-meta** (`log`) — author/committer identities, dates, parents, subject and trailers incl. co-authors; the base everything else joins against. Batched.
 1.  **churn** (`log`) — lines added/deleted per commit vs first parent, by file extension. Batched.

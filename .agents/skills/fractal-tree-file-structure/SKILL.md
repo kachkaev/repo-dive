@@ -76,7 +76,6 @@ If `my-app.ts` becomes unused, delete it together with its internal folder safel
 
 All imports within a workspace use relative paths.
 Avoid mixing path alias systems (e.g. `@/foo`) with relative imports, as this creates inconsistency.
-(This project uses `@/` aliases for the `src/` root as a convention.)
 
 ### `shared/` folder convention
 
