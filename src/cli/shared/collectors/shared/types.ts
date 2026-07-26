@@ -1,4 +1,5 @@
 import type { Effect } from "effect";
+import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import type { ResolvedConfig } from "../../config.ts";
 import type { SamplingPolicy } from "../../sampling.ts";
@@ -58,7 +59,9 @@ export type Collector = {
    * ones run everywhere. Overridable via `scan --sample`.
    */
   readonly defaultSampling: SamplingPolicy;
-  readonly collect: (context: CollectContext) => Effect.Effect<unknown, Error>;
+  readonly collect: (
+    context: CollectContext,
+  ) => Effect.Effect<unknown, Error, ChildProcessSpawner.ChildProcessSpawner>;
   /**
    * Optional bulk path: produce outputs for many commits in O(1) subprocesses
    * (e.g. one `git log` pass over the whole history). Commits missing from
@@ -67,7 +70,11 @@ export type Collector = {
   readonly collectBatch?: (context: {
     readonly repoRoot: string;
     readonly shas: ReadonlySet<string>;
-  }) => Effect.Effect<ReadonlyMap<string, unknown>, Error>;
+  }) => Effect.Effect<
+    ReadonlyMap<string, unknown>,
+    Error,
+    ChildProcessSpawner.ChildProcessSpawner
+  >;
   /**
    * Turns one raw output (as re-read from the catalog, hence `unknown`) into
    * facts for the cube. Pure and cheap: `index` re-runs it freely, so
