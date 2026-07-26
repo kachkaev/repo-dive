@@ -62,10 +62,10 @@ export const parseBlamePorcelain = (stdout: string): LineAttribution[] => {
 export const survivalCollector: Collector = {
   name: "survival",
   description:
-    "Line survival via git blame: living lines by extension, author and age cohort (sampled quarterly by default; expensive)",
+    "Line survival via git blame: living lines by extension, author and age cohort (sampled monthly by default; expensive)",
   version: "1",
   strategy: "tree",
-  defaultSampling: "quarterly",
+  defaultSampling: "monthly",
   collect: ({ repoRoot, sha }) =>
     Effect.gen(function* () {
       const fileList = yield* runGit([
