@@ -1,5 +1,20 @@
 # repo-dive
 
+## 0.6.0
+
+### Minor Changes
+
+- [#64](https://github.com/kachkaev/repo-dive/pull/64) [`bb126b7`](https://github.com/kachkaev/repo-dive/commit/bb126b753697b0e4d20cf7162e633b43faace708) - Add a GitHub-style commit calendar to the dashboard.
+
+  The new **"Commit calendar"** section shows commits per day as a heatmap, with horizontal gaps between months so month boundaries stay readable.
+  A range dropdown switches between the last 12 months (whole months, the current partial month shown in full), this year, the last 3 years, all years and any individual year; multi-year ranges render one strip per year, newest first.
+  Days are bucketed by the author's local date, cell intensity uses quartiles of nonzero daily counts across the whole history (so switching ranges never recolors a day), and hovering a cell reveals its date, commit count and AI-assisted share.
+  On narrow screens the calendar keeps its cell size and scrolls horizontally.
+
+  A new `charts.weekStartsOn` config option (`"monday"` by default, `"sunday"` also supported) sets the first day of the week for calendar-shaped charts.
+
+- [#69](https://github.com/kachkaev/repo-dive/pull/69) [`a349473`](https://github.com/kachkaev/repo-dive/commit/a349473f7a531d5414804802e004e9afcbf9b0b4) - Add a universal contributor-kind legend across the dashboard: reserved colors for humans (blue), bots (amber) and AI agents (plum), with diagonal hatching marking AI-assisted work. The commit calendar now stacks each day's cell by author kind (volume as opacity) and gains kind filter chips; commits per month splits into Human / Human · AI-assisted / AI agent / Bot; the churn chart hatches AI-assisted added lines; contributor lists and the AI co-authors chart use the kind colors; and the survival-by-contributor chart folds bots and AI agents into one band per kind. `dashboard.json` now records each commit's author kind, and drops its `monthly` rollup: both monthly charts sum the per-commit rows the calendar already loads. Run `index` to rebuild it.
+
 ## 0.5.0
 
 ### Minor Changes
