@@ -849,7 +849,9 @@ export function App({ data }: { data: DashboardData }) {
                 <SelectTrigger
                   id={calendarRangeSelectId}
                   size="sm"
-                  className="h-auto px-2 py-1 text-xs"
+                  // No height override: the sm variant's data-[size=sm]:h-8
+                  // out-specifies any bare h-* utility passed here.
+                  className="px-2 py-1 text-xs"
                 >
                   <SelectValue />
                 </SelectTrigger>

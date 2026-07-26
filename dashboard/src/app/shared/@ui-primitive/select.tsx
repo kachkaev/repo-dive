@@ -10,14 +10,14 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 
-import { cn } from "./shared/cn.ts";
+import { cn, type PropsWithPlainClassName } from "./shared/cn.ts";
 
 export const Select = SelectPrimitive.Root;
 
 export function SelectValue({
   className,
   ...props
-}: SelectPrimitive.Value.Props) {
+}: PropsWithPlainClassName<SelectPrimitive.Value.Props>) {
   return (
     <SelectPrimitive.Value
       data-slot="select-value"
@@ -32,7 +32,7 @@ export function SelectTrigger({
   size,
   children,
   ...props
-}: SelectPrimitive.Trigger.Props & {
+}: PropsWithPlainClassName<SelectPrimitive.Trigger.Props> & {
   size?: "sm" | "default";
 }) {
   return (
@@ -56,7 +56,7 @@ export function SelectTrigger({
 function SelectScrollUpButton({
   className,
   ...props
-}: SelectPrimitive.ScrollUpArrow.Props) {
+}: PropsWithPlainClassName<SelectPrimitive.ScrollUpArrow.Props>) {
   return (
     <SelectPrimitive.ScrollUpArrow
       data-slot="select-scroll-up-button"
@@ -74,7 +74,7 @@ function SelectScrollUpButton({
 function SelectScrollDownButton({
   className,
   ...props
-}: SelectPrimitive.ScrollDownArrow.Props) {
+}: PropsWithPlainClassName<SelectPrimitive.ScrollDownArrow.Props>) {
   return (
     <SelectPrimitive.ScrollDownArrow
       data-slot="select-scroll-down-button"
@@ -98,7 +98,7 @@ export function SelectContent({
   alignOffset,
   alignItemWithTrigger,
   ...props
-}: SelectPrimitive.Popup.Props &
+}: PropsWithPlainClassName<SelectPrimitive.Popup.Props> &
   Pick<
     SelectPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
@@ -136,7 +136,7 @@ export function SelectItem({
   className,
   children,
   ...props
-}: SelectPrimitive.Item.Props) {
+}: PropsWithPlainClassName<SelectPrimitive.Item.Props>) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"

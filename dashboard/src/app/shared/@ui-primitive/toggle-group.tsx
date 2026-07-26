@@ -14,7 +14,7 @@ import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group
 import { cva, type VariantProps } from "class-variance-authority";
 import { createContext, useContext } from "react";
 
-import { cn } from "./shared/cn.ts";
+import { cn, type PropsWithPlainClassName } from "./shared/cn.ts";
 
 const toggleVariants = cva(
   "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-pressed:bg-accent data-pressed:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -48,7 +48,8 @@ export function ToggleGroup({
   size,
   children,
   ...props
-}: ToggleGroupPrimitive.Props & VariantProps<typeof toggleVariants>) {
+}: PropsWithPlainClassName<ToggleGroupPrimitive.Props> &
+  VariantProps<typeof toggleVariants>) {
   return (
     <ToggleGroupPrimitive
       data-slot="toggle-group"
@@ -70,7 +71,8 @@ export function ToggleGroupItem({
   variant,
   size,
   ...props
-}: TogglePrimitive.Props & VariantProps<typeof toggleVariants>) {
+}: PropsWithPlainClassName<TogglePrimitive.Props> &
+  VariantProps<typeof toggleVariants>) {
   const context = useContext(ToggleGroupContext);
   return (
     <TogglePrimitive

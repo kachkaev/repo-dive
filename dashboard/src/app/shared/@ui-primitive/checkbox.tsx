@@ -7,12 +7,12 @@
 import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
 import { CheckIcon } from "lucide-react";
 
-import { cn } from "./shared/cn.ts";
+import { cn, type PropsWithPlainClassName } from "./shared/cn.ts";
 
 export function Checkbox({
   className,
   ...props
-}: CheckboxPrimitive.Root.Props) {
+}: PropsWithPlainClassName<CheckboxPrimitive.Root.Props>) {
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"

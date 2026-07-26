@@ -11,13 +11,13 @@
  */
 import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
 
-import { cn } from "./shared/cn.ts";
+import { cn, type PropsWithPlainClassName } from "./shared/cn.ts";
 
 function ScrollBar({
   className,
   orientation,
   ...props
-}: ScrollAreaPrimitive.Scrollbar.Props) {
+}: PropsWithPlainClassName<ScrollAreaPrimitive.Scrollbar.Props>) {
   return (
     <ScrollAreaPrimitive.Scrollbar
       data-slot="scroll-area-scrollbar"
@@ -48,7 +48,7 @@ export function ScrollArea({
   className,
   children,
   ...props
-}: ScrollAreaPrimitive.Root.Props) {
+}: PropsWithPlainClassName<ScrollAreaPrimitive.Root.Props>) {
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
