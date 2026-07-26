@@ -18,4 +18,6 @@ export function cn(...inputs: ClassNameValue[]): string {
  * per-state callback — to the plain-string form these wrappers merge with
  * {@link cn}.
  */
-export type PropsWithPlainClassName<Props> = Props & { className?: string };
+export type PropsWithPlainClassName<Props> = Props & {
+  className?: string | undefined;
+};

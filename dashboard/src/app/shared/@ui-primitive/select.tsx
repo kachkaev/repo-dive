@@ -33,7 +33,7 @@ export function SelectTrigger({
   children,
   ...props
 }: PropsWithPlainClassName<SelectPrimitive.Trigger.Props> & {
-  size?: "sm" | "default";
+  size?: "sm" | "default" | undefined;
 }) {
   return (
     <SelectPrimitive.Trigger
