@@ -51,6 +51,13 @@ const kindFilterLabels: Record<Exclude<CalendarKindFilter, "all">, string> = {
   ai: "AI agents",
 };
 
+/** Qualifies a count once a single kind is filtered: "4 bot commits". */
+const kindNouns: Record<Exclude<CalendarKindFilter, "all">, string> = {
+  human: "human",
+  bot: "bot",
+  ai: "AI-agent",
+};
+
 /**
  * Zero + four intensity steps. A cell's kind segments keep their full colors;
  * the day's commit volume fades the whole stack toward the surface via group
@@ -385,7 +392,7 @@ function CalendarStrip({
             patternUnits="userSpaceOnUse"
             patternTransform="rotate(45)"
           >
-            <rect width={1} height={3} fill="var(--kind-ai)" />
+            <rect width={1} height={3} fill={kindColors.ai} />
           </pattern>
           {/* Rounds each cell's stacked segments as one shape (scales to any cell). */}
           <clipPath id={clipId} clipPathUnits="objectBoundingBox">
@@ -583,8 +590,23 @@ export function CommitCalendar({
     }
   }
 
-  const breakdown = (day: DayTotal): string =>
-    [
+  // Every count below is the one the calendar is drawing: filtering to bots
+  // must not leave the caption quoting a repo-wide total, or a busiest day
+  // picked by its bot count described by its (much larger) overall one.
+  const countPhrase = (day: DayTotal): string => {
+    const total = filterValueOf(day, kindFilter);
+    const noun = kindFilter === "all" ? "" : `${kindNouns[kindFilter]} `;
+    return `${total} ${noun}${total === 1 ? "commit" : "commits"}`;
+  };
+
+  /** What the count phrase leaves unsaid: the kind split, or just the AI share. */
+  const detailOf = (day: DayTotal): string => {
+    if (kindFilter !== "all") {
+      return kindFilter === "human" && day.humanAi > 0
+        ? `${day.humanAi} AI-assisted`
+        : "";
+    }
+    return [
       day.human > 0
         ? `${day.human} human${day.humanAi > 0 ? ` (${day.humanAi} AI-assisted)` : ""}`
         : undefined,
@@ -593,14 +615,17 @@ export function CommitCalendar({
     ]
       .filter(Boolean)
       .join(" · ");
+  };
 
   const describe = (cell: Cell): string => {
-    const total = totalOf(cell.day);
-    const parts = breakdown(cell.day);
-    return `${cell.isoDate}: ${total} ${total === 1 ? "commit" : "commits"}${
-      parts && total > 0 ? ` — ${parts}` : ""
-    }`;
+    const detail = detailOf(cell.day);
+    return `${cell.isoDate}: ${countPhrase(cell.day)}${detail ? ` — ${detail}` : ""}`;
   };
+
+  const rangeDetail = detailOf(rangeTotal);
+  const rangeSummary = `${countPhrase(rangeTotal)} in this range${
+    rangeDetail ? ` (${rangeDetail})` : ""
+  }${busiest ? ` · busiest day ${describe(busiest)}` : ""}`;
 
   const legendColor =
     kindFilter === "all" ? kindColors.human : kindColors[kindFilter];
@@ -666,13 +691,7 @@ export function CommitCalendar({
       </div>
       <div className="mt-2 flex items-center justify-between gap-4 text-xs text-(--text-secondary)">
         <span className="tabular-nums">
-          {hovered
-            ? describe(hovered)
-            : `${totalOf(rangeTotal)} commits in this range${
-                breakdown(rangeTotal) && totalOf(rangeTotal) > 0
-                  ? ` (${breakdown(rangeTotal)})`
-                  : ""
-              }${busiest ? ` · busiest day ${describe(busiest)}` : ""}`}
+          {hovered ? describe(hovered) : rangeSummary}
         </span>
         <span className="flex shrink-0 items-center gap-1 text-(--text-muted)">
           Less

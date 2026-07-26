@@ -372,7 +372,8 @@ test.concurrent(
         GIT_COMMITTER_EMAIL: email,
         GIT_COMMITTER_NAME: name,
       };
-      writeFileSync(path.join(repoPath, "file.txt"), `${subject}\n`);
+      // `.md` rather than `.txt`: only source files are blamed for survival.
+      writeFileSync(path.join(repoPath, "file.md"), `${subject}\n`);
       runGitAs(repoPath, identity, "add", ".");
       runGitAs(repoPath, identity, "commit", "-m", subject);
     }
@@ -386,6 +387,9 @@ test.concurrent(
         "renovate[bot]",
         "bump deps",
       );
+      // An AI agent recognizable only by its name: the email says nothing.
+      // Committed last so its line is the one still alive under blame.
+      commitAs("noreply@anthropic.com", "Claude", "agent edit");
 
       // A .ts config (exercises Node's type stripping through the real CLI). The
       // `defineConfig` import is covered by unit tests — a temp repo has no
@@ -415,7 +419,7 @@ test.concurrent(
         "--repo",
         repoPath,
         "--collectors",
-        "commit-meta,churn",
+        "commit-meta,churn,survival",
       );
       const indexRun = await runCli("index", "--repo", repoPath);
       expect(indexRun.status, indexRun.stderr).toBe(0);
@@ -432,8 +436,8 @@ test.concurrent(
       );
       expect(
         contributorCount,
-        "Alice's aliases collapse; bot is separate",
-      ).toBe(2);
+        "Alice's aliases collapse; the bot and the AI agent stay separate",
+      ).toBe(3);
 
       const contributors = arrayAt(dashboard, "contributors");
       const alice = contributors.find(
@@ -455,7 +459,15 @@ test.concurrent(
         stringAt(row, "kind"),
       );
       // Same-second fixture commits have no stable order; compare as a multiset.
-      expect(commitKinds.toSorted()).toEqual(["bot", "human", "human"]);
+      expect(commitKinds.toSorted()).toEqual(["ai", "bot", "human", "human"]);
+
+      // Survival facts carry only an email, so folding a non-human into its
+      // kind band has to resolve the kind with the author's name too — without
+      // it "Claude <noreply@anthropic.com>" reads as an ordinary human.
+      const survivalAuthors = Object.keys(
+        recordAt(arrayAt(dashboard, "survival").at(-1), "byContributor"),
+      );
+      expect(survivalAuthors).toContain("AI agents");
     } finally {
       rmSync(repoPath, { force: true, recursive: true });
     }

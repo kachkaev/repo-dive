@@ -255,8 +255,25 @@ const buildDashboardData = (
   // server-side lets the dashboard color the bands with the reserved kind
   // colors without needing a label → kind mapping of its own (the contributors
   // list is truncated, so it cannot serve as one).
+  //
+  // Survival facts carry only the author's email, but kind derivation also
+  // reads the name — "Claude <noreply@anthropic.com>" is an AI agent by its
+  // name alone. Feed the names the commits already carry, so a survival band
+  // folds exactly the way the contributors list classifies the same person.
+  const authorNameByEmail = new Map<string, string>();
+  for (const commit of commits) {
+    if (commit.authorName) {
+      authorNameByEmail.set(
+        commit.authorEmail.toLowerCase(),
+        commit.authorName,
+      );
+    }
+  }
   const survivalLabelOf = (email: string): string => {
-    const resolved = config.resolveContributor(email);
+    const resolved = config.resolveContributor(
+      email,
+      authorNameByEmail.get(email.toLowerCase()),
+    );
     return resolved.kind === "human"
       ? resolved.label
       : kindGroupLabels[resolved.kind];

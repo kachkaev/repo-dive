@@ -304,20 +304,31 @@ const kindColors = {
 
 /**
  * Survival series that indexing folds non-human contributors into (must match
- * `kindGroupLabels` in src/lib/indexing.ts), colored with the reserved kind
- * colors instead of palette slots.
+ * `kindGroupLabels` in src/cli/shared/indexing.ts), colored with the reserved
+ * kind colors instead of palette slots.
  */
 const kindGroupSeriesColors: Record<string, string> = {
   Bots: kindColors.bot,
   "AI agents": kindColors.ai,
 };
 
+/**
+ * Palette slots a person may take in a chart that also draws the folded Bots /
+ * AI agents bands. `--series-3` is skipped because `--kind-bot` aliases it (see
+ * styles.css) — otherwise a human and the Bots band render in the very same
+ * amber within one stack, which is exactly what the reserved colors exist to
+ * prevent. `--series-1` stays in: it *is* `--kind-human`.
+ */
+const humanCategoricalColors = categoricalColors.filter(
+  (color) => color !== "var(--series-3)",
+);
+
 // Bots and AI agents arrive pre-folded into one series per kind (indexing
 // groups them), colored with the reserved kind colors; humans take palette
 // slots by rank as before.
 const survivalBaseColorOf = (label: string, rank: number): string =>
   kindGroupSeriesColors[label] ??
-  categoricalColors[rank % categoricalColors.length] ??
+  humanCategoricalColors[rank % humanCategoricalColors.length] ??
   otherColor;
 
 export function App({ data }: { data: DashboardData }) {
@@ -578,7 +589,9 @@ export function App({ data }: { data: DashboardData }) {
         colors: flat.seriesKeys.map((key, index) =>
           key === "Other"
             ? otherColor
-            : (kindGroupSeriesColors[key] ?? flat.colors[index] ?? otherColor),
+            : (kindGroupSeriesColors[key] ??
+              humanCategoricalColors[index % humanCategoricalColors.length] ??
+              otherColor),
         ),
       };
     } else {
