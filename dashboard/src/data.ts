@@ -67,13 +67,13 @@ type SurvivalRow = {
    * Optional: absent in dashboard.json written before per-year survival landed.
    */
   byContributorYear?: Record<string, Record<string, number>>;
-  byExtension: Record<string, number>;
+  byLanguage: Record<string, number>;
   /**
-   * Living lines per file extension, split by the year each line was authored.
+   * Living lines per language, split by the year each line was authored.
    * Optional: absent in dashboard.json written before per-year survival by
-   * extension landed.
+   * language landed.
    */
-  byExtensionYear?: Record<string, Record<string, number>>;
+  byLanguageYear?: Record<string, Record<string, number>>;
 };
 
 export type ContributorKind = "human" | "bot" | "ai";

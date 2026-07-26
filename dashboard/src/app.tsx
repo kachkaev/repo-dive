@@ -7,7 +7,6 @@ import {
 } from "./app/activity-calendar.tsx";
 import { BarList } from "./app/bar-list.tsx";
 import { DivergingBars } from "./app/diverging-bars.tsx";
-import { languageOfExtension } from "./app/languages.ts";
 import { Checkbox } from "./app/shared/@ui-primitive/checkbox.tsx";
 import { Label } from "./app/shared/@ui-primitive/label.tsx";
 import {
@@ -589,37 +588,26 @@ export function App({ data }: { data: DashboardData }) {
         };
 
   const languagesHasYearData = data.survival.some(
-    (row) => row.byExtensionYear !== undefined,
+    (row) => row.byLanguageYear !== undefined,
   );
 
-  // Blame-based alternative to the tokei chart: living lines per language
-  // (approximated from file extensions), shaded by the year each line was
-  // written. Languages the tokei chart also shows keep its colors so toggling
-  // doesn't recolor the stack; extras take palette slots past the tokei ones.
+  // Blame-based counterpart to the per-commit chart: the same lines over the
+  // same files, shaded by the year each was written. Languages the flat chart
+  // also shows keep its colors so toggling doesn't recolor the stack; the two
+  // top-7 lists can still differ, since survival samples fewer commits, so an
+  // extra takes a palette slot past the flat chart's.
   const languagesYearChart: StackedChart | undefined = languagesHasYearData
     ? shapeYearBands(
-        data.survival.map((row) => {
-          const byGroupYear: Record<string, Record<string, number>> = {};
-          for (const [extension, byYear] of Object.entries(
-            row.byExtensionYear ?? {},
-          )) {
-            const language = languageOfExtension(extension);
-            // Plain assignment rather than `??=`, which React Compiler 1.0 does
-            // not yet lower and would silently bail the whole component on.
-            byGroupYear[language] = byGroupYear[language] ?? {};
-            const target = byGroupYear[language];
-            for (const [year, lines] of Object.entries(byYear)) {
-              target[year] = (target[year] ?? 0) + lines;
-            }
-          }
-          return { date: row.date, byGroupYear };
-        }),
+        data.survival.map((row) => ({
+          date: row.date,
+          byGroupYear: row.byLanguageYear ?? {},
+        })),
         7,
         survivalYearScale,
         (label, rank) => {
-          const tokeiKeys = languagesChart.seriesKeys;
-          const matched = tokeiKeys.indexOf(label);
-          const slot = matched === -1 ? tokeiKeys.length + rank : matched;
+          const flatKeys = languagesChart.seriesKeys;
+          const matched = flatKeys.indexOf(label);
+          const slot = matched === -1 ? flatKeys.length + rank : matched;
           return (
             categoricalColors[slot % categoricalColors.length] ?? otherColor
           );
@@ -754,8 +742,8 @@ export function App({ data }: { data: DashboardData }) {
           title="Lines by language"
           subtitle={
             shadeLanguagesByYear && languagesYearChart
-              ? "living lines via git blame at sampled commits, grouped by language (from file extensions) and shaded by the year each line was written"
-              : "tokei snapshots at sampled commits; embedded code counts toward its host file's language"
+              ? "the same lines, attributed via git blame at sampled commits and shaded by the year each one was written"
+              : "lines in source files at each commit, grouped by language (from file extensions); lockfiles, minified bundles and generated data are not counted"
           }
           controls={
             languagesYearChart ? (

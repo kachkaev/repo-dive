@@ -54,7 +54,7 @@ Collectors so far:
 - **directives** — eslint-disable comments by rule (block disables tracked as gray areas) and `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck`
 - **dependencies** — total resolved packages from package-manager lockfiles, per package manager (pnpm, npm and yarn — classic and berry; version-aware and monorepo-aware, extensible to more managers), plus direct/dev/optional dependencies and the number of manifests read straight from `package.json` files
 - **todo-comments** — TODO/FIXME/HACK/XXX counts
-- **languages** — tokei language/LOC breakdown (sampled monthly; markdown counted whole)
+- **languages** — lines and file count per language across a commit's source files (lockfiles, minified bundles and generated data excluded)
 - **survival** — `git blame` line survival by extension, author and age cohort (sampled monthly)
 
 `index` normalizes raw snapshots into `.repo-dive/index/metrics.sqlite` (a facts-by-categories cube, rebuildable at any time) plus `dashboard.json`, and `dashboard` serves a local React app with interactive charts: languages over time, a GitHub-style commit calendar, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
