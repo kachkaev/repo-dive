@@ -24,8 +24,8 @@ re-scan, or when they don't.
 
 Bump levels while the package is 0.x:
 
-- `patch` — features and fixes, which is almost everything.
-- `minor` — breaking changes only (renames, catalog/config format changes users must act on).
+- `minor` — user-facing features (a new command, chart, collector, metric, config option) and breaking changes (renames, catalog/config format changes users must act on).
+- `patch` — fixes and internal changes.
 
 ## Backfilling a missed changeset
 
