@@ -34,6 +34,13 @@ export const prettifyAuthorEmail = (email: string): string => {
   return match?.[1] ?? email;
 };
 
+/**
+ * Series labels non-human contributors fold into in survival data. The
+ * dashboard matches these literal strings to color the bands with the
+ * reserved kind colors, so change them in both places or not at all.
+ */
+export const kindGroupLabels = { bot: "Bots", ai: "AI agents" } as const;
+
 /** "Claude Fable 5 <noreply@anthropic.com>" → "Claude Fable 5" */
 export const coAuthorIdentity = (coAuthor: string): string => {
   const angleIndex = coAuthor.indexOf("<");
@@ -127,6 +134,7 @@ const buildDashboardData = (
     sha: commit.sha.slice(0, 10),
     date: commit.date,
     author: commit.authorEmail,
+    kind: config.resolveContributor(commit.authorEmail, commit.authorName).kind,
     ai: aiCoAuthorsOf(commit).length > 0,
     added: sumMetric(commit, "churn.added"),
     deleted: sumMetric(commit, "churn.deleted"),
@@ -245,6 +253,18 @@ const buildDashboardData = (
         .map(([rule, count]) => ({ rule, count }))
     : [];
 
+  // Non-human contributors fold into one series per kind in the survival
+  // charts: individual bots/agents rarely matter there, and grouping them
+  // server-side lets the dashboard color the bands with the reserved kind
+  // colors without needing a label → kind mapping of its own (the contributors
+  // list is truncated, so it cannot serve as one).
+  const survivalLabelOf = (email: string): string => {
+    const resolved = config.resolveContributor(email);
+    return resolved.kind === "human"
+      ? resolved.label
+      : kindGroupLabels[resolved.kind];
+  };
+
   const survival = commits
     .filter((commit) => hasMetric(commit, "survival.lines"))
     .map((commit) => {
@@ -258,9 +278,7 @@ const buildDashboardData = (
           if (fact.metric !== "survival.lines") {
             continue;
           }
-          const label = config.resolveContributor(
-            fact.categories?.["author"] ?? "",
-          ).label;
+          const label = survivalLabelOf(fact.categories?.["author"] ?? "");
           const year = (fact.categories?.["cohort"] ?? "").slice(0, 4) || "?";
           const byYear = (byContributorYear[label] ??= {});
           byYear[year] = (byYear[year] ?? 0) + fact.value;
@@ -275,7 +293,7 @@ const buildDashboardData = (
         byCohort: groupMetric(commit, "survival.lines", "cohort"),
         byContributor: sumByKey(
           groupMetric(commit, "survival.lines", "author"),
-          (email) => config.resolveContributor(email).label,
+          survivalLabelOf,
         ),
         byContributorYear,
         byExtension: groupMetric(commit, "survival.lines", "extension"),

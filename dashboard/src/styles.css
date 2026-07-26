@@ -31,6 +31,18 @@
   --series-20: #3d54cb;
   --diverge-pos: #2a78d6;
   --diverge-neg: #e34948;
+  /*
+   * Reserved contributor-kind colors, used by every authorship-aware chart
+   * (calendar, commits per month, churn, survival, contributor lists) so
+   * "human", "AI" and "bot" read as the same hue everywhere. Human and bot
+   * alias palette slots (the alias re-resolves per theme); the AI plum is its
+   * own value — unlike the palette purples, it keeps enough red to stay
+   * distinguishable from the human blue under simulated color-vision
+   * deficiency in both themes (validated).
+   */
+  --kind-human: var(--series-1);
+  --kind-bot: var(--series-3);
+  --kind-ai: #93278f;
   --seq-100: #cde2fb;
   --seq-200: #9ec5f4;
   --seq-300: #6da7ec;
@@ -71,6 +83,7 @@
     --series-20: #425ad1;
     --diverge-pos: #3987e5;
     --diverge-neg: #e66767;
+    --kind-ai: #b02fa8;
   }
 }
 

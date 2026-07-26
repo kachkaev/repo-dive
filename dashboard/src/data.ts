@@ -2,6 +2,12 @@ type CommitRow = {
   sha: string;
   date: string;
   author: string;
+  /**
+   * The author's contributor kind. Missing in dashboard.json written before
+   * per-commit kinds landed — treat as "human".
+   */
+  kind?: ContributorKind;
+  /** At least one AI co-author trailer on the commit. */
   ai: boolean;
   added: number;
   deleted: number;
@@ -79,7 +85,7 @@ type SurvivalRow = {
   byExtensionYear?: Record<string, Record<string, number>>;
 };
 
-type ContributorKind = "human" | "bot" | "ai";
+export type ContributorKind = "human" | "bot" | "ai";
 
 type ContributorRow = {
   email: string;
