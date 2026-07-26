@@ -3,19 +3,19 @@ import { Console, Effect } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
 import packageJson from "../package.json" with { type: "json" };
-import { collectorsCommand } from "./commands/collectors.ts";
-import { dashboardCommand } from "./commands/dashboard.ts";
-import { gcCommand } from "./commands/gc.ts";
-import { indexCommand } from "./commands/index-command.ts";
-import { mcpCommand } from "./commands/mcp.ts";
-import { queryCommand } from "./commands/query.ts";
-import { reportCommand } from "./commands/report.ts";
-import { scanCommand } from "./commands/scan.ts";
-import { statusCommand } from "./commands/status.ts";
-import { defaultDashboardPort } from "./lib/config.ts";
-import { runDashboard } from "./lib/dashboard-server.ts";
-import { runIndex } from "./lib/indexing.ts";
-import { runScan } from "./lib/scan.ts";
+import { collectorsCommand } from "./cli/collectors-command.ts";
+import { dashboardCommand } from "./cli/dashboard-command.ts";
+import { gcCommand } from "./cli/gc-command.ts";
+import { indexCommand } from "./cli/index-command.ts";
+import { mcpCommand } from "./cli/mcp-command.ts";
+import { queryCommand } from "./cli/query-command.ts";
+import { reportCommand } from "./cli/report-command.ts";
+import { scanCommand } from "./cli/scan-command.ts";
+import { defaultDashboardPort } from "./cli/shared/config.ts";
+import { runDashboard } from "./cli/shared/dashboard-server.ts";
+import { runIndex } from "./cli/shared/indexing.ts";
+import { runScan } from "./cli/shared/scan.ts";
+import { statusCommand } from "./cli/status-command.ts";
 
 const cli = Command.make("repo-dive", {
   repoPath: Flag.string("repo").pipe(

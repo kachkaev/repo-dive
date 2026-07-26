@@ -3,22 +3,19 @@ import { useState } from "react";
 import {
   type CalendarRange,
   CommitCalendar,
-} from "./components/activity-calendar.tsx";
-import { BarList } from "./components/bar-list.tsx";
-import { DivergingBars } from "./components/diverging-bars.tsx";
-import { DataTable, Section, StatTile } from "./components/primitives.tsx";
-import {
-  type TimePoint,
-  TimeSeriesChart,
-} from "./components/time-stack-chart.tsx";
-import type { DashboardData } from "./data.ts";
+} from "./app/activity-calendar.tsx";
+import { BarList } from "./app/bar-list.tsx";
+import { DivergingBars } from "./app/diverging-bars.tsx";
+import { languageOfExtension } from "./app/languages.ts";
 import {
   formatBytes,
   formatCount,
   formatDate,
   formatPercent,
-} from "./format.ts";
-import { languageOfExtension } from "./languages.ts";
+} from "./app/shared/format.ts";
+import { DataTable, Section, StatTile } from "./app/shared/primitives.tsx";
+import { type TimePoint, TimeSeriesChart } from "./app/time-stack-chart.tsx";
+import type { DashboardData } from "./data.ts";
 
 const categoricalColors = Array.from(
   { length: 20 },
