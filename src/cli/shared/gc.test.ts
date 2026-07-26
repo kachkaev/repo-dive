@@ -76,8 +76,11 @@ function createMergeFixtureRepo() {
 const seedOutput = (repoRoot: string, sha: string, collectorName: string) =>
   Effect.gen(function* () {
     const collector = collectorNamed(collectorName);
-    const catalog = yield* openCatalog(repoRoot);
     const config = yield* loadConfig(repoRoot);
+    const catalog = yield* openCatalog({
+      repoRoot,
+      catalogPath: config.catalogPath,
+    });
     yield* writeCollectorOutput({
       catalog,
       sha,
@@ -174,8 +177,9 @@ it.effect(
     return Effect.gen(function* () {
       const collector = collectorNamed("directives");
       const config = yield* loadConfig(repoPath);
+      const { catalogPath } = config;
       const liveCacheKey = collectorCacheKey(collector, config);
-      const cache = getBlobCache(repoPath);
+      const cache = getBlobCache(catalogPath);
       const entries = new Map([["0".repeat(40), "[]"]]);
 
       cache.setMany(collector.name, liveCacheKey, entries);
@@ -183,17 +187,17 @@ it.effect(
       cache.setMany(collector.name, "000000000000", entries);
       cache.setMany("retired-collector", liveCacheKey, entries);
 
-      expect(listBlobCacheNamespaces(repoPath)).toHaveLength(3);
+      expect(listBlobCacheNamespaces(catalogPath)).toHaveLength(3);
 
       yield* runGc({ repoPath, stale: true, dryRun: true, yes: true });
       expect(
-        listBlobCacheNamespaces(repoPath),
+        listBlobCacheNamespaces(catalogPath),
         "--dry-run must leave the cache alone",
       ).toHaveLength(3);
 
       yield* runGc({ repoPath, stale: true, yes: true });
 
-      expect(listBlobCacheNamespaces(repoPath)).toEqual([
+      expect(listBlobCacheNamespaces(catalogPath)).toEqual([
         { collector: collector.name, cacheKey: liveCacheKey, entryCount: 1 },
       ]);
     }).pipe(
@@ -208,10 +212,10 @@ it.effect(
 );
 
 test("pruneBlobCacheNamespaces compacts the file it prunes", () => {
-  const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-cache-"));
+  const catalogPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-cache-"));
 
   try {
-    const cache = getBlobCache(repoPath);
+    const cache = getBlobCache(catalogPath);
     const bulk = new Map(
       Array.from({ length: 2000 }, (_, index) => [
         String(index).padStart(40, "0"),
@@ -227,7 +231,7 @@ test("pruneBlobCacheNamespaces compacts the file it prunes", () => {
       new Map([["a".repeat(40), "[]"]]),
     );
 
-    const bytesReclaimed = pruneBlobCacheNamespaces(repoPath, [
+    const bytesReclaimed = pruneBlobCacheNamespaces(catalogPath, [
       { collector: "directives", cacheKey: "deadbeef0000" },
     ]);
 
@@ -235,10 +239,10 @@ test("pruneBlobCacheNamespaces compacts the file it prunes", () => {
       bytesReclaimed,
       "VACUUM should hand back the freed pages",
     ).toBeGreaterThan(0);
-    expect(listBlobCacheNamespaces(repoPath)).toEqual([
+    expect(listBlobCacheNamespaces(catalogPath)).toEqual([
       { collector: "directives", cacheKey: "cafebabe1111", entryCount: 1 },
     ]);
   } finally {
-    rmSync(repoPath, { force: true, recursive: true });
+    rmSync(catalogPath, { force: true, recursive: true });
   }
 });

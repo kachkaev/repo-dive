@@ -12,6 +12,7 @@ npx repo-dive dashboard  [--repo PATH] [--port N] [--open]
 npx repo-dive status     [--repo PATH]
 npx repo-dive collectors
 npx repo-dive gc         [--repo PATH] [--unreachable] [--off-mainline] [--stale] [--collectors a,b] [--dry-run] [--yes]
+npx repo-dive ignore     [--repo PATH] [--dry-run]
 npx repo-dive report     [--repo PATH] [--out PATH] [--open]
 npx repo-dive query      [--repo PATH] [--json] "<sql>"
 npx repo-dive mcp        [--repo PATH]
@@ -21,6 +22,7 @@ npx repo-dive mcp        [--repo PATH]
 - **`index`** — the reduce phase. Normalizes raw snapshots into the SQLite cube. Fast and idempotent: every run rebuilds the cube from scratch, which is safe because raw data is the source of truth.
 - **`status`** — inspects the catalog: how many commits each collector has collected out of the ones its sampling policy targets. The "where am I?" command for the multi-step workflow.
 - **`gc`** — reclaims catalog space. Each flag names one kind of dead weight: `--unreachable` drops whole commit folders git can no longer reach; `--off-mainline` drops tree/worktree snapshots stored under commits that are reachable but not on HEAD's first-parent chain (see [collectors](04-collectors.md)) — `log` outputs are kept, since a commit's own metadata is a fact wherever the commit sits; `--stale` drops catalog outputs and blob-cache entries whose collector fingerprint no longer matches any registered collector. Run without flags it lists what it found and asks; `--dry-run` reports the same plan without touching anything.
+- **`ignore`** — adds the catalog folder to every ignore file at the repository root (`.gitignore`, `.prettierignore`, `.dockerignore`, …) that does not cover it yet. The catalog hides itself from git with a nested `.gitignore`, but every other tool reads a single ignore file at the root, so without this the catalog becomes their input. `scan`, `index` and `status` warn when an entry is missing and point here; `--dry-run` reports the same plan without writing. Only existing ignore files are amended — none is created — and a catalog configured to live outside the repository needs none of this.
 - **`report`** — exports the dashboard as one self-contained HTML file (bundle + data inlined) for sharing and presentations.
 - **`query`** — escape hatch: run a read-only SQL query against the cube and print rows (table or `--json`).
 - **`mcp`** — serve the cube over the Model Context Protocol (stdio) with `schema` and `query` tools, so AI agents can explore a scanned repository.

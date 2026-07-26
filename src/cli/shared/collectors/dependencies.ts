@@ -64,9 +64,10 @@ export const dependenciesCollector: Collector = {
   version: "4",
   strategy: "tree",
   defaultSampling: "all",
-  collect: ({ repoRoot, sha, cacheKey }) =>
+  collect: ({ repoRoot, catalogPath, sha, cacheKey }) =>
     scanTreeFilesWithBlobCache({
       repoRoot,
+      catalogPath,
       sha,
       collectorName: "dependencies",
       cacheKey,

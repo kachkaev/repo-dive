@@ -57,9 +57,10 @@ export const todoCommentsCollector: Collector = {
   version: "2",
   strategy: "tree",
   defaultSampling: "all",
-  collect: ({ repoRoot, sha, cacheKey }) =>
+  collect: ({ repoRoot, catalogPath, sha, cacheKey }) =>
     scanTreeWithBlobCache({
       repoRoot,
+      catalogPath,
       sha,
       collectorName: "todo-comments",
       cacheKey,

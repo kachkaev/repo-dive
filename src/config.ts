@@ -25,6 +25,9 @@
  *   charts: {
  *     weekStartsOn: "monday",
  *   },
+ *   catalog: {
+ *     dir: ".repo-dive",
+ *   },
  * });
  * ```
  */
@@ -81,9 +84,26 @@ export type ChartsConfig = {
   readonly weekStartsOn?: WeekStart;
 };
 
+export type CatalogConfig = {
+  /**
+   * Where the catalog of raw snapshots, caches and the metrics cube lives.
+   * Relative paths resolve against the repository root; absolute paths are
+   * taken as they are. Defaults to `".repo-dive"`.
+   */
+  readonly dir?: string;
+  /**
+   * Whether to warn when ignore files at the repository root (`.gitignore`,
+   * `.prettierignore`, …) do not cover the catalog, which makes the tools
+   * reading them walk it. Defaults to `true`; irrelevant — and skipped — when
+   * the catalog sits outside the repository.
+   */
+  readonly checkIgnoreFiles?: boolean;
+};
+
 export type RepoDiveConfig = {
   readonly contributors?: ContributorsConfig;
   readonly charts?: ChartsConfig;
+  readonly catalog?: CatalogConfig;
 };
 
 /**

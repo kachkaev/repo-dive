@@ -563,3 +563,95 @@ test.concurrent("mcp serves the cube over stdio", async () => {
     rmSync(repoPath, { force: true, recursive: true });
   }
 });
+
+test.concurrent(
+  "scan warns about ignore files that do not cover the catalog, and ignore fixes them",
+  async () => {
+    const repoPath = createFixtureRepo();
+
+    try {
+      writeFileSync(path.join(repoPath, ".prettierignore"), "node_modules\n");
+      writeFileSync(path.join(repoPath, ".gitignore"), "node_modules\n");
+
+      const firstScan = await runCli(
+        "scan",
+        "--repo",
+        repoPath,
+        "--collectors",
+        "commit-meta",
+      );
+      expect(firstScan.status, firstScan.stderr).toBe(0);
+      expect(firstScan.stderr).toMatch(
+        /\.gitignore, \.prettierignore do not cover \.repo-dive\//,
+      );
+
+      const dryRun = await runCli("ignore", "--repo", repoPath, "--dry-run");
+      expect(dryRun.status, dryRun.stderr).toBe(0);
+      expect(dryRun.stdout).toMatch(/Would add \.repo-dive\/ to:/);
+      expect(
+        readFileSync(path.join(repoPath, ".prettierignore"), "utf8"),
+        "--dry-run must not write",
+      ).toBe("node_modules\n");
+
+      const applied = await runCli("ignore", "--repo", repoPath);
+      expect(applied.status, applied.stderr).toBe(0);
+      expect(applied.stdout).toMatch(/Added \.repo-dive\/ to:/);
+      for (const name of [".gitignore", ".prettierignore"]) {
+        expect(readFileSync(path.join(repoPath, name), "utf8")).toMatch(
+          /# repo-dive catalog\n\.repo-dive\/\n$/,
+        );
+      }
+
+      const secondScan = await runCli(
+        "scan",
+        "--repo",
+        repoPath,
+        "--collectors",
+        "commit-meta",
+      );
+      expect(secondScan.status, secondScan.stderr).toBe(0);
+      expect(secondScan.stderr).not.toMatch(/do not cover/);
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  },
+);
+
+test.concurrent(
+  "a catalog configured outside the repo is used as is and raises no ignore-file concern",
+  async () => {
+    const repoPath = createFixtureRepo();
+    const catalogPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-out-"));
+
+    try {
+      writeFileSync(path.join(repoPath, ".gitignore"), "node_modules\n");
+      writeFileSync(
+        path.join(repoPath, "repo-dive.config.mjs"),
+        `export default { catalog: { dir: ${JSON.stringify(catalogPath)} } };\n`,
+      );
+
+      const scan = await runCli(
+        "scan",
+        "--repo",
+        repoPath,
+        "--collectors",
+        "commit-meta",
+      );
+      expect(scan.status, scan.stderr).toBe(0);
+      expect(scan.stdout).toMatch(new RegExp(`Catalog: ${catalogPath}`));
+      expect(scan.stderr).not.toMatch(/does not cover|do not cover/);
+      expect(existsSync(path.join(catalogPath, "catalog.json"))).toBe(true);
+      expect(existsSync(path.join(repoPath, ".repo-dive"))).toBe(false);
+
+      const ignore = await runCli("ignore", "--repo", repoPath);
+      expect(ignore.status, ignore.stderr).toBe(0);
+      expect(ignore.stdout).toMatch(/outside/);
+      expect(readFileSync(path.join(repoPath, ".gitignore"), "utf8")).toBe(
+        "node_modules\n",
+      );
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+      rmSync(catalogPath, { force: true, recursive: true });
+    }
+  },
+);

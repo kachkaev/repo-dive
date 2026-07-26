@@ -2,6 +2,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -11,7 +12,8 @@ import path from "node:path";
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { catalogDirName, openCatalog } from "./catalog.ts";
+import { openCatalog } from "./catalog.ts";
+import { defaultCatalogDirName } from "./config.ts";
 
 const legacyCatalogDirName = ".repo-insighter";
 
@@ -30,6 +32,13 @@ function writeCatalogManifest(repoRoot: string, dirName: string) {
   return dir;
 }
 
+/** These cases are about the default placement; `catalog.dir` is config.test's. */
+const openDefaultCatalog = (repoRoot: string) =>
+  openCatalog({
+    repoRoot,
+    catalogPath: path.join(repoRoot, defaultCatalogDirName),
+  });
+
 const cleanup = (repoRoot: string) =>
   Effect.sync(() => {
     rmSync(repoRoot, { recursive: true, force: true });
@@ -39,13 +48,35 @@ it.effect("openCatalog scaffolds a self-ignoring catalog", () => {
   const repoRoot = makeRepoRoot();
 
   return Effect.gen(function* () {
-    const catalog = yield* openCatalog(repoRoot);
+    const catalog = yield* openDefaultCatalog(repoRoot);
 
-    expect(catalog.rootPath).toBe(path.join(repoRoot, catalogDirName));
+    expect(catalog.rootPath).toBe(path.join(repoRoot, defaultCatalogDirName));
     expect(existsSync(path.join(catalog.rootPath, "catalog.json"))).toBe(true);
     expect(existsSync(path.join(catalog.rootPath, ".gitignore"))).toBe(true);
   }).pipe(Effect.ensuring(cleanup(repoRoot)));
 });
+
+it.effect(
+  "openCatalog keeps a .gitignore already sitting in a configured dir",
+  () => {
+    const repoRoot = makeRepoRoot();
+
+    return Effect.gen(function* () {
+      const catalogPath = path.join(repoRoot, "existing-dir");
+      mkdirSync(catalogPath, { recursive: true });
+      writeFileSync(path.join(catalogPath, ".gitignore"), "custom\n", "utf8");
+
+      const catalog = yield* openCatalog({ repoRoot, catalogPath });
+
+      expect(existsSync(path.join(catalog.rootPath, "catalog.json"))).toBe(
+        true,
+      );
+      expect(readFileSync(path.join(catalogPath, ".gitignore"), "utf8")).toBe(
+        "custom\n",
+      );
+    }).pipe(Effect.ensuring(cleanup(repoRoot)));
+  },
+);
 
 it.effect("openCatalog points at a catalog left by the former name", () => {
   const repoRoot = makeRepoRoot();
@@ -53,10 +84,10 @@ it.effect("openCatalog points at a catalog left by the former name", () => {
   return Effect.gen(function* () {
     writeCatalogManifest(repoRoot, legacyCatalogDirName);
 
-    const error = yield* Effect.flip(openCatalog(repoRoot));
+    const error = yield* Effect.flip(openDefaultCatalog(repoRoot));
     expect(error.message).toMatch(/left by repo-insighter/);
     // Bailing out must not leave a half-made catalog that hides the old one.
-    expect(existsSync(path.join(repoRoot, catalogDirName))).toBe(false);
+    expect(existsSync(path.join(repoRoot, defaultCatalogDirName))).toBe(false);
   }).pipe(Effect.ensuring(cleanup(repoRoot)));
 });
 
@@ -67,10 +98,10 @@ it.effect(
 
     return Effect.gen(function* () {
       writeCatalogManifest(repoRoot, legacyCatalogDirName);
-      writeCatalogManifest(repoRoot, catalogDirName);
+      writeCatalogManifest(repoRoot, defaultCatalogDirName);
 
-      const catalog = yield* openCatalog(repoRoot);
-      expect(catalog.rootPath).toBe(path.join(repoRoot, catalogDirName));
+      const catalog = yield* openDefaultCatalog(repoRoot);
+      expect(catalog.rootPath).toBe(path.join(repoRoot, defaultCatalogDirName));
     }).pipe(Effect.ensuring(cleanup(repoRoot)));
   },
 );

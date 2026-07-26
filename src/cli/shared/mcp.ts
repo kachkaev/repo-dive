@@ -4,6 +4,7 @@ import { McpServer, Tool, Toolkit } from "effect/unstable/ai";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import packageJson from "../../../package.json" with { type: "json" };
+import { loadConfig } from "./config.ts";
 import { query, QueryError } from "./query.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
@@ -32,21 +33,21 @@ const schemaTool = Tool.make("schema", {
   .annotate(Tool.Destructive, false);
 
 const buildSchemaDescription = (
-  repoRoot: string,
+  catalogPath: string,
 ): Effect.Effect<unknown, QueryError> =>
   Effect.gen(function* () {
     const metrics = yield* query(
-      repoRoot,
+      catalogPath,
       `SELECT metric, count(*) AS facts, min(value) AS min_value, max(value) AS max_value
      FROM facts GROUP BY metric ORDER BY metric`,
     );
     const categorySamples = yield* query(
-      repoRoot,
+      catalogPath,
       `SELECT metric, categories FROM facts
      WHERE id IN (SELECT min(id) FROM facts GROUP BY metric)`,
     );
     const commitRange = yield* query(
-      repoRoot,
+      catalogPath,
       "SELECT count(*) AS commits, min(authored_at) AS first, max(authored_at) AS last FROM commits",
     );
 
@@ -88,22 +89,23 @@ export const buildMcpLayer = (
 > =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
+    const { catalogPath } = yield* loadConfig(repoRoot);
 
     // Fail fast (before the protocol starts) if the cube is missing.
-    yield* query(repoRoot, "SELECT 1");
+    yield* query(catalogPath, "SELECT 1");
 
     // Declared `failure` schemas make the server report handler failures as
     // proper MCP tool errors (isError: true), so handlers just fail.
     const handlers = mcpToolkit.toLayer({
       query: ({ sql }) =>
-        query(repoRoot, sql, 200).pipe(
+        query(catalogPath, sql, 200).pipe(
           Effect.map((result): unknown => ({
             columns: result.columns,
             rows: result.rows,
             truncated: result.truncated,
           })),
         ),
-      schema: () => buildSchemaDescription(repoRoot),
+      schema: () => buildSchemaDescription(catalogPath),
     });
 
     return McpServer.toolkit(mcpToolkit).pipe(
