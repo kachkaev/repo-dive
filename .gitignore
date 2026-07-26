@@ -27,5 +27,7 @@
 /.repo-dive/
 /.repo-insighter/
 
-## Local Claude Code config (contains machine-specific paths)
-/.claude/
+## Local Claude Code config (contains machine-specific paths), except the
+## skills symlinked from /.agents/skills/ so that Claude Code discovers them
+/.claude/*
+!/.claude/skills/
