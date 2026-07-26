@@ -2,6 +2,7 @@ import type { Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import type { ResolvedConfig } from "../../config.ts";
+import { sourceExtensions } from "../../languages.ts";
 import type { SamplingPolicy } from "../../sampling.ts";
 
 type CollectContext = {
@@ -102,49 +103,6 @@ export const extensionOf = (filePath: string): string => {
   const dotIndex = basename.lastIndexOf(".");
   return dotIndex > 0 ? basename.slice(dotIndex).toLowerCase() : "(none)";
 };
-
-/**
- * Extensions considered source-like for content-scanning collectors
- * (directives, survival). Deliberately excludes binaries and lockfiles.
- */
-const sourceExtensions = new Set([
-  ".astro",
-  ".c",
-  ".cjs",
-  ".cpp",
-  ".cs",
-  ".css",
-  ".cts",
-  ".go",
-  ".h",
-  ".hpp",
-  ".html",
-  ".java",
-  ".js",
-  ".jsx",
-  ".kt",
-  ".less",
-  ".md",
-  ".mdx",
-  ".mjs",
-  ".mts",
-  ".php",
-  ".prisma",
-  ".py",
-  ".rb",
-  ".rs",
-  ".sass",
-  ".scss",
-  ".sh",
-  ".sql",
-  ".svelte",
-  ".swift",
-  ".ts",
-  ".tsx",
-  ".vue",
-  ".yaml",
-  ".yml",
-]);
 
 const excludedPathSegments = [
   "node_modules/",

@@ -55,7 +55,7 @@ Collectors so far:
 - **directives** — eslint-disable comments by rule (block disables tracked as gray areas) and `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck`
 - **dependencies** — total resolved packages from package-manager lockfiles, per package manager (pnpm, npm and yarn — classic and berry; version-aware and monorepo-aware, extensible to more managers), plus direct/dev/optional dependencies and the number of manifests read straight from `package.json` files
 - **todo-comments** — TODO/FIXME/HACK/XXX counts
-- **languages** — tokei language/LOC breakdown (sampled monthly; markdown counted whole)
+- **languages** — lines and file count per language across a commit's source files (lockfiles, minified bundles and generated data excluded)
 - **survival** — `git blame` line survival by extension, author and age cohort (sampled monthly)
 
 The catalog hides itself from git, but other tools that walk the repository (prettier, markdownlint, cspell, docker builds) each read one ignore file at its root.

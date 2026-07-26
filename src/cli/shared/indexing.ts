@@ -16,6 +16,7 @@ import {
   type ResolvedConfig,
 } from "./config.ts";
 import { warnAboutIgnoreFiles } from "./ignore-files.ts";
+import { languageOfExtension } from "./languages.ts";
 import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
 class NoCollectedCommitsError extends Data.TaggedError(
@@ -265,7 +266,7 @@ const buildDashboardData = (
       // year each line was authored — the dashboard splits each contributor's
       // or language's area into year bands.
       const byContributorYear: Record<string, Record<string, number>> = {};
-      const byExtensionYear: Record<string, Record<string, number>> = {};
+      const byLanguageYear: Record<string, Record<string, number>> = {};
       for (const facts of commit.factsByCollector.values()) {
         for (const fact of facts) {
           if (fact.metric !== "survival.lines") {
@@ -275,9 +276,14 @@ const buildDashboardData = (
           const year = (fact.categories?.["cohort"] ?? "").slice(0, 4) || "?";
           const byYear = (byContributorYear[label] ??= {});
           byYear[year] = (byYear[year] ?? 0) + fact.value;
-          const extension = fact.categories?.["extension"] ?? "";
-          const extensionYears = (byExtensionYear[extension] ??= {});
-          extensionYears[year] = (extensionYears[year] ?? 0) + fact.value;
+          // Survival facts stay keyed by extension — the raw truth — and are
+          // relabelled here with the same map the languages collector uses, so
+          // both halves of "Lines by language" name their stacks identically.
+          const language = languageOfExtension(
+            fact.categories?.["extension"] ?? "",
+          );
+          const languageYears = (byLanguageYear[language] ??= {});
+          languageYears[year] = (languageYears[year] ?? 0) + fact.value;
         }
       }
       return {
@@ -289,8 +295,11 @@ const buildDashboardData = (
           survivalLabelOf,
         ),
         byContributorYear,
-        byExtension: groupMetric(commit, "survival.lines", "extension"),
-        byExtensionYear,
+        byLanguage: sumByKey(
+          groupMetric(commit, "survival.lines", "extension"),
+          languageOfExtension,
+        ),
+        byLanguageYear,
       };
     });
 
