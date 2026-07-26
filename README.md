@@ -57,7 +57,7 @@ Collectors so far:
 - **languages** — tokei language/LOC breakdown (sampled monthly; markdown counted whole)
 - **survival** — `git blame` line survival by extension, author and age cohort (sampled monthly)
 
-`index` normalizes raw snapshots into `.repo-dive/index/metrics.sqlite` (a facts-by-categories cube, rebuildable at any time) plus `dashboard.json`, and `dashboard` serves a local React app with interactive charts: languages over time, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
+`index` normalizes raw snapshots into `.repo-dive/index/metrics.sqlite` (a facts-by-categories cube, rebuildable at any time) plus `dashboard.json`, and `dashboard` serves a local React app with interactive charts: languages over time, a GitHub-style commit calendar, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
 
 ## Configuration
 
@@ -82,9 +82,14 @@ export default defineConfig({
     // How many contributors charts keep before folding the rest into "Other" (default 10).
     maxInCharts: 10,
   },
+  charts: {
+    // First day of the week in calendar-shaped charts (default "monday").
+    weekStartsOn: "monday",
+  },
 });
 ```
 
+`charts.weekStartsOn` sets the first day of the week in calendar-shaped charts such as the commit calendar (`"monday"` by default, `"sunday"` also supported).
 `contributors.aliases` merges the multiple identities one person commits under (work + personal email, GitHub noreply, name variants) so attribution, the contributors table and code-survival-by-contributor count them once; a group can also carry a `displayName`, a profile `url` and a `kind` (`human`/`bot`/`ai`, otherwise auto-derived — the dashboard badges bots and AI agents and lists them apart from humans).
 The config is read by `index`.
 See [docs/specs/07-config.md](docs/specs/07-config.md) for details.

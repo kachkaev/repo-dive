@@ -8,6 +8,7 @@ import type { ResolvedConfig } from "../src/lib/config.ts";
 function config(maxInCharts: number): ResolvedConfig {
   return {
     maxInCharts,
+    weekStartsOn: "monday",
     resolveContributor: (email) => ({
       canonicalEmail: email,
       label: email,

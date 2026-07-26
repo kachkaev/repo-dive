@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 
 import { Effect } from "effect";
 
-import type { ContributorKind } from "../config.ts";
+import type { ContributorKind, WeekStart } from "../config.ts";
 import { prettifyAuthorEmail } from "./indexing.ts";
 
 /** Config file names, in resolution order. First match wins. */
@@ -16,6 +16,8 @@ const configFileNames = [
 ];
 
 export const defaultMaxInCharts = 10;
+
+export const defaultWeekStartsOn: WeekStart = "monday";
 
 /**
  * Default port for the dashboard server. 2141 spells "DIVE" in Scrabble tile
@@ -78,6 +80,8 @@ export type ResolvedConfig = {
   ) => ResolvedContributor;
   /** How many contributors per-contributor charts keep before folding into "Other". */
   readonly maxInCharts: number;
+  /** Which day calendar-shaped dashboard charts start the week on. */
+  readonly weekStartsOn: WeekStart;
 };
 
 /** Internal per-group metadata keyed by every email (and handle) in the group. */
@@ -113,6 +117,7 @@ const defaultResolvedConfig: ResolvedConfig = {
   resolveContributor: (email, name) =>
     bareResolveContributor(new Map(), email, name),
   maxInCharts: defaultMaxInCharts,
+  weekStartsOn: defaultWeekStartsOn,
 };
 
 const configError = (message: string): Error =>
@@ -259,6 +264,20 @@ const parseMaxInCharts = (value: unknown): number => {
   return value;
 };
 
+const weekStarts: readonly WeekStart[] = ["monday", "sunday"];
+
+const parseWeekStartsOn = (value: unknown): WeekStart => {
+  if (value === undefined) {
+    return defaultWeekStartsOn;
+  }
+  for (const weekStart of weekStarts) {
+    if (value === weekStart) {
+      return weekStart;
+    }
+  }
+  throw configError('`charts.weekStartsOn` must be "monday" or "sunday".');
+};
+
 /** Validates a raw imported config value and turns it into a {@link ResolvedConfig}. */
 export const resolveConfig = (raw: unknown): ResolvedConfig => {
   if (!isPlainObject(raw)) {
@@ -274,11 +293,19 @@ export const resolveConfig = (raw: unknown): ResolvedConfig => {
   const maxInCharts = parseMaxInCharts(
     contributors === undefined ? undefined : prop(contributors, "maxInCharts"),
   );
+  const charts = prop(raw, "charts");
+  if (charts !== undefined && !isPlainObject(charts)) {
+    throw configError("`charts` must be an object.");
+  }
+  const weekStartsOn = parseWeekStartsOn(
+    charts === undefined ? undefined : prop(charts, "weekStartsOn"),
+  );
 
   return {
     resolveContributor: (email, name) =>
       bareResolveContributor(aliasMap, email, name),
     maxInCharts,
+    weekStartsOn,
   };
 };
 

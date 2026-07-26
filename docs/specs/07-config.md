@@ -25,6 +25,10 @@ export default defineConfig({
     // How many contributors charts keep before folding the rest into "Other".
     maxInCharts: 10,
   },
+  charts: {
+    // First day of the week in calendar-shaped charts.
+    weekStartsOn: "monday",
+  },
 });
 ```
 
@@ -69,3 +73,12 @@ How many contributors the per-contributor charts keep before folding the remaind
 Defaults to `10`, must be an integer between 1 and 100.
 The stacked survival-by-contributor area keeps up to `maxInCharts` series; the contributors bar list keeps twice that.
 The categorical palette provides 20 distinct colors and cycles beyond that.
+
+## `charts`
+
+### `charts.weekStartsOn`
+
+Which day calendar-shaped dashboard charts (currently the commit calendar) start the week on.
+One of `"monday"` (the default) or `"sunday"`.
+The value is not specific to any single chart — future calendar-shaped charts are expected to honor it too.
+It flows into `dashboard.json` under `config.charts.weekStartsOn`, so the dashboard renders without re-reading the config file.
