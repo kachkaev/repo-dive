@@ -5,10 +5,10 @@ import { Group } from "@visx/group";
 import { scaleLinear, scaleTime } from "@visx/scale";
 import { AreaStack, BarStack, LinePath } from "@visx/shape";
 import { bisector } from "d3-array";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { formatCount, formatDate, formatPercent } from "./shared/format.ts";
-import { Legend } from "./shared/primitives.tsx";
+import { Legend, Swatch } from "./shared/primitives.tsx";
 import { useMeasuredWidth } from "./shared/use-measure.ts";
 
 export type TimePoint = {
@@ -16,7 +16,7 @@ export type TimePoint = {
   values: Record<string, number>;
 };
 
-export type LegendItem = { label: string; color: string };
+export type LegendItem = { label: string; color: string; hatch?: string };
 
 /**
  * Collapses several stacked sub-series (e.g. one contributor's per-year bands)
@@ -55,6 +55,7 @@ function ChartMarks({
   separateGroups,
   groupBoundaryKeys,
   barWidth,
+  hatchUrlOf,
 }: {
   mode: "area" | "bar" | "line";
   displayRows: Array<Record<string, number>>;
@@ -67,6 +68,8 @@ function ChartMarks({
   separateGroups: boolean | undefined;
   groupBoundaryKeys: Set<string>;
   barWidth: number;
+  /** `url(#…)` of the hatch pattern for a series key, if it has one. */
+  hatchUrlOf: (key: string) => string | undefined;
 }) {
   return (
     <>
@@ -88,14 +91,18 @@ function ChartMarks({
           {({ stacks, path }) => (
             <>
               {stacks.map((stack) => (
-                <path
-                  key={stack.key}
-                  d={path(stack) ?? ""}
-                  fill={colors[seriesKeys.indexOf(stack.key)]}
-                  stroke="var(--surface-1)"
-                  strokeWidth={separateGroups ? 0.5 : 1}
-                  strokeOpacity={separateGroups ? 0.35 : 1}
-                />
+                <g key={stack.key}>
+                  <path
+                    d={path(stack) ?? ""}
+                    fill={colors[seriesKeys.indexOf(stack.key)]}
+                    stroke="var(--surface-1)"
+                    strokeWidth={separateGroups ? 0.5 : 1}
+                    strokeOpacity={separateGroups ? 0.35 : 1}
+                  />
+                  {hatchUrlOf(stack.key) && (
+                    <path d={path(stack) ?? ""} fill={hatchUrlOf(stack.key)} />
+                  )}
+                </g>
               ))}
               {stacks
                 .filter((stack) => groupBoundaryKeys.has(stack.key))
@@ -126,17 +133,29 @@ function ChartMarks({
           {(barStacks) =>
             barStacks.map((barStack) =>
               barStack.bars.map((bar) => (
-                <rect
-                  key={`${barStack.index}-${bar.index}`}
-                  x={bar.x + bar.width / 2 - barWidth / 2}
-                  y={bar.y}
-                  width={barWidth}
-                  height={Math.max(0, bar.height)}
-                  fill={bar.color}
-                  stroke="var(--surface-1)"
-                  strokeWidth={1}
-                  rx={1}
-                />
+                <g key={`${barStack.index}-${bar.index}`}>
+                  {/* No stroke: segment boundaries come from hue/hatch changes,
+                      so stacked heights read as exact totals (and match the
+                      gapless churn bars). */}
+                  <rect
+                    x={bar.x + bar.width / 2 - barWidth / 2}
+                    y={bar.y}
+                    width={barWidth}
+                    height={Math.max(0, bar.height)}
+                    fill={bar.color}
+                    rx={1}
+                  />
+                  {hatchUrlOf(bar.key) && (
+                    <rect
+                      x={bar.x + bar.width / 2 - barWidth / 2}
+                      y={bar.y}
+                      width={barWidth}
+                      height={Math.max(0, bar.height)}
+                      fill={hatchUrlOf(bar.key)}
+                      rx={1}
+                    />
+                  )}
+                </g>
               )),
             )
           }
@@ -189,6 +208,7 @@ export function TimeSeriesChart({
   points,
   seriesKeys,
   colors,
+  seriesHatch,
   mode,
   valueFormat,
   legendItems,
@@ -201,6 +221,12 @@ export function TimeSeriesChart({
   points: TimePoint[];
   seriesKeys: string[];
   colors: string[];
+  /**
+   * Series key → hatch color: overlays 45° diagonal lines in that color on the
+   * series' marks (2px lines at a 6px pitch — 2/3 base fill, 1/3 hatch). The
+   * kind legend uses it for "authored by X, assisted by Y" series.
+   */
+  seriesHatch?: Record<string, string>;
   mode: "area" | "bar" | "line";
   valueFormat?: (value: number) => string;
   /** Overrides the per-series legend — e.g. one swatch per contributor. */
@@ -235,6 +261,16 @@ export function TimeSeriesChart({
   // crosshair reaches the whole domain, including stretches with no data point.
   const [hoverMs, setHoverMs] = useState<number | undefined>();
   const [percentMode, setPercentMode] = useState(false);
+  const patternIdBase = useId();
+
+  // One <pattern> per distinct hatch color; series map to them by color.
+  const hatchColors = [...new Set(Object.values(seriesHatch ?? {}))];
+  const hatchUrlOf = (key: string): string | undefined => {
+    const hatchColor = seriesHatch?.[key];
+    return hatchColor === undefined
+      ? undefined
+      : `url(#${patternIdBase}-hatch-${hatchColors.indexOf(hatchColor)})`;
+  };
 
   // Resolved here rather than as a destructuring default: React Compiler bails
   // on a default value inside a typed destructured parameter (see editing-react
@@ -365,6 +401,14 @@ export function TimeSeriesChart({
     Math.min(24, (innerWidth / Math.max(1, rows.length)) * 0.8),
   );
 
+  // When a legend override is supplied without tooltip groups, the tooltip
+  // follows the legend's reading order — the stack order may be reversed for
+  // display (e.g. humans drawn on top of each bar but listed first).
+  const legendRank = (label: string): number => {
+    const index = legendItems?.findIndex((item) => item.label === label) ?? -1;
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+  };
+
   if (points.length === 0) {
     return (
       <p className="text-sm text-(--text-muted)">No data collected yet.</p>
@@ -380,6 +424,7 @@ export function TimeSeriesChart({
             seriesKeys.map((key, index) => ({
               label: key,
               color: colors[index] ?? "var(--series-1)",
+              hatch: seriesHatch?.[key],
             }))
           }
         />
@@ -417,6 +462,23 @@ export function TimeSeriesChart({
       </div>
       <div ref={containerRef} className="relative">
         <svg width={width} height={height} role="img">
+          {hatchColors.length > 0 && (
+            <defs>
+              {/* Assist hatch: 2px lines at a 6px pitch — 2/3 base fill, 1/3 helper. */}
+              {hatchColors.map((hatchColor, index) => (
+                <pattern
+                  key={hatchColor}
+                  id={`${patternIdBase}-hatch-${index}`}
+                  width={6}
+                  height={6}
+                  patternUnits="userSpaceOnUse"
+                  patternTransform="rotate(45)"
+                >
+                  <rect width={2} height={6} fill={hatchColor} />
+                </pattern>
+              ))}
+            </defs>
+          )}
           <Group left={margin.left} top={margin.top}>
             <ChartMarks
               mode={mode}
@@ -430,6 +492,7 @@ export function TimeSeriesChart({
               separateGroups={separateGroups}
               groupBoundaryKeys={groupBoundaryKeys}
               barWidth={barWidth}
+              hatchUrlOf={hatchUrlOf}
             />
             {crosshairMs !== undefined && (
               <line
@@ -512,24 +575,32 @@ export function TimeSeriesChart({
                 ? tooltipGroups.map((group) => ({
                     key: group.label,
                     color: group.color,
+                    hatch: undefined,
                     value: group.keys.reduce(
                       (sum, key) => sum + (hovered[key] ?? 0),
                       0,
                     ),
                   }))
-                : seriesKeys.map((key, index) => ({
-                    key,
-                    color: colors[index] ?? "var(--series-1)",
-                    value: hovered[key] ?? 0,
-                  }))
+                : seriesKeys
+                    .map((key, index) => ({
+                      key,
+                      color: colors[index] ?? "var(--series-1)",
+                      hatch: seriesHatch?.[key],
+                      value: hovered[key] ?? 0,
+                    }))
+                    .toSorted(
+                      (left, right) =>
+                        legendRank(left.key) - legendRank(right.key),
+                    )
               )
                 .filter((entry) => entry.value !== 0 || seriesKeys.length <= 3)
                 .slice(0, 10)
                 .map((entry) => (
                   <div key={entry.key} className="flex items-center gap-1.5">
-                    <span
+                    <Swatch
+                      color={entry.color}
+                      hatch={entry.hatch}
                       className="inline-block size-2 rounded-xs"
-                      style={{ background: entry.color }}
                     />
                     <span className="text-(--text-secondary)">{entry.key}</span>
                     <span

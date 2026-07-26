@@ -11,6 +11,8 @@ export function BarList({
     label: string;
     value: number;
     href?: string | undefined;
+    /** Per-item bar color (e.g. a contributor-kind color); wins over `color`. */
+    color?: string | undefined;
   }>;
   color?: string;
 }) {
@@ -50,7 +52,7 @@ export function BarList({
               className="absolute inset-y-0 left-0 rounded-xs opacity-90 group-hover:opacity-100"
               style={{
                 width: `${Math.max(0.5, (item.value / max) * 100)}%`,
-                background: barColor,
+                background: item.color ?? barColor,
               }}
             />
           </span>

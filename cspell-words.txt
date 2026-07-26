@@ -15,6 +15,7 @@ EAV
 env
 esbuild
 explorable
+gapless
 gilot
 gitext
 gitinspector
@@ -39,6 +40,7 @@ mergestat
 mousemove
 msgpackr
 mts
+multiset
 npmjs
 numstat
 onefetch

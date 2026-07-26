@@ -2,7 +2,7 @@ import { AxisBottom, AxisLeft } from "@visx/axis";
 import { GridRows } from "@visx/grid";
 import { Group } from "@visx/group";
 import { scaleLinear, scaleTime } from "@visx/scale";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { formatCount, formatMonth } from "./shared/format.ts";
 import { Legend } from "./shared/primitives.tsx";
@@ -16,13 +16,30 @@ export function DivergingBars({
   points,
   positiveLabel,
   negativeLabel,
+  positiveSecondaryLabel,
+  positiveSecondaryHatch,
 }: {
-  points: Array<{ month: string; positive: number; negative: number }>;
+  points: Array<{
+    month: string;
+    positive: number;
+    negative: number;
+    /** A sub-part of `positive`, drawn as a hatched band from the baseline up. */
+    positiveSecondary?: number;
+  }>;
   positiveLabel: string;
   negativeLabel: string;
+  /** Legend/tooltip label for the hatched `positiveSecondary` band. */
+  positiveSecondaryLabel?: string | undefined;
+  /** Hatch color for the `positiveSecondary` band (e.g. the AI kind color). */
+  positiveSecondaryHatch?: string | undefined;
 }) {
   const [containerRef, width] = useMeasuredWidth<HTMLDivElement>();
   const [hoverIndex, setHoverIndex] = useState<number | undefined>();
+  const hatchId = useId();
+  const showSecondary =
+    positiveSecondaryLabel !== undefined &&
+    positiveSecondaryHatch !== undefined &&
+    points.some((point) => (point.positiveSecondary ?? 0) > 0);
 
   const innerWidth = Math.max(10, width - margin.left - margin.right);
   const innerHeight = height - margin.top - margin.bottom;
@@ -70,11 +87,34 @@ export function DivergingBars({
       <Legend
         items={[
           { label: positiveLabel, color: "var(--diverge-pos)" },
+          ...(showSecondary
+            ? [
+                {
+                  label: positiveSecondaryLabel,
+                  color: "var(--diverge-pos)",
+                  hatch: positiveSecondaryHatch,
+                },
+              ]
+            : []),
           { label: negativeLabel, color: "var(--diverge-neg)" },
         ]}
       />
       <div ref={containerRef} className="relative">
         <svg width={width} height={height} role="img">
+          {showSecondary && (
+            <defs>
+              {/* Assist hatch: 2px lines at a 6px pitch — 2/3 base fill, 1/3 helper. */}
+              <pattern
+                id={hatchId}
+                width={6}
+                height={6}
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(45)"
+              >
+                <rect width={2} height={6} fill={positiveSecondaryHatch} />
+              </pattern>
+            </defs>
+          )}
           <Group left={margin.left} top={margin.top}>
             <GridRows
               scale={yScale}
@@ -100,6 +140,20 @@ export function DivergingBars({
                     fill="var(--diverge-pos)"
                     rx={1}
                   />
+                  {showSecondary && (point.positiveSecondary ?? 0) > 0 && (
+                    // The assisted share of "added", anchored to the baseline.
+                    <rect
+                      x={x}
+                      y={yScale(point.positiveSecondary ?? 0)}
+                      width={barWidth}
+                      height={Math.max(
+                        0,
+                        zero - yScale(point.positiveSecondary ?? 0),
+                      )}
+                      fill={`url(#${hatchId})`}
+                      rx={1}
+                    />
+                  )}
                   <rect
                     x={x}
                     y={zero}
@@ -190,6 +244,14 @@ export function DivergingBars({
                 +{formatCount(hovered.positive)}
               </span>
             </div>
+            {showSecondary && (hovered.positiveSecondary ?? 0) > 0 && (
+              <div>
+                {positiveSecondaryLabel}:{" "}
+                <span className="font-medium tabular-nums">
+                  +{formatCount(hovered.positiveSecondary ?? 0)}
+                </span>
+              </div>
+            )}
             <div>
               {negativeLabel}:{" "}
               <span className="font-medium tabular-nums">

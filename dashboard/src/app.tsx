@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import {
+  type CalendarKindFilter,
   type CalendarRange,
   CommitCalendar,
 } from "./app/activity-calendar.tsx";
@@ -294,6 +295,68 @@ const kindBadge: Record<"bot" | "ai", { icon: string; title: string }> = {
   ai: { icon: "✨", title: "AI agent" },
 };
 
+/** The reserved contributor-kind colors (see styles.css). */
+const kindColors = {
+  human: "var(--kind-human)",
+  bot: "var(--kind-bot)",
+  ai: "var(--kind-ai)",
+} as const;
+
+/**
+ * Survival series that indexing folds non-human contributors into (must match
+ * `kindGroupLabels` in src/cli/shared/indexing.ts), colored with the reserved
+ * kind colors instead of palette slots.
+ */
+const kindGroupSeriesColors: Record<string, string> = {
+  Bots: kindColors.bot,
+  "AI agents": kindColors.ai,
+};
+
+/**
+ * Palette slots a person may take in a chart that also draws the folded Bots /
+ * AI agents bands. `--series-3` is skipped because `--kind-bot` aliases it (see
+ * styles.css) — otherwise a human and the Bots band render in the very same
+ * amber within one stack, which is exactly what the reserved colors exist to
+ * prevent. `--series-1` stays in: it *is* `--kind-human`.
+ */
+const humanCategoricalColors = categoricalColors.filter(
+  (color) => color !== "var(--series-3)",
+);
+
+/** The commits-per-month series: author kind, with humans split by AI assistance. */
+const commitKindSeries = {
+  human: "Human",
+  humanAi: "Human · AI-assisted",
+  ai: "AI agent",
+  bot: "Bot",
+} as const;
+
+/** Reading order — humans first, bots last, matching a calendar cell top-down. */
+const commitKindOrder = ["human", "humanAi", "ai", "bot"] as const;
+
+const commitKindColorOf = (kind: keyof typeof commitKindSeries): string =>
+  kind === "humanAi" ? kindColors.human : kindColors[kind];
+
+/**
+ * A month's commit counts by kind plus its churn — everything the two monthly
+ * charts need, summed from the per-commit rows rather than shipped alongside
+ * them.
+ */
+type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
+  added: number;
+  deleted: number;
+  /** Lines added by commits carrying an AI co-author trailer. */
+  aiAdded: number;
+};
+
+// Bots and AI agents arrive pre-folded into one series per kind (indexing
+// groups them), colored with the reserved kind colors; humans take palette
+// slots by rank as before.
+const survivalBaseColorOf = (label: string, rank: number): string =>
+  kindGroupSeriesColors[label] ??
+  humanCategoricalColors[rank % humanCategoricalColors.length] ??
+  otherColor;
+
 export function App({ data }: { data: DashboardData }) {
   const maxContributorsInCharts =
     data.config?.contributors.maxInCharts ?? defaultMaxContributorsInCharts;
@@ -312,6 +375,9 @@ export function App({ data }: { data: DashboardData }) {
   const [shadeLanguagesByYear, setShadeLanguagesByYear] = useState(false);
   const [calendarRange, setCalendarRange] =
     useState<CalendarRange>("last-12-months");
+  // Lifted out of CommitCalendar so it survives the remount on range change.
+  const [calendarKindFilter, setCalendarKindFilter] =
+    useState<CalendarKindFilter>("all");
 
   // Repo inception, used to anchor charts whose series start mid-history (e.g.
   // dependencies, tracked only once a lockfile exists) to the full timeline.
@@ -336,16 +402,63 @@ export function App({ data }: { data: DashboardData }) {
     7,
   );
 
+  // One pass over the per-commit rows feeds both monthly charts. dashboard.json
+  // carries no monthly rollup of its own: every field of one is a group-by-month
+  // sum over rows the calendar already needs in full, and re-deriving here also
+  // means a file written before per-commit kinds still renders — everything
+  // lands in the human series there, matching the old two-series chart.
+  const monthlyBuckets = new Map<string, MonthlyBucket>();
+  for (const commit of data.commits) {
+    const month = commit.date.slice(0, 7);
+    const bucket = monthlyBuckets.get(month) ?? {
+      human: 0,
+      humanAi: 0,
+      ai: 0,
+      bot: 0,
+      added: 0,
+      deleted: 0,
+      aiAdded: 0,
+    };
+    const kind = commit.kind ?? "human";
+    if (kind === "human") {
+      bucket[commit.ai ? "humanAi" : "human"] += 1;
+    } else {
+      bucket[kind] += 1;
+    }
+    bucket.added += commit.added;
+    bucket.deleted += commit.deleted;
+    if (commit.ai) {
+      bucket.aiAdded += commit.added;
+    }
+    monthlyBuckets.set(month, bucket);
+  }
+  const monthlyRows = [...monthlyBuckets.entries()].toSorted(
+    ([left], [right]) => left.localeCompare(right),
+  );
+  // Keep only kinds that ever occur, so a bot-free repo gets no empty series.
+  const commitKindKeys = commitKindOrder.filter((kind) =>
+    monthlyRows.some(([, bucket]) => bucket[kind] > 0),
+  );
   const commitsChart = {
-    points: data.monthly.map((row) => ({
-      dateMs: new Date(`${row.month}-15`).getTime(),
-      values: {
-        "AI-assisted": row.aiCommits,
-        Human: row.commits - row.aiCommits,
-      },
+    points: monthlyRows.map(([month, bucket]) => ({
+      dateMs: new Date(`${month}-15`).getTime(),
+      values: Object.fromEntries(
+        commitKindKeys.map((kind) => [commitKindSeries[kind], bucket[kind]]),
+      ),
     })),
-    seriesKeys: ["Human", "AI-assisted"],
-    colors: ["var(--series-1)", "var(--series-5)"],
+    // Bars stack bottom-up, so reverse the reading order: humans end up on
+    // top of each bar, bots at the baseline — same as a calendar cell.
+    seriesKeys: commitKindKeys
+      .toReversed()
+      .map((kind) => commitKindSeries[kind]),
+    colors: commitKindKeys.toReversed().map(commitKindColorOf),
+    seriesHatch: { [commitKindSeries.humanAi]: kindColors.ai },
+    // The legend and tooltip keep the reading order, humans first.
+    legendItems: commitKindKeys.map((kind) => ({
+      label: commitKindSeries[kind],
+      color: commitKindColorOf(kind),
+      ...(kind === "humanAi" ? { hatch: kindColors.ai } : {}),
+    })),
   };
 
   const suppressionRows = decimate(data.directives, 400);
@@ -482,25 +595,38 @@ export function App({ data }: { data: DashboardData }) {
 
   // Flat one-color-per-contributor stack when age shading is off, or when a
   // pre-per-year dashboard.json has no byContributorYear to shade with.
-  const survivalAuthorChart: StackedChart | undefined =
-    data.survival.length === 0
-      ? undefined
-      : !shadeContributorsByYear || !survivalHasYearData
-        ? shapeStacked(
-            data.survival.map((row) => ({
-              date: row.date,
-              values: row.byContributor,
-            })),
-            maxContributorsInCharts,
-          )
-        : shapeYearBands(
-            data.survival.map((row) => ({
-              date: row.date,
-              byGroupYear: row.byContributorYear ?? {},
-            })),
-            maxContributorsInCharts,
-            survivalYearScale,
-          );
+  let survivalAuthorChart: StackedChart | undefined;
+  if (data.survival.length > 0) {
+    if (!shadeContributorsByYear || !survivalHasYearData) {
+      const flat = shapeStacked(
+        data.survival.map((row) => ({
+          date: row.date,
+          values: row.byContributor,
+        })),
+        maxContributorsInCharts,
+      );
+      survivalAuthorChart = {
+        ...flat,
+        colors: flat.seriesKeys.map((key, index) =>
+          key === "Other"
+            ? otherColor
+            : (kindGroupSeriesColors[key] ??
+              humanCategoricalColors[index % humanCategoricalColors.length] ??
+              otherColor),
+        ),
+      };
+    } else {
+      survivalAuthorChart = shapeYearBands(
+        data.survival.map((row) => ({
+          date: row.date,
+          byGroupYear: row.byContributorYear ?? {},
+        })),
+        maxContributorsInCharts,
+        survivalYearScale,
+        survivalBaseColorOf,
+      );
+    }
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
@@ -717,26 +843,34 @@ export function App({ data }: { data: DashboardData }) {
             firstCommitDate={data.repo.firstCommitDate}
             weekStartsOn={data.config?.charts?.weekStartsOn ?? "monday"}
             range={calendarRange}
+            kindFilter={calendarKindFilter}
+            onKindFilterChange={setCalendarKindFilter}
           />
         </Section>
       )}
 
       <Section
         title="Commits per month"
-        subtitle="AI-assisted = at least one AI co-author trailer on the commit"
+        subtitle="split by author kind; hatched = human commits with at least one AI co-author trailer"
       >
         <TimeSeriesChart mode="bar" {...commitsChart} />
       </Section>
 
-      <Section title="Churn per month" subtitle="lines added and deleted">
+      <Section
+        title="Churn per month"
+        subtitle="lines added and deleted; hatched = lines added by AI-assisted commits"
+      >
         <DivergingBars
-          points={data.monthly.map((row) => ({
-            month: row.month,
-            positive: row.added,
-            negative: row.deleted,
+          points={monthlyRows.map(([month, bucket]) => ({
+            month,
+            positive: bucket.added,
+            negative: bucket.deleted,
+            positiveSecondary: bucket.aiAdded,
           }))}
           positiveLabel="added"
           negativeLabel="deleted"
+          positiveSecondaryLabel="added · AI-assisted"
+          positiveSecondaryHatch={kindColors.ai}
         />
       </Section>
 
@@ -802,7 +936,7 @@ export function App({ data }: { data: DashboardData }) {
               label: row.identity,
               value: row.commits,
             }))}
-            color="var(--series-5)"
+            color={kindColors.ai}
           />
         </Section>
       )}
@@ -821,6 +955,10 @@ export function App({ data }: { data: DashboardData }) {
                   title={kindBadge[contributor.kind].title}
                   className="mr-1 select-none"
                 >
+                  <span
+                    className="mr-1 inline-block size-2.5 rounded-xs"
+                    style={{ background: kindColors[contributor.kind] }}
+                  />
                   {kindBadge[contributor.kind].icon}
                 </span>
               ) : undefined}
@@ -846,6 +984,7 @@ export function App({ data }: { data: DashboardData }) {
           ])}
         />
         <BarList
+          color={kindColors.human}
           items={humanContributors
             .slice(0, maxContributorsInCharts * 2)
             .map((contributor) => ({
@@ -861,12 +1000,12 @@ export function App({ data }: { data: DashboardData }) {
               Bots &amp; AI agents
             </h3>
             <BarList
-              color="var(--series-9)"
               items={nonHumanContributors.map((contributor) => ({
                 id: contributor.email,
                 label: `${kindBadge[contributor.kind === "ai" ? "ai" : "bot"].icon} ${contributor.name || contributor.email}`,
                 value: contributor.commits,
                 href: contributor.url,
+                color: kindColors[contributor.kind === "ai" ? "ai" : "bot"],
               }))}
             />
           </>

@@ -52,19 +52,45 @@ export function StatTile({
   );
 }
 
-export function Legend({
-  items,
+export type LegendEntry = {
+  label: string;
+  color: string;
+  /** Overlays diagonal hatching in this color — "assisted by" in the kind legend. */
+  hatch?: string | undefined;
+};
+
+/**
+ * A legend/tooltip swatch: base color, plus the same 45° hatch the marks use
+ * (2px lines at a 6px pitch — 2/3 base fill, 1/3 helper color).
+ */
+export function Swatch({
+  color,
+  hatch,
+  className,
 }: {
-  items: Array<{ label: string; color: string }>;
+  color: string;
+  hatch?: string | undefined;
+  className?: string;
 }) {
+  return (
+    <span
+      className={className ?? "inline-block size-2.5 rounded-xs"}
+      style={{
+        backgroundColor: color,
+        backgroundImage: hatch
+          ? `repeating-linear-gradient(45deg, transparent 0 4px, ${hatch} 4px 6px)`
+          : undefined,
+      }}
+    />
+  );
+}
+
+export function Legend({ items }: { items: LegendEntry[] }) {
   return (
     <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-(--text-secondary)">
       {items.map((item) => (
         <span key={item.label} className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block size-2.5 rounded-xs"
-            style={{ background: item.color }}
-          />
+          <Swatch color={item.color} hatch={item.hatch} />
           {item.label}
         </span>
       ))}

@@ -31,6 +31,13 @@ export const isAiCoAuthor = (coAuthor: string): boolean =>
     coAuthor,
   );
 
+/**
+ * Series labels non-human contributors fold into in survival data. The
+ * dashboard matches these literal strings to color the bands with the
+ * reserved kind colors, so change them in both places or not at all.
+ */
+const kindGroupLabels = { bot: "Bots", ai: "AI agents" } as const;
+
 /** "Claude Fable 5 <noreply@anthropic.com>" → "Claude Fable 5" */
 export const coAuthorIdentity = (coAuthor: string): string => {
   const angleIndex = coAuthor.indexOf("<");
@@ -39,8 +46,6 @@ export const coAuthorIdentity = (coAuthor: string): string => {
   ).trim();
   return name || coAuthor.trim();
 };
-
-const monthOf = (isoDate: string): string => isoDate.slice(0, 7);
 
 type CommitFacts = {
   readonly sha: string;
@@ -124,42 +129,16 @@ const buildDashboardData = (
     sha: commit.sha.slice(0, 10),
     date: commit.date,
     author: commit.authorEmail,
+    kind: config.resolveContributor(commit.authorEmail, commit.authorName).kind,
     ai: aiCoAuthorsOf(commit).length > 0,
     added: sumMetric(commit, "churn.added"),
     deleted: sumMetric(commit, "churn.deleted"),
   }));
 
-  const monthlyMap = new Map<
-    string,
-    {
-      commits: number;
-      aiCommits: number;
-      added: number;
-      deleted: number;
-      aiAdded: number;
-    }
-  >();
-  for (const row of commitRows) {
-    const month = monthOf(row.date);
-    const bucket = monthlyMap.get(month) ?? {
-      commits: 0,
-      aiCommits: 0,
-      added: 0,
-      deleted: 0,
-      aiAdded: 0,
-    };
-    bucket.commits += 1;
-    bucket.added += row.added;
-    bucket.deleted += row.deleted;
-    if (row.ai) {
-      bucket.aiCommits += 1;
-      bucket.aiAdded += row.added;
-    }
-    monthlyMap.set(month, bucket);
-  }
-  const monthly = [...monthlyMap.entries()]
-    .toSorted(([left], [right]) => left.localeCompare(right))
-    .map(([month, bucket]) => ({ month, ...bucket }));
+  // No monthly rollup is written: every field of one (commits, AI-assisted
+  // commits, added, deleted) is a group-by-month sum over `commitRows`, which
+  // the dashboard already loads in full for the commit calendar. Shipping both
+  // meant two aggregations to keep in step for no data the second one added.
 
   const languages = commits
     .filter((commit) => hasMetric(commit, "languages.lines"))
@@ -242,6 +221,35 @@ const buildDashboardData = (
         .map(([rule, count]) => ({ rule, count }))
     : [];
 
+  // Non-human contributors fold into one series per kind in the survival
+  // charts: individual bots/agents rarely matter there, and grouping them
+  // server-side lets the dashboard color the bands with the reserved kind
+  // colors without needing a label → kind mapping of its own (the contributors
+  // list is truncated, so it cannot serve as one).
+  //
+  // Survival facts carry only the author's email, but kind derivation also
+  // reads the name — "Claude <noreply@anthropic.com>" is an AI agent by its
+  // name alone. Feed the names the commits already carry, so a survival band
+  // folds exactly the way the contributors list classifies the same person.
+  const authorNameByEmail = new Map<string, string>();
+  for (const commit of commits) {
+    if (commit.authorName) {
+      authorNameByEmail.set(
+        commit.authorEmail.toLowerCase(),
+        commit.authorName,
+      );
+    }
+  }
+  const survivalLabelOf = (email: string): string => {
+    const resolved = config.resolveContributor(
+      email,
+      authorNameByEmail.get(email.toLowerCase()),
+    );
+    return resolved.kind === "human"
+      ? resolved.label
+      : kindGroupLabels[resolved.kind];
+  };
+
   const survival = commits
     .filter((commit) => hasMetric(commit, "survival.lines"))
     .map((commit) => {
@@ -255,9 +263,7 @@ const buildDashboardData = (
           if (fact.metric !== "survival.lines") {
             continue;
           }
-          const label = config.resolveContributor(
-            fact.categories?.["author"] ?? "",
-          ).label;
+          const label = survivalLabelOf(fact.categories?.["author"] ?? "");
           const year = (fact.categories?.["cohort"] ?? "").slice(0, 4) || "?";
           const byYear = (byContributorYear[label] ??= {});
           byYear[year] = (byYear[year] ?? 0) + fact.value;
@@ -272,7 +278,7 @@ const buildDashboardData = (
         byCohort: groupMetric(commit, "survival.lines", "cohort"),
         byContributor: sumByKey(
           groupMetric(commit, "survival.lines", "author"),
-          (email) => config.resolveContributor(email).label,
+          survivalLabelOf,
         ),
         byContributorYear,
         byExtension: groupMetric(commit, "survival.lines", "extension"),
@@ -352,7 +358,6 @@ const buildDashboardData = (
       lastCommitDate: commits.at(-1)?.date,
     },
     commits: commitRows,
-    monthly,
     languages,
     fileTypes,
     directives,
