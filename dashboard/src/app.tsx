@@ -400,9 +400,13 @@ export function App({ data }: { data: DashboardData }) {
     ([left], [right]) => left.localeCompare(right),
   );
   // Keep only kinds that ever occur, so a bot-free repo gets no empty series.
+  // The reading order (humans, then AI agents, then bots) matches the
+  // calendar cells.
   const commitKindKeys = (["human", "humanAi", "ai", "bot"] as const).filter(
     (kind) => monthlyKindRows.some(([, bucket]) => bucket[kind] > 0),
   );
+  const commitKindColorOf = (kind: (typeof commitKindKeys)[number]) =>
+    kind === "humanAi" ? kindColors.human : kindColors[kind];
   const commitsChart = {
     points: monthlyKindRows.map(([month, bucket]) => ({
       dateMs: new Date(`${month}-15`).getTime(),
@@ -410,11 +414,19 @@ export function App({ data }: { data: DashboardData }) {
         commitKindKeys.map((kind) => [commitKindSeries[kind], bucket[kind]]),
       ),
     })),
-    seriesKeys: commitKindKeys.map((kind) => commitKindSeries[kind]),
-    colors: commitKindKeys.map((kind) =>
-      kind === "humanAi" ? kindColors.human : kindColors[kind],
-    ),
+    // Bars stack bottom-up, so reverse the reading order: humans end up on
+    // top of each bar, bots at the baseline — same as a calendar cell.
+    seriesKeys: commitKindKeys
+      .toReversed()
+      .map((kind) => commitKindSeries[kind]),
+    colors: commitKindKeys.toReversed().map(commitKindColorOf),
     seriesHatch: { [commitKindSeries.humanAi]: kindColors.ai },
+    // The legend and tooltip keep the reading order, humans first.
+    legendItems: commitKindKeys.map((kind) => ({
+      label: commitKindSeries[kind],
+      color: commitKindColorOf(kind),
+      ...(kind === "humanAi" ? { hatch: kindColors.ai } : {}),
+    })),
   };
 
   const suppressionRows = decimate(data.directives, 400);

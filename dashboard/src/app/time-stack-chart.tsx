@@ -134,14 +134,15 @@ function ChartMarks({
             barStacks.map((barStack) =>
               barStack.bars.map((bar) => (
                 <g key={`${barStack.index}-${bar.index}`}>
+                  {/* No stroke: segment boundaries come from hue/hatch changes,
+                      so stacked heights read as exact totals (and match the
+                      gapless churn bars). */}
                   <rect
                     x={bar.x + bar.width / 2 - barWidth / 2}
                     y={bar.y}
                     width={barWidth}
                     height={Math.max(0, bar.height)}
                     fill={bar.color}
-                    stroke="var(--surface-1)"
-                    strokeWidth={1}
                     rx={1}
                   />
                   {hatchUrlOf(bar.key) && (
@@ -400,6 +401,14 @@ export function TimeSeriesChart({
     Math.min(24, (innerWidth / Math.max(1, rows.length)) * 0.8),
   );
 
+  // When a legend override is supplied without tooltip groups, the tooltip
+  // follows the legend's reading order — the stack order may be reversed for
+  // display (e.g. humans drawn on top of each bar but listed first).
+  const legendRank = (label: string): number => {
+    const index = legendItems?.findIndex((item) => item.label === label) ?? -1;
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+  };
+
   if (points.length === 0) {
     return (
       <p className="text-sm text-(--text-muted)">No data collected yet.</p>
@@ -572,12 +581,17 @@ export function TimeSeriesChart({
                       0,
                     ),
                   }))
-                : seriesKeys.map((key, index) => ({
-                    key,
-                    color: colors[index] ?? "var(--series-1)",
-                    hatch: seriesHatch?.[key],
-                    value: hovered[key] ?? 0,
-                  }))
+                : seriesKeys
+                    .map((key, index) => ({
+                      key,
+                      color: colors[index] ?? "var(--series-1)",
+                      hatch: seriesHatch?.[key],
+                      value: hovered[key] ?? 0,
+                    }))
+                    .toSorted(
+                      (left, right) =>
+                        legendRank(left.key) - legendRank(right.key),
+                    )
               )
                 .filter((entry) => entry.value !== 0 || seriesKeys.length <= 3)
                 .slice(0, 10)

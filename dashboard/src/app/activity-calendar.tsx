@@ -93,7 +93,7 @@ const filterValueOf = (day: DayTotal, filter: CalendarKindFilter): number =>
 type StackPart = { kind: ContributorKind; hatched: boolean; value: number };
 
 /**
- * A day's stack for the active filter, bottom-up: human (plain, then the
+ * A day's stack for the active filter, top-down: human (plain, then the
  * AI-assisted slice hatched) → AI agent → bot. Filtering never changes the
  * rule — a single-kind view simply has fewer parts. Hatched slices thinner
  * than {@link hatchFoldPx} fold into their plain segment.
@@ -136,7 +136,9 @@ const stackPartsOf = (
       folded.push({ ...part });
     }
   }
-  return folded;
+  // Parts are assembled in top-down reading order; the renderer stacks
+  // bottom-up, so reverse to put humans at the top and bots at the bottom.
+  return folded.toReversed();
 };
 
 /**
@@ -637,8 +639,8 @@ export function CommitCalendar({
                 style={{
                   background:
                     option === "all"
-                      ? // Mirrors a cell's stacking order, bottom-up.
-                        `linear-gradient(to top, ${kindColors.human} 0 34%, ${kindColors.ai} 34% 67%, ${kindColors.bot} 67% 100%)`
+                      ? // Mirrors a cell's stacking order, top-down.
+                        `linear-gradient(to bottom, ${kindColors.human} 0 34%, ${kindColors.ai} 34% 67%, ${kindColors.bot} 67% 100%)`
                       : kindColors[option],
                 }}
               />
