@@ -312,6 +312,14 @@ const kindGroupSeriesColors: Record<string, string> = {
   "AI agents": kindColors.ai,
 };
 
+// Bots and AI agents arrive pre-folded into one series per kind (indexing
+// groups them), colored with the reserved kind colors; humans take palette
+// slots by rank as before.
+const survivalBaseColorOf = (label: string, rank: number): string =>
+  kindGroupSeriesColors[label] ??
+  categoricalColors[rank % categoricalColors.length] ??
+  otherColor;
+
 export function App({ data }: { data: DashboardData }) {
   const maxContributorsInCharts =
     data.config?.contributors.maxInCharts ?? defaultMaxContributorsInCharts;
@@ -540,14 +548,6 @@ export function App({ data }: { data: DashboardData }) {
   const survivalHasYearData = data.survival.some(
     (row) => row.byContributorYear !== undefined,
   );
-
-  // Bots and AI agents arrive pre-folded into one series per kind (indexing
-  // groups them), colored with the reserved kind colors; humans take palette
-  // slots by rank as before.
-  const survivalBaseColorOf = (label: string, rank: number): string =>
-    kindGroupSeriesColors[label] ??
-    categoricalColors[rank % categoricalColors.length] ??
-    otherColor;
 
   // Flat one-color-per-contributor stack when age shading is off, or when a
   // pre-per-year dashboard.json has no byContributorYear to shade with.
@@ -890,7 +890,7 @@ export function App({ data }: { data: DashboardData }) {
               label: row.identity,
               value: row.commits,
             }))}
-            color="var(--series-5)"
+            color={kindColors.ai}
           />
         </Section>
       )}
@@ -909,6 +909,10 @@ export function App({ data }: { data: DashboardData }) {
                   title={kindBadge[contributor.kind].title}
                   className="mr-1 select-none"
                 >
+                  <span
+                    className="mr-1 inline-block size-2.5 rounded-xs"
+                    style={{ background: kindColors[contributor.kind] }}
+                  />
                   {kindBadge[contributor.kind].icon}
                 </span>
               ) : undefined}
@@ -934,6 +938,7 @@ export function App({ data }: { data: DashboardData }) {
           ])}
         />
         <BarList
+          color={kindColors.human}
           items={humanContributors
             .slice(0, maxContributorsInCharts * 2)
             .map((contributor) => ({
@@ -949,12 +954,12 @@ export function App({ data }: { data: DashboardData }) {
               Bots &amp; AI agents
             </h3>
             <BarList
-              color="var(--series-9)"
               items={nonHumanContributors.map((contributor) => ({
                 id: contributor.email,
                 label: `${kindBadge[contributor.kind === "ai" ? "ai" : "bot"].icon} ${contributor.name || contributor.email}`,
                 value: contributor.commits,
                 href: contributor.url,
+                color: kindColors[contributor.kind === "ai" ? "ai" : "bot"],
               }))}
             />
           </>

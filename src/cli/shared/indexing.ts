@@ -36,7 +36,7 @@ export const isAiCoAuthor = (coAuthor: string): boolean =>
  * dashboard matches these literal strings to color the bands with the
  * reserved kind colors, so change them in both places or not at all.
  */
-export const kindGroupLabels = { bot: "Bots", ai: "AI agents" } as const;
+const kindGroupLabels = { bot: "Bots", ai: "AI agents" } as const;
 
 /** "Claude Fable 5 <noreply@anthropic.com>" → "Claude Fable 5" */
 export const coAuthorIdentity = (coAuthor: string): string => {

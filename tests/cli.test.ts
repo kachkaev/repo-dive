@@ -448,6 +448,14 @@ test.concurrent(
       const bot = contributors.find((row) => stringAt(row, "kind") === "bot");
       expect(bot, "renovate should be auto-classified as a bot").toBeTruthy();
       expect(stringAt(bot, "email")).toBe("renovate[bot]");
+
+      // Each commit row carries its author's kind, so the dashboard can split
+      // the calendar and monthly charts without re-deriving kinds client-side.
+      const commitKinds = arrayAt(dashboard, "commits").map((row) =>
+        stringAt(row, "kind"),
+      );
+      // Same-second fixture commits have no stable order; compare as a multiset.
+      expect(commitKinds.toSorted()).toEqual(["bot", "human", "human"]);
     } finally {
       rmSync(repoPath, { force: true, recursive: true });
     }
