@@ -2,13 +2,24 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { Console, Effect } from "effect";
+import { Console, Effect, Schema } from "effect";
+import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import { catalogDirName } from "./catalog.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
-const toError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
+/**
+ * Failure of a metrics-cube query. Schema-backed so it can cross the MCP
+ * serialization boundary (see {@link ./mcp.ts}).
+ */
+export class QueryError extends Schema.TaggedErrorClass<QueryError>()(
+  "QueryError",
+  { reason: Schema.String },
+) {
+  override get message(): string {
+    return this.reason;
+  }
+}
 
 export type QueryResult = {
   readonly columns: readonly string[];
@@ -21,7 +32,7 @@ export type QueryResult = {
  * The database is opened read-only, and only SELECT-shaped statements are
  * accepted, so the cube can never be mutated through this path.
  */
-export const executeQuery = (
+const executeQuery = (
   repoRoot: string,
   sql: string,
   maxRows = 1000,
@@ -96,6 +107,20 @@ const formatTable = (result: QueryResult): string => {
   ].join("\n");
 };
 
+/** {@link executeQuery} lifted into Effect with a typed failure. */
+export const query = (
+  repoRoot: string,
+  sql: string,
+  maxRows?: number,
+): Effect.Effect<QueryResult, QueryError> =>
+  Effect.try({
+    try: () => executeQuery(repoRoot, sql, maxRows),
+    catch: (cause) =>
+      new QueryError({
+        reason: cause instanceof Error ? cause.message : String(cause),
+      }),
+  });
+
 export const runQuery = ({
   repoPath,
   sql,
@@ -104,13 +129,10 @@ export const runQuery = ({
   readonly repoPath: string;
   readonly sql: string;
   readonly json: boolean;
-}): Effect.Effect<void, Error> =>
+}): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
-    const result = yield* Effect.try({
-      try: () => executeQuery(repoRoot, sql),
-      catch: toError,
-    });
+    const result = yield* query(repoRoot, sql);
     yield* Console.log(
       json ? JSON.stringify(result.rows, undefined, 2) : formatTable(result),
     );

@@ -3,8 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
+import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { expect, test } from "vitest";
 
 import { scanTreeFilesWithBlobCache } from "./tree-files.ts";
 
@@ -21,24 +22,25 @@ function git(cwd: string, ...args: readonly string[]) {
 // A matched file whose scan yields undefined (e.g. a package.json that isn't a
 // JSON object) must not break the blob-cache write — JSON.stringify(undefined)
 // is undefined, which cannot be bound to SQLite and used to fail the batch.
-test("scanTreeFilesWithBlobCache caches an undefined scan result without failing", async () => {
-  const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-tf-"));
+it.effect(
+  "scanTreeFilesWithBlobCache caches an undefined scan result without failing",
+  () => {
+    const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-tf-"));
 
-  try {
-    git(repoPath, "init", "-b", "main");
-    writeFileSync(
-      path.join(repoPath, "package.json"),
-      JSON.stringify({ dependencies: { a: "^1" } }),
-    );
-    // Valid JSON, but an array — the kind of package.json a scan skips.
-    mkdirSync(path.join(repoPath, "fixture"));
-    writeFileSync(path.join(repoPath, "fixture", "package.json"), "[]");
-    git(repoPath, "add", ".");
-    git(repoPath, "commit", "-m", "Add manifests");
-    const sha = git(repoPath, "rev-parse", "HEAD");
+    return Effect.gen(function* () {
+      git(repoPath, "init", "-b", "main");
+      writeFileSync(
+        path.join(repoPath, "package.json"),
+        JSON.stringify({ dependencies: { a: "^1" } }),
+      );
+      // Valid JSON, but an array — the kind of package.json a scan skips.
+      mkdirSync(path.join(repoPath, "fixture"));
+      writeFileSync(path.join(repoPath, "fixture", "package.json"), "[]");
+      git(repoPath, "add", ".");
+      git(repoPath, "commit", "-m", "Add manifests");
+      const sha = git(repoPath, "rev-parse", "HEAD");
 
-    const scan = Effect.runPromise(
-      scanTreeFilesWithBlobCache({
+      const results = yield* scanTreeFilesWithBlobCache({
         repoRoot: repoPath,
         sha,
         collectorName: "test",
@@ -52,16 +54,24 @@ test("scanTreeFilesWithBlobCache caches an undefined scan result without failing
             ? { ok: true }
             : undefined;
         },
-      }),
-    );
+      });
 
-    const results = await scan;
-    const byPath = new Map(results.map((file) => [file.filePath, file.result]));
-    expect(byPath.get("package.json")).toStrictEqual({ ok: true });
-    // The skipped file still appears (as a non-record), and the run persisted a
-    // cache entry for it rather than throwing.
-    expect(byPath.get("fixture/package.json")).not.toStrictEqual({ ok: true });
-  } finally {
-    rmSync(repoPath, { recursive: true, force: true });
-  }
-});
+      const byPath = new Map(
+        results.map((file) => [file.filePath, file.result]),
+      );
+      expect(byPath.get("package.json")).toStrictEqual({ ok: true });
+      // The skipped file still appears (as a non-record), and the run persisted a
+      // cache entry for it rather than throwing.
+      expect(byPath.get("fixture/package.json")).not.toStrictEqual({
+        ok: true,
+      });
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          rmSync(repoPath, { recursive: true, force: true });
+        }),
+      ),
+      Effect.provide(NodeServices.layer),
+    );
+  },
+);

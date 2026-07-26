@@ -3,8 +3,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
+import { expect, it, test } from "@effect/vitest";
 import { Effect } from "effect";
-import { expect, test } from "vitest";
 
 import {
   listCommits,
@@ -87,44 +88,63 @@ function commitFile(repoPath: string, name: string, message: string) {
   return git(repoPath, "rev-parse", "HEAD");
 }
 
-test("listFirstParentShas keeps the mainline and drops merged-in history", async () => {
-  const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-fp-"));
+it.effect(
+  "listFirstParentShas keeps the mainline and drops merged-in history",
+  () => {
+    const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-fp-"));
 
-  try {
-    git(repoPath, "init", "-b", "main");
-    const base = commitFile(repoPath, "main.txt", "Base");
+    return Effect.gen(function* () {
+      git(repoPath, "init", "-b", "main");
+      const base = commitFile(repoPath, "main.txt", "Base");
 
-    // A foreign history absorbed by an unrelated-histories merge — exactly the
-    // shape that used to put cliffs into every snapshot timeline.
-    git(repoPath, "checkout", "--orphan", "foreign");
-    git(repoPath, "rm", "-rf", ".");
-    const foreign = commitFile(repoPath, "foreign.txt", "Foreign");
+      // A foreign history absorbed by an unrelated-histories merge — exactly the
+      // shape that used to put cliffs into every snapshot timeline.
+      git(repoPath, "checkout", "--orphan", "foreign");
+      git(repoPath, "rm", "-rf", ".");
+      const foreign = commitFile(repoPath, "foreign.txt", "Foreign");
 
-    git(repoPath, "checkout", "main");
-    git(repoPath, "merge", "--no-ff", "--allow-unrelated-histories", "foreign");
-    const merge = git(repoPath, "rev-parse", "HEAD");
+      git(repoPath, "checkout", "main");
+      git(
+        repoPath,
+        "merge",
+        "--no-ff",
+        "--allow-unrelated-histories",
+        "foreign",
+      );
+      const merge = git(repoPath, "rev-parse", "HEAD");
 
-    const all = await Effect.runPromise(listCommits(repoPath));
-    const firstParent = await Effect.runPromise(listFirstParentShas(repoPath));
+      const all = yield* listCommits(repoPath);
+      const firstParent = yield* listFirstParentShas(repoPath);
 
-    expect(all.map((commit) => commit.hash).toSorted()).toStrictEqual(
-      [base, foreign, merge].toSorted(),
+      expect(all.map((commit) => commit.hash).toSorted()).toStrictEqual(
+        [base, foreign, merge].toSorted(),
+      );
+      expect([...firstParent].toSorted()).toStrictEqual(
+        [base, merge].toSorted(),
+      );
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          rmSync(repoPath, { recursive: true, force: true });
+        }),
+      ),
+      Effect.provide(NodeServices.layer),
     );
-    expect([...firstParent].toSorted()).toStrictEqual([base, merge].toSorted());
-  } finally {
-    rmSync(repoPath, { recursive: true, force: true });
-  }
-});
+  },
+);
 
-test("listFirstParentShas is empty for a repo without commits", async () => {
+it.effect("listFirstParentShas is empty for a repo without commits", () => {
   const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-fp-"));
 
-  try {
+  return Effect.gen(function* () {
     git(repoPath, "init", "-b", "main");
-    expect(
-      await Effect.runPromise(listFirstParentShas(repoPath)),
-    ).toStrictEqual(new Set());
-  } finally {
-    rmSync(repoPath, { recursive: true, force: true });
-  }
+    expect(yield* listFirstParentShas(repoPath)).toStrictEqual(new Set());
+  }).pipe(
+    Effect.ensuring(
+      Effect.sync(() => {
+        rmSync(repoPath, { recursive: true, force: true });
+      }),
+    ),
+    Effect.provide(NodeServices.layer),
+  );
 });

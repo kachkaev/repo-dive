@@ -83,6 +83,7 @@
     "@changesets/cli": "2.31.1",
     "@changesets/config": "3.1.4",
     "@effect/platform-node": "4.0.0-beta.101",
+    "@effect/vitest": "4.0.0-beta.101",
     "@kachkaev/eslint-config-base": "1.2.0",
     "@kachkaev/markdownlint-config": "1.0.1",
     "@kachkaev/prettier-config": "2.2.1",

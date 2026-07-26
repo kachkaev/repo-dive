@@ -78,10 +78,7 @@ export const survivalCollector: Collector = {
       ]);
       const files = fileList.split("\n").filter(isScannableSourceFile);
 
-      const counts = new Map<string, number>();
-      let totalLines = 0;
-
-      yield* Effect.forEach(
+      const attributionsPerFile = yield* Effect.forEach(
         files,
         (filePath) =>
           runGit([
@@ -94,17 +91,23 @@ export const survivalCollector: Collector = {
             "--",
             filePath,
           ]).pipe(
-            Effect.map((stdout) => {
-              const extension = extensionOf(filePath);
-              for (const attribution of parseBlamePorcelain(stdout)) {
-                const key = `${extension}\u001F${attribution.authorEmail}\u001F${attribution.cohortMonth}`;
-                counts.set(key, (counts.get(key) ?? 0) + 1);
-                totalLines += 1;
-              }
-            }),
+            Effect.map((stdout) => ({
+              extension: extensionOf(filePath),
+              attributions: parseBlamePorcelain(stdout),
+            })),
           ),
-        { concurrency: 8, discard: true },
+        { concurrency: 8 },
       );
+
+      const counts = new Map<string, number>();
+      let totalLines = 0;
+      for (const { extension, attributions } of attributionsPerFile) {
+        for (const attribution of attributions) {
+          const key = `${extension}\u001F${attribution.authorEmail}\u001F${attribution.cohortMonth}`;
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+          totalLines += 1;
+        }
+      }
 
       const rows: SurvivalRow[] = [...counts.entries()].map(([key, lines]) => {
         const [extension = "", authorEmail = "", cohortMonth = ""] =

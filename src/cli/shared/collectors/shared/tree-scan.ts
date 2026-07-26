@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import { getBlobCache } from "../../blob-cache.ts";
 import { runCommandBytes, runGit } from "../../git.ts";
@@ -15,7 +16,7 @@ type TreeBlob = {
 const listSourceBlobs = (
   repoRoot: string,
   sha: string,
-): Effect.Effect<TreeBlob[], Error> =>
+): Effect.Effect<TreeBlob[], Error, ChildProcessSpawner.ChildProcessSpawner> =>
   runGit(["-C", repoRoot, "ls-tree", "-r", sha]).pipe(
     Effect.map((stdout) => {
       const blobs: TreeBlob[] = [];
@@ -41,7 +42,11 @@ const newline = 10;
 const fetchBlobContents = (
   repoRoot: string,
   blobShas: readonly string[],
-): Effect.Effect<Map<string, string>, Error> =>
+): Effect.Effect<
+  Map<string, string>,
+  Error,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
   blobShas.length === 0
     ? Effect.succeed(new Map())
     : runCommandBytes("git", ["-C", repoRoot, "cat-file", "--batch"], {
@@ -104,7 +109,11 @@ export const scanTreeWithBlobCache = ({
   readonly cacheKey: string;
   /** Pure per-file scan; its JSON-encoded result is what gets cached. */
   readonly scanContent: (content: string) => unknown;
-}): Effect.Effect<Array<{ filePath: string; result: unknown }>, Error> =>
+}): Effect.Effect<
+  Array<{ filePath: string; result: unknown }>,
+  Error,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
   Effect.gen(function* () {
     const blobs = yield* listSourceBlobs(repoRoot, sha);
     const cache = getBlobCache(repoRoot);

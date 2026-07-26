@@ -114,13 +114,18 @@ export const languagesCollector: Collector = {
           cwd: worktreePath,
         }).pipe(
           Effect.map(parseTokeiJson),
-          Effect.mapError((error) =>
-            error.message.includes("ENOENT")
-              ? new Error(
+          // A missing binary surfaces as a PlatformError with a NotFound reason.
+          Effect.catchIf(
+            (error) =>
+              error._tag === "PlatformError" &&
+              error.reason._tag === "NotFound",
+            () =>
+              Effect.fail(
+                new Error(
                   "tokei is not installed (the languages collector shells out to it). " +
                     "Install it via `brew install tokei` or see https://github.com/XAMPPRocky/tokei.",
-                )
-              : error,
+                ),
+              ),
           ),
         ),
   normalize: (raw) => {

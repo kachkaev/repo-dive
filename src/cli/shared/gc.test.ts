@@ -3,8 +3,9 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
+import { expect, it, test } from "@effect/vitest";
 import { Effect } from "effect";
-import { expect, test } from "vitest";
 
 import {
   getBlobCache,
@@ -72,27 +73,20 @@ function createMergeFixtureRepo() {
 }
 
 /** Writes a realistic catalog output, sidecar included, for one (commit, collector). */
-async function seedOutput(
-  repoRoot: string,
-  sha: string,
-  collectorName: string,
-) {
-  const collector = collectorNamed(collectorName);
-  await Effect.runPromise(
-    Effect.gen(function* () {
-      const catalog = yield* openCatalog(repoRoot);
-      const config = yield* loadConfig(repoRoot);
-      yield* writeCollectorOutput({
-        catalog,
-        sha,
-        collector,
-        cacheKey: collectorCacheKey(collector, config),
-        output: {},
-        durationMs: 1,
-      });
-    }),
-  );
-}
+const seedOutput = (repoRoot: string, sha: string, collectorName: string) =>
+  Effect.gen(function* () {
+    const collector = collectorNamed(collectorName);
+    const catalog = yield* openCatalog(repoRoot);
+    const config = yield* loadConfig(repoRoot);
+    yield* writeCollectorOutput({
+      catalog,
+      sha,
+      collector,
+      cacheKey: collectorCacheKey(collector, config),
+      output: {},
+      durationMs: 1,
+    });
+  });
 
 function outputPath(repoRoot: string, sha: string, collectorName: string) {
   return path.join(
@@ -105,96 +99,113 @@ function outputPath(repoRoot: string, sha: string, collectorName: string) {
   );
 }
 
-test("gc --off-mainline reclaims snapshots off the first-parent chain only", async () => {
-  const { repoPath, baseSha, sideSha, mergeSha } = createMergeFixtureRepo();
+it.effect(
+  "gc --off-mainline reclaims snapshots off the first-parent chain only",
+  () => {
+    const { repoPath, baseSha, sideSha, mergeSha } = createMergeFixtureRepo();
 
-  try {
-    for (const sha of [baseSha, sideSha, mergeSha]) {
-      // file-types is a tree collector, commit-meta a log one.
-      await seedOutput(repoPath, sha, "file-types");
-      await seedOutput(repoPath, sha, "commit-meta");
-    }
+    return Effect.gen(function* () {
+      for (const sha of [baseSha, sideSha, mergeSha]) {
+        // file-types is a tree collector, commit-meta a log one.
+        yield* seedOutput(repoPath, sha, "file-types");
+        yield* seedOutput(repoPath, sha, "commit-meta");
+      }
 
-    await Effect.runPromise(
-      runGc({ repoPath, offMainline: true, dryRun: true, yes: true }),
-    );
-    expect(
-      existsSync(outputPath(repoPath, sideSha, "file-types")),
-      "--dry-run must leave the catalog alone",
-    ).toBe(true);
-
-    await Effect.runPromise(runGc({ repoPath, offMainline: true, yes: true }));
-
-    expect(
-      existsSync(outputPath(repoPath, sideSha, "file-types")),
-      "the side branch's tree snapshot is off the mainline",
-    ).toBe(false);
-    expect(
-      existsSync(outputPath(repoPath, sideSha, "commit-meta")),
-      "a commit's own metadata is valid wherever the commit sits",
-    ).toBe(true);
-    for (const sha of [baseSha, mergeSha]) {
+      yield* runGc({ repoPath, offMainline: true, dryRun: true, yes: true });
       expect(
-        existsSync(outputPath(repoPath, sha, "file-types")),
-        "mainline snapshots stay",
+        existsSync(outputPath(repoPath, sideSha, "file-types")),
+        "--dry-run must leave the catalog alone",
       ).toBe(true);
-    }
-  } finally {
-    rmSync(repoPath, { force: true, recursive: true });
-  }
-});
 
-test("gc --unreachable leaves off-mainline snapshots alone", async () => {
+      yield* runGc({ repoPath, offMainline: true, yes: true });
+
+      expect(
+        existsSync(outputPath(repoPath, sideSha, "file-types")),
+        "the side branch's tree snapshot is off the mainline",
+      ).toBe(false);
+      expect(
+        existsSync(outputPath(repoPath, sideSha, "commit-meta")),
+        "a commit's own metadata is valid wherever the commit sits",
+      ).toBe(true);
+      for (const sha of [baseSha, mergeSha]) {
+        expect(
+          existsSync(outputPath(repoPath, sha, "file-types")),
+          "mainline snapshots stay",
+        ).toBe(true);
+      }
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          rmSync(repoPath, { force: true, recursive: true });
+        }),
+      ),
+      Effect.provide(NodeServices.layer),
+    );
+  },
+);
+
+it.effect("gc --unreachable leaves off-mainline snapshots alone", () => {
   const { repoPath, sideSha } = createMergeFixtureRepo();
 
-  try {
-    await seedOutput(repoPath, sideSha, "file-types");
+  return Effect.gen(function* () {
+    yield* seedOutput(repoPath, sideSha, "file-types");
 
-    await Effect.runPromise(runGc({ repoPath, unreachable: true, yes: true }));
+    yield* runGc({ repoPath, unreachable: true, yes: true });
 
     expect(
       existsSync(outputPath(repoPath, sideSha, "file-types")),
       "the side commit is still reachable from HEAD",
     ).toBe(true);
-  } finally {
-    rmSync(repoPath, { force: true, recursive: true });
-  }
+  }).pipe(
+    Effect.ensuring(
+      Effect.sync(() => {
+        rmSync(repoPath, { force: true, recursive: true });
+      }),
+    ),
+    Effect.provide(NodeServices.layer),
+  );
 });
 
-test("gc --stale drops blob-cache namespaces no collector can look up", async () => {
-  const { repoPath } = createMergeFixtureRepo();
+it.effect(
+  "gc --stale drops blob-cache namespaces no collector can look up",
+  () => {
+    const { repoPath } = createMergeFixtureRepo();
 
-  try {
-    const collector = collectorNamed("directives");
-    const config = await Effect.runPromise(loadConfig(repoPath));
-    const liveCacheKey = collectorCacheKey(collector, config);
-    const cache = getBlobCache(repoPath);
-    const entries = new Map([["0".repeat(40), "[]"]]);
+    return Effect.gen(function* () {
+      const collector = collectorNamed("directives");
+      const config = yield* loadConfig(repoPath);
+      const liveCacheKey = collectorCacheKey(collector, config);
+      const cache = getBlobCache(repoPath);
+      const entries = new Map([["0".repeat(40), "[]"]]);
 
-    cache.setMany(collector.name, liveCacheKey, entries);
-    // An earlier version of the same collector, and one that no longer exists.
-    cache.setMany(collector.name, "000000000000", entries);
-    cache.setMany("retired-collector", liveCacheKey, entries);
+      cache.setMany(collector.name, liveCacheKey, entries);
+      // An earlier version of the same collector, and one that no longer exists.
+      cache.setMany(collector.name, "000000000000", entries);
+      cache.setMany("retired-collector", liveCacheKey, entries);
 
-    expect(listBlobCacheNamespaces(repoPath)).toHaveLength(3);
+      expect(listBlobCacheNamespaces(repoPath)).toHaveLength(3);
 
-    await Effect.runPromise(
-      runGc({ repoPath, stale: true, dryRun: true, yes: true }),
+      yield* runGc({ repoPath, stale: true, dryRun: true, yes: true });
+      expect(
+        listBlobCacheNamespaces(repoPath),
+        "--dry-run must leave the cache alone",
+      ).toHaveLength(3);
+
+      yield* runGc({ repoPath, stale: true, yes: true });
+
+      expect(listBlobCacheNamespaces(repoPath)).toEqual([
+        { collector: collector.name, cacheKey: liveCacheKey, entryCount: 1 },
+      ]);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          rmSync(repoPath, { force: true, recursive: true });
+        }),
+      ),
+      Effect.provide(NodeServices.layer),
     );
-    expect(
-      listBlobCacheNamespaces(repoPath),
-      "--dry-run must leave the cache alone",
-    ).toHaveLength(3);
-
-    await Effect.runPromise(runGc({ repoPath, stale: true, yes: true }));
-
-    expect(listBlobCacheNamespaces(repoPath)).toEqual([
-      { collector: collector.name, cacheKey: liveCacheKey, entryCount: 1 },
-    ]);
-  } finally {
-    rmSync(repoPath, { force: true, recursive: true });
-  }
-});
+  },
+);
 
 test("pruneBlobCacheNamespaces compacts the file it prunes", () => {
   const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-cache-"));
