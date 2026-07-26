@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { Console, Effect } from "effect";
+import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import { loadConfig } from "./config.ts";
 import {
@@ -20,7 +21,7 @@ export const runIgnoreCatalog = ({
 }: {
   readonly repoPath: string;
   readonly dryRun: boolean;
-}): Effect.Effect<void, Error> =>
+}): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
     const config = yield* loadConfig(repoRoot);

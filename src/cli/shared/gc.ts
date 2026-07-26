@@ -1,9 +1,9 @@
 import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 
-import { NodeServices } from "@effect/platform-node";
-import { Console, Effect } from "effect";
+import { Console, Effect, type Terminal } from "effect";
 import { Prompt } from "effect/unstable/cli";
+import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import {
   type BlobCacheNamespace,
@@ -20,26 +20,20 @@ import { loadConfig } from "./config.ts";
 import { runGit } from "./git.ts";
 import { listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
-const toError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
-
 const readdirIfExists = (dirPath: string) =>
-  Effect.tryPromise({
-    try: async () => {
-      try {
-        return await readdir(dirPath);
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          "code" in error &&
-          error.code === "ENOENT"
-        ) {
-          return [];
-        }
-        throw error;
+  Effect.tryPromise(async () => {
+    try {
+      return await readdir(dirPath);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ) {
+        return [];
       }
-    },
-    catch: toError,
+      throw error;
+    }
   });
 
 type StaleOutput = {
@@ -68,7 +62,9 @@ type GcPlan = {
   readonly staleCacheNamespaces: readonly BlobCacheNamespace[];
 };
 
-const buildPlan = (repoRoot: string): Effect.Effect<GcPlan, Error> =>
+const buildPlan = (
+  repoRoot: string,
+): Effect.Effect<GcPlan, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
     const config = yield* loadConfig(repoRoot);
     const catalogPath = config.catalogPath;
@@ -153,10 +149,9 @@ const buildPlan = (repoRoot: string): Effect.Effect<GcPlan, Error> =>
         ([collectorName, cacheKey]) => `${collectorName}:${cacheKey}`,
       ),
     );
-    const staleCacheNamespaces = (yield* Effect.try({
-      try: () => listBlobCacheNamespaces(catalogPath),
-      catch: toError,
-    })).filter(
+    const staleCacheNamespaces = (yield* Effect.try(() =>
+      listBlobCacheNamespaces(catalogPath),
+    )).filter(
       (namespace) =>
         !liveNamespaces.has(`${namespace.collector}:${namespace.cacheKey}`),
     );
@@ -181,10 +176,7 @@ const removePaths = (
     : Effect.forEach(
         paths,
         (target) =>
-          Effect.tryPromise({
-            try: () => rm(target, { force: true, recursive: true }),
-            catch: toError,
-          }),
+          Effect.tryPromise(() => rm(target, { force: true, recursive: true })),
         { concurrency: 8, discard: true },
       );
 
@@ -197,10 +189,9 @@ const pruneEmptyCommitDirs = (
     for (const sha of yield* readdirIfExists(commitsPath)) {
       const commitDir = path.join(commitsPath, sha);
       if ((yield* readdirIfExists(commitDir)).length === 0) {
-        yield* Effect.tryPromise({
-          try: () => rm(commitDir, { force: true, recursive: true }),
-          catch: toError,
-        });
+        yield* Effect.tryPromise(() =>
+          rm(commitDir, { force: true, recursive: true }),
+        );
         pruned += 1;
       }
     }
@@ -241,7 +232,11 @@ export const runGc = ({
   readonly collectorNames?: string | undefined;
   readonly dryRun?: boolean | undefined;
   readonly yes?: boolean | undefined;
-}): Effect.Effect<void, Error> =>
+}): Effect.Effect<
+  void,
+  Error | Terminal.QuitError,
+  Prompt.Environment | ChildProcessSpawner.ChildProcessSpawner
+> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
     const plan = yield* buildPlan(repoRoot);
@@ -314,12 +309,14 @@ export const runGc = ({
         return;
       }
 
+      // A Ctrl-C quit fails with Terminal.QuitError, which the CLI runner
+      // turns into a clean interrupt (exit code 130).
       const selected = yield* Prompt.run(
         Prompt.multiSelect<Action>({
           message: "What should be removed from the catalog?",
           choices,
         }),
-      ).pipe(Effect.mapError(() => new Error("Aborted.")));
+      );
 
       if (selected.length === 0) {
         yield* Console.log("Nothing selected — catalog left untouched.");
@@ -405,7 +402,7 @@ export const runGc = ({
     if (!yes) {
       const confirmed = yield* Prompt.run(
         Prompt.confirm({ message: summary.replace(/\.$/, "?") }),
-      ).pipe(Effect.mapError(() => new Error("Aborted.")));
+      );
       if (!confirmed) {
         yield* Console.log("Aborted — catalog left untouched.");
         return;
@@ -415,14 +412,9 @@ export const runGc = ({
     yield* removePaths([...targets], false);
     const pruned = yield* pruneEmptyCommitDirs(plan.commitsPath);
     const cacheBytesReclaimed = pruneCacheNamespaces
-      ? yield* Effect.try({
-          try: () =>
-            pruneBlobCacheNamespaces(
-              plan.catalogPath,
-              plan.staleCacheNamespaces,
-            ),
-          catch: toError,
-        })
+      ? yield* Effect.try(() =>
+          pruneBlobCacheNamespaces(plan.catalogPath, plan.staleCacheNamespaces),
+        )
       : 0;
 
     yield* Console.log(
@@ -430,4 +422,4 @@ export const runGc = ({
         `${cacheBytesReclaimed > 0 ? ` Blob cache shrank by ${formatBytes(cacheBytesReclaimed)}.` : ""} ` +
         "Run `repo-dive index` to refresh rollups.",
     );
-  }).pipe(Effect.provide(NodeServices.layer));
+  });

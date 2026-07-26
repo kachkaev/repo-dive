@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { expect, it, test } from "@effect/vitest";
 import { Effect } from "effect";
-import { expect, test } from "vitest";
 
 import {
   defaultCatalogDirName,
@@ -291,47 +291,61 @@ test("resolveConfig rejects invalid catalog config", () => {
   );
 });
 
-test("loadConfig returns defaults when no config file exists", async () => {
+it.effect("loadConfig returns defaults when no config file exists", () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "repo-dive-cfg-"));
-  try {
-    const resolved = await Effect.runPromise(loadConfig(dir));
+  return Effect.gen(function* () {
+    const resolved = yield* loadConfig(dir);
     expect(resolved.maxInCharts).toBe(defaultMaxInCharts);
-  } finally {
-    rmSync(dir, { force: true, recursive: true });
-  }
+  }).pipe(
+    Effect.ensuring(
+      Effect.sync(() => {
+        rmSync(dir, { force: true, recursive: true });
+      }),
+    ),
+  );
 });
 
-test("loadConfig imports a .mjs config file", async () => {
+it.effect("loadConfig imports a .mjs config file", () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "repo-dive-cfg-"));
-  try {
+  return Effect.gen(function* () {
     writeFileSync(
       path.join(dir, "repo-dive.config.mjs"),
       'export default { contributors: { maxInCharts: 15, aliases: [["a@x.example", "a@y.example"]] } };\n',
     );
-    const resolved = await Effect.runPromise(loadConfig(dir));
+    const resolved = yield* loadConfig(dir);
     expect(resolved.maxInCharts).toBe(15);
     expect(resolved.resolveContributor("a@y.example").label).toBe(
       "a@x.example",
     );
-  } finally {
-    rmSync(dir, { force: true, recursive: true });
-  }
+  }).pipe(
+    Effect.ensuring(
+      Effect.sync(() => {
+        rmSync(dir, { force: true, recursive: true });
+      }),
+    ),
+  );
 });
 
-test("loadConfig fails with a friendly message on a malformed config", async () => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "repo-dive-cfg-"));
-  try {
-    writeFileSync(
-      path.join(dir, "repo-dive.config.mjs"),
-      "export default { contributors: { maxInCharts: -1 } };\n",
+it.effect(
+  "loadConfig fails with a friendly message on a malformed config",
+  () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "repo-dive-cfg-"));
+    return Effect.gen(function* () {
+      writeFileSync(
+        path.join(dir, "repo-dive.config.mjs"),
+        "export default { contributors: { maxInCharts: -1 } };\n",
+      );
+      const error = yield* Effect.flip(loadConfig(dir));
+      expect(error.message).toMatch(/Invalid repo-dive config/);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          rmSync(dir, { force: true, recursive: true });
+        }),
+      ),
     );
-    await expect(Effect.runPromise(loadConfig(dir))).rejects.toThrow(
-      /Invalid repo-dive config/,
-    );
-  } finally {
-    rmSync(dir, { force: true, recursive: true });
-  }
-});
+  },
+);
 
 test("prettifyAuthorEmail shortens GitHub noreply addresses", () => {
   expect(prettifyAuthorEmail("12345+alice@users.noreply.github.com")).toBe(

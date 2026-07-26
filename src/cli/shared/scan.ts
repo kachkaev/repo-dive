@@ -1,4 +1,13 @@
-import { Console, Effect } from "effect";
+import {
+  Clock,
+  Console,
+  Data,
+  Duration,
+  Effect,
+  type PlatformError,
+  Ref,
+} from "effect";
+import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import {
   type Catalog,
@@ -13,7 +22,7 @@ import {
   resolveCollectors,
 } from "./collectors.ts";
 import { loadConfig } from "./config.ts";
-import { GitCommandError, runGit } from "./git.ts";
+import { type CommandError, runGit } from "./git.ts";
 import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import {
   parseSamplingPolicy,
@@ -30,6 +39,26 @@ export type CommitMeta = {
   readonly authorDate: string;
   readonly subject: string;
 };
+
+export class NotAGitRepositoryError extends Data.TaggedError(
+  "NotAGitRepositoryError",
+)<{
+  readonly repoPath: string;
+}> {
+  override get message(): string {
+    return `Not a git repository: ${this.repoPath}`;
+  }
+}
+
+class CollectorRunError extends Data.TaggedError("CollectorRunError")<{
+  readonly collectorName: string;
+  readonly sha: string;
+  readonly cause: Error;
+}> {
+  override get message(): string {
+    return `Collector ${this.collectorName} failed on ${this.sha.slice(0, 10)}: ${this.cause.message}`;
+  }
+}
 
 const fieldSeparator = "\u001F";
 
@@ -59,30 +88,40 @@ export const parseGitLog = (stdout: string): CommitMeta[] => {
 
 export const resolveRepoRoot = (
   repoPath: string,
-): Effect.Effect<string, Error> =>
+): Effect.Effect<
+  string,
+  NotAGitRepositoryError | PlatformError.PlatformError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
   runGit(["-C", repoPath, "rev-parse", "--show-toplevel"]).pipe(
     Effect.map((stdout) => stdout.trim()),
-    Effect.mapError(
+    Effect.catchTag("GitCommandError", () =>
+      Effect.fail(new NotAGitRepositoryError({ repoPath })),
+    ),
+  );
+
+const succeedIfNoCommitsYet = <R>(
+  effect: Effect.Effect<string, CommandError, R>,
+): Effect.Effect<string, CommandError, R> =>
+  effect.pipe(
+    Effect.catchIf(
       (error) =>
-        new Error(
-          error instanceof GitCommandError
-            ? `Not a git repository: ${repoPath}`
-            : `Unable to run git: ${error.message}`,
-        ),
+        error._tag === "GitCommandError" &&
+        error.stderr.includes("does not have any commits yet"),
+      () => Effect.succeed(""),
     ),
   );
 
 /** Lists commits reachable from HEAD, newest first. Empty for a repo with no commits. */
 export const listCommits = (
   repoRoot: string,
-): Effect.Effect<CommitMeta[], Error> =>
+): Effect.Effect<
+  CommitMeta[],
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
   runGit(["-C", repoRoot, "log", `--format=${gitLogFormat}`]).pipe(
-    Effect.catch((error) =>
-      error instanceof GitCommandError &&
-      error.stderr.includes("does not have any commits yet")
-        ? Effect.succeed("")
-        : Effect.fail(error),
-    ),
+    succeedIfNoCommitsYet,
     Effect.map(parseGitLog),
   );
 
@@ -93,14 +132,13 @@ export const listCommits = (
  */
 export const listFirstParentShas = (
   repoRoot: string,
-): Effect.Effect<Set<string>, Error> =>
+): Effect.Effect<
+  Set<string>,
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
   runGit(["-C", repoRoot, "log", "--first-parent", "--format=%H"]).pipe(
-    Effect.catch((error) =>
-      error instanceof GitCommandError &&
-      error.stderr.includes("does not have any commits yet")
-        ? Effect.succeed("")
-        : Effect.fail(error),
-    ),
+    succeedIfNoCommitsYet,
     Effect.map((stdout) => new Set(stdout.split("\n").filter(Boolean))),
   );
 
@@ -140,34 +178,43 @@ const runCollector = ({
   readonly collector: Collector;
   readonly cacheKey: string;
   readonly worktreePath?: string | undefined;
-}): Effect.Effect<void, Error> =>
-  Effect.gen(function* () {
-    const startedAt = Date.now();
-    const output = yield* collector
-      .collect({
-        repoRoot: catalog.repoRoot,
-        catalogPath: catalog.rootPath,
-        sha,
-        cacheKey,
-        worktreePath,
-      })
-      .pipe(
-        Effect.mapError(
-          (error) =>
-            new Error(
-              `Collector ${collector.name} failed on ${sha.slice(0, 10)}: ${error.message}`,
-            ),
-        ),
-      );
-    yield* writeCollectorOutput({
-      catalog,
+}): Effect.Effect<
+  void,
+  CollectorRunError | Error,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
+  collector
+    .collect({
+      repoRoot: catalog.repoRoot,
+      catalogPath: catalog.rootPath,
       sha,
-      collector,
       cacheKey,
-      output,
-      durationMs: Date.now() - startedAt,
-    });
-  });
+      worktreePath,
+    })
+    .pipe(
+      Effect.mapError(
+        (cause) =>
+          new CollectorRunError({ collectorName: collector.name, sha, cause }),
+      ),
+      Effect.timed,
+      Effect.flatMap(([duration, output]) =>
+        writeCollectorOutput({
+          catalog,
+          sha,
+          collector,
+          cacheKey,
+          output,
+          durationMs: Math.round(Duration.toMillis(duration)),
+        }),
+      ),
+    );
+
+type CommitOutcome = {
+  readonly run: number;
+  readonly skipped: number;
+  /** Failed runs are recorded here instead of aborting the whole scan. */
+  readonly failures: readonly string[];
+};
 
 const collectCommit = ({
   catalog,
@@ -175,16 +222,17 @@ const collectCommit = ({
   collectors,
   cacheKeyOf,
   force,
-  failures,
 }: {
   readonly catalog: Catalog;
   readonly sha: string;
   readonly collectors: readonly Collector[];
   readonly cacheKeyOf: (collector: Collector) => string;
   readonly force: boolean;
-  /** Failed runs are recorded here instead of aborting the whole scan. */
-  readonly failures: string[];
-}): Effect.Effect<{ run: number; skipped: number }, Error> =>
+}): Effect.Effect<
+  CommitOutcome,
+  Error,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
   Effect.gen(function* () {
     const pending: Collector[] = [];
     let skipped = 0;
@@ -208,29 +256,30 @@ const collectCommit = ({
     );
 
     let run = 0;
+    const failures: string[] = [];
     for (const collector of direct) {
-      const outcome = yield* runCollector({
+      const failure = yield* runCollector({
         catalog,
         sha,
         collector,
         cacheKey: cacheKeyOf(collector),
       }).pipe(
-        Effect.map(() => true),
-        Effect.catch((error) => {
-          failures.push(error.message);
-          return Effect.succeed(false);
-        }),
+        Effect.as(undefined),
+        Effect.catch((error) => Effect.succeed(error.message)),
       );
-      if (outcome) {
+      if (failure === undefined) {
         run += 1;
+      } else {
+        failures.push(failure);
       }
     }
 
     if (needingWorktree.length > 0) {
-      yield* withTemporaryWorktree(catalog.repoRoot, sha, (worktreePath) =>
-        Effect.forEach(
-          needingWorktree,
-          (collector) =>
+      const worktreeFailures = yield* withTemporaryWorktree(
+        catalog.repoRoot,
+        sha,
+        (worktreePath) =>
+          Effect.forEach(needingWorktree, (collector) =>
             runCollector({
               catalog,
               sha,
@@ -238,25 +287,27 @@ const collectCommit = ({
               cacheKey: cacheKeyOf(collector),
               worktreePath,
             }).pipe(
-              Effect.map(() => {
-                run += 1;
-              }),
-              Effect.catch((error) => {
-                failures.push(error.message);
-                return Effect.void;
-              }),
+              Effect.as(undefined),
+              Effect.catch((error) => Effect.succeed(error.message)),
             ),
-          { discard: true },
-        ),
+          ),
       ).pipe(
-        Effect.catch((error) => {
-          failures.push(`Worktree for ${sha.slice(0, 10)}: ${error.message}`);
-          return Effect.void;
-        }),
+        Effect.catch((error) =>
+          Effect.succeed([
+            `Worktree for ${sha.slice(0, 10)}: ${error.message}`,
+          ]),
+        ),
       );
+      for (const failure of worktreeFailures) {
+        if (failure === undefined) {
+          run += 1;
+        } else {
+          failures.push(failure);
+        }
+      }
     }
 
-    return { run, skipped };
+    return { run, skipped, failures };
   });
 
 export const runScan = ({
@@ -271,20 +322,15 @@ export const runScan = ({
   readonly maxCommits?: number | undefined;
   readonly sample?: string | undefined;
   readonly force?: boolean | undefined;
-}): Effect.Effect<void, Error> =>
+}): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
-    const collectors = resolveCollectors(collectorNames);
-    if (collectors instanceof Error) {
-      return yield* Effect.fail(collectors);
-    }
+    const collectors = yield* Effect.fromResult(
+      resolveCollectors(collectorNames),
+    );
 
     let sampleOverride: SamplingPolicy | undefined;
     if (sample !== undefined) {
-      const parsed = parseSamplingPolicy(sample);
-      if (parsed instanceof Error) {
-        return yield* Effect.fail(parsed);
-      }
-      sampleOverride = parsed;
+      sampleOverride = yield* Effect.fromResult(parseSamplingPolicy(sample));
     }
 
     const repoRoot = yield* resolveRepoRoot(repoPath);
@@ -292,10 +338,10 @@ export const runScan = ({
     const selected =
       maxCommits === undefined ? commits : commits.slice(0, maxCommits);
 
-    // One fingerprint per collector for the whole run: the config it depends on
-    // is fixed, so this decides re-collection uniformly across every commit.
+    // Loaded before the catalog is opened: the config decides where it lives.
+    // One fingerprint per collector for the whole run follows from it too — the
+    // config is fixed, so it decides re-collection uniformly across commits.
     const config = yield* loadConfig(repoRoot);
-
     const catalog = yield* openCatalog({
       repoRoot,
       catalogPath: config.catalogPath,
@@ -338,7 +384,6 @@ export const runScan = ({
 
     let totalRun = 0;
     let totalSkipped = 0;
-    let processed = 0;
     const failures: string[] = [];
 
     // Batch phase: collectors that can cover many commits per subprocess do so
@@ -364,37 +409,36 @@ export const runScan = ({
         continue;
       }
 
-      const batchStartedAt = Date.now();
-      const outputs = yield* collector
+      const [batchDuration, outputs] = yield* collector
         .collectBatch({ repoRoot, shas: pending })
         .pipe(
           Effect.catch((error) => {
             failures.push(`Batch ${collector.name}: ${error.message}`);
             return Effect.succeed(new Map<string, unknown>());
           }),
+          Effect.timed,
         );
       const durationMs = Math.max(
         1,
-        Math.round((Date.now() - batchStartedAt) / Math.max(1, outputs.size)),
+        Math.round(
+          Duration.toMillis(batchDuration) / Math.max(1, outputs.size),
+        ),
       );
 
-      const written = new Set<string>();
-      yield* Effect.forEach(
-        [...outputs.entries()],
-        ([sha, output]) =>
-          writeCollectorOutput({
-            catalog,
-            sha,
-            collector,
-            cacheKey: cacheKeyOf(collector),
-            output,
-            durationMs,
-          }).pipe(
-            Effect.map(() => {
-              written.add(sha);
-            }),
-          ),
-        { concurrency: 16, discard: true },
+      const written = new Set(
+        yield* Effect.forEach(
+          [...outputs.entries()],
+          ([sha, output]) =>
+            writeCollectorOutput({
+              catalog,
+              sha,
+              collector,
+              cacheKey: cacheKeyOf(collector),
+              output,
+              durationMs,
+            }).pipe(Effect.as(sha)),
+          { concurrency: 16 },
+        ),
       );
       totalRun += written.size;
 
@@ -412,10 +456,10 @@ export const runScan = ({
       }
     }
 
-    const startedAt = Date.now();
+    const startedAt = yield* Clock.currentTimeMillis;
 
-    const formatEta = (): string => {
-      const elapsedSeconds = (Date.now() - startedAt) / 1000;
+    const formatEta = (processed: number, now: number): string => {
+      const elapsedSeconds = (now - startedAt) / 1000;
       const rate = processed / Math.max(1, elapsedSeconds);
       const remainingSeconds = Math.round(
         (selected.length - processed) / Math.max(0.01, rate),
@@ -425,7 +469,8 @@ export const runScan = ({
       return `${Math.round(rate)}/s, ~${minutes > 0 ? `${minutes}m ` : ""}${seconds}s left`;
     };
 
-    yield* Effect.forEach(
+    const processedRef = yield* Ref.make(0);
+    const outcomes = yield* Effect.forEach(
       selected,
       (commit) =>
         collectCommit({
@@ -440,23 +485,30 @@ export const runScan = ({
             .map((plan) => plan.collector),
           cacheKeyOf,
           force,
-          failures,
         }).pipe(
-          Effect.tap(({ run, skipped }) =>
+          Effect.tap(() =>
             Effect.gen(function* () {
-              totalRun += run;
-              totalSkipped += skipped;
-              processed += 1;
+              const processed = yield* Ref.updateAndGet(
+                processedRef,
+                (count) => count + 1,
+              );
               if (processed % 250 === 0) {
+                const now = yield* Clock.currentTimeMillis;
                 yield* Console.log(
-                  `Scanned ${processed}/${selected.length} commits (${formatEta()})…`,
+                  `Scanned ${processed}/${selected.length} commits (${formatEta(processed, now)})…`,
                 );
               }
             }),
           ),
         ),
-      { concurrency: 4, discard: true },
+      { concurrency: 4 },
     );
+
+    for (const outcome of outcomes) {
+      totalRun += outcome.run;
+      totalSkipped += outcome.skipped;
+      failures.push(...outcome.failures);
+    }
 
     yield* Console.log(
       [

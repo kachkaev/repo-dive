@@ -8,8 +8,8 @@ import {
 import os from "node:os";
 import path from "node:path";
 
+import { expect, it, test } from "@effect/vitest";
 import { Effect } from "effect";
-import { expect, test } from "vitest";
 
 import {
   appendIgnoreEntry,
@@ -21,6 +21,11 @@ import {
 function makeRepoRoot() {
   return mkdtempSync(path.join(os.tmpdir(), "repo-dive-ignore-"));
 }
+
+const cleanup = (repoRoot: string) =>
+  Effect.sync(() => {
+    rmSync(repoRoot, { force: true, recursive: true });
+  });
 
 test("coversPath recognizes the forms people actually write", () => {
   for (const pattern of [
@@ -57,37 +62,38 @@ test("coversPath honors a later re-include", () => {
   expect(coversPath("!.repo-dive\n.repo-dive/\n", ".repo-dive")).toBe(true);
 });
 
-test("findIgnoreFileNames picks up dotfiles ending in ignore, sorted", async () => {
+it.effect(
+  "findIgnoreFileNames picks up dotfiles ending in ignore, sorted",
+  () => {
+    const repoRoot = makeRepoRoot();
+
+    return Effect.gen(function* () {
+      for (const name of [
+        ".prettierignore",
+        ".gitignore",
+        ".dockerignore",
+        "ignore",
+        "ignore.txt",
+        "package.json",
+      ]) {
+        writeFileSync(path.join(repoRoot, name), "", "utf8");
+      }
+      // A directory whose name fits the pattern is not an ignore file.
+      mkdirSync(path.join(repoRoot, ".npmignore"));
+
+      expect(yield* findIgnoreFileNames(repoRoot)).toEqual([
+        ".dockerignore",
+        ".gitignore",
+        ".prettierignore",
+      ]);
+    }).pipe(Effect.ensuring(cleanup(repoRoot)));
+  },
+);
+
+it.effect("checkIgnoreFiles reports each root ignore file", () => {
   const repoRoot = makeRepoRoot();
 
-  try {
-    for (const name of [
-      ".prettierignore",
-      ".gitignore",
-      ".dockerignore",
-      "ignore",
-      "ignore.txt",
-      "package.json",
-    ]) {
-      writeFileSync(path.join(repoRoot, name), "", "utf8");
-    }
-    // A directory whose name fits the pattern is not an ignore file.
-    mkdirSync(path.join(repoRoot, ".npmignore"));
-
-    expect(await Effect.runPromise(findIgnoreFileNames(repoRoot))).toEqual([
-      ".dockerignore",
-      ".gitignore",
-      ".prettierignore",
-    ]);
-  } finally {
-    rmSync(repoRoot, { force: true, recursive: true });
-  }
-});
-
-test("checkIgnoreFiles reports each root ignore file", async () => {
-  const repoRoot = makeRepoRoot();
-
-  try {
+  return Effect.gen(function* () {
     writeFileSync(path.join(repoRoot, ".gitignore"), "node_modules\n", "utf8");
     writeFileSync(
       path.join(repoRoot, ".prettierignore"),
@@ -96,46 +102,41 @@ test("checkIgnoreFiles reports each root ignore file", async () => {
     );
 
     expect(
-      await Effect.runPromise(
-        checkIgnoreFiles({ repoRoot, catalogRelativePath: ".repo-dive" }),
-      ),
+      yield* checkIgnoreFiles({ repoRoot, catalogRelativePath: ".repo-dive" }),
     ).toEqual([
       { name: ".gitignore", covered: false },
       { name: ".prettierignore", covered: true },
     ]);
-  } finally {
-    rmSync(repoRoot, { force: true, recursive: true });
-  }
+  }).pipe(Effect.ensuring(cleanup(repoRoot)));
 });
 
-test("appendIgnoreEntry separates the entry from what is already there", async () => {
-  const repoRoot = makeRepoRoot();
+it.effect(
+  "appendIgnoreEntry separates the entry from what is already there",
+  () => {
+    const repoRoot = makeRepoRoot();
 
-  try {
-    const cases = [
-      { name: ".eslintignore", before: "node_modules\n" },
-      // No trailing newline: the entry must not land on the last line.
-      { name: ".npmignore", before: "node_modules" },
-      { name: ".markdownlintignore", before: "" },
-      { name: ".dockerignore", before: "node_modules\n\n" },
-    ];
-    for (const { name, before } of cases) {
-      writeFileSync(path.join(repoRoot, name), before, "utf8");
-      await Effect.runPromise(
-        appendIgnoreEntry({
+    return Effect.gen(function* () {
+      const cases = [
+        { name: ".eslintignore", before: "node_modules\n" },
+        // No trailing newline: the entry must not land on the last line.
+        { name: ".npmignore", before: "node_modules" },
+        { name: ".markdownlintignore", before: "" },
+        { name: ".dockerignore", before: "node_modules\n\n" },
+      ];
+      for (const { name, before } of cases) {
+        writeFileSync(path.join(repoRoot, name), before, "utf8");
+        yield* appendIgnoreEntry({
           filePath: path.join(repoRoot, name),
           catalogRelativePath: ".repo-dive",
-        }),
-      );
-      const after = readFileSync(path.join(repoRoot, name), "utf8");
-      expect(after.endsWith("# repo-dive catalog\n.repo-dive/\n"), name).toBe(
-        true,
-      );
-      expect(after.startsWith(before), name).toBe(true);
-      expect(coversPath(after, ".repo-dive"), name).toBe(true);
-      expect(after).not.toContain("\n\n\n");
-    }
-  } finally {
-    rmSync(repoRoot, { force: true, recursive: true });
-  }
-});
+        });
+        const after = readFileSync(path.join(repoRoot, name), "utf8");
+        expect(after.endsWith("# repo-dive catalog\n.repo-dive/\n"), name).toBe(
+          true,
+        );
+        expect(after.startsWith(before), name).toBe(true);
+        expect(coversPath(after, ".repo-dive"), name).toBe(true);
+        expect(after).not.toContain("\n\n\n");
+      }
+    }).pipe(Effect.ensuring(cleanup(repoRoot)));
+  },
+);

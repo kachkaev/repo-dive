@@ -22,9 +22,6 @@ const ignoreFileNamePattern = /^\..+ignore$/;
 /** Marks the line the `ignore-catalog` command appends. */
 const ignoreEntryComment = "# repo-dive catalog";
 
-const toError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
-
 /**
  * Ignore files sitting at the repository root, sorted by name. Only the root is
  * searched: ignore files further down govern their own subtree, and the tools
@@ -33,17 +30,14 @@ const toError = (error: unknown) =>
 export const findIgnoreFileNames = (
   repoRoot: string,
 ): Effect.Effect<readonly string[], Error> =>
-  Effect.tryPromise({
-    try: async () => {
-      const entries = await readdir(repoRoot, { withFileTypes: true });
-      return entries
-        .filter(
-          (entry) => entry.isFile() && ignoreFileNamePattern.test(entry.name),
-        )
-        .map((entry) => entry.name)
-        .toSorted();
-    },
-    catch: toError,
+  Effect.tryPromise(async () => {
+    const entries = await readdir(repoRoot, { withFileTypes: true });
+    return entries
+      .filter(
+        (entry) => entry.isFile() && ignoreFileNamePattern.test(entry.name),
+      )
+      .map((entry) => entry.name)
+      .toSorted();
   });
 
 /** Strips the decoration that does not change which path a pattern points at. */
@@ -107,16 +101,13 @@ export const checkIgnoreFiles = ({
   Effect.gen(function* () {
     const names = yield* findIgnoreFileNames(repoRoot);
     return yield* Effect.forEach(names, (name) =>
-      Effect.tryPromise({
-        try: async (): Promise<IgnoreFileStatus> => ({
-          name,
-          covered: coversPath(
-            await readFile(path.join(repoRoot, name), "utf8"),
-            catalogRelativePath,
-          ),
-        }),
-        catch: toError,
-      }),
+      Effect.tryPromise(async (): Promise<IgnoreFileStatus> => ({
+        name,
+        covered: coversPath(
+          await readFile(path.join(repoRoot, name), "utf8"),
+          catalogRelativePath,
+        ),
+      })),
     );
   });
 
@@ -136,22 +127,19 @@ export const appendIgnoreEntry = ({
   readonly filePath: string;
   readonly catalogRelativePath: string;
 }): Effect.Effect<void, Error> =>
-  Effect.tryPromise({
-    try: async () => {
-      const contents = await readFile(filePath, "utf8");
-      const separator =
-        contents === "" || contents.endsWith("\n\n")
-          ? ""
-          : contents.endsWith("\n")
-            ? "\n"
-            : "\n\n";
-      await writeFile(
-        filePath,
-        `${contents}${separator}${ignoreEntryComment}\n${ignoreEntryFor(catalogRelativePath)}\n`,
-        "utf8",
-      );
-    },
-    catch: toError,
+  Effect.tryPromise(async () => {
+    const contents = await readFile(filePath, "utf8");
+    const separator =
+      contents === "" || contents.endsWith("\n\n")
+        ? ""
+        : contents.endsWith("\n")
+          ? "\n"
+          : "\n\n";
+    await writeFile(
+      filePath,
+      `${contents}${separator}${ignoreEntryComment}\n${ignoreEntryFor(catalogRelativePath)}\n`,
+      "utf8",
+    );
   });
 
 /**

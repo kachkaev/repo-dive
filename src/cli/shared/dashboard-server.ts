@@ -4,15 +4,33 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { NodeServices } from "@effect/platform-node";
-import { Console, Effect } from "effect";
-import { ChildProcess } from "effect/unstable/process";
+import { Console, Data, Effect } from "effect";
+import {
+  ChildProcess,
+  type ChildProcessSpawner,
+} from "effect/unstable/process";
 
 import { loadConfig } from "./config.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
-const toError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
+export class DashboardUnavailableError extends Data.TaggedError(
+  "DashboardUnavailableError",
+)<{
+  readonly reason: string;
+}> {
+  override get message(): string {
+    return this.reason;
+  }
+}
+
+class ServerListenError extends Data.TaggedError("ServerListenError")<{
+  readonly port: number;
+  readonly cause: Error;
+}> {
+  override get message(): string {
+    return `Unable to listen on port ${this.port}: ${this.cause.message}`;
+  }
+}
 
 const mimeTypes: Record<string, string> = {
   ".css": "text/css",
@@ -35,7 +53,9 @@ export const resolveAssetsDir = (): string | undefined => {
   );
 };
 
-export const openInBrowser = (url: string): Effect.Effect<void, Error> =>
+export const openInBrowser = (
+  url: string,
+): Effect.Effect<void, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.scoped(
     Effect.gen(function* () {
       const command =
@@ -51,11 +71,7 @@ export const openInBrowser = (url: string): Effect.Effect<void, Error> =>
       });
       yield* handle.exitCode;
     }),
-  ).pipe(
-    Effect.mapError(toError),
-    Effect.provide(NodeServices.layer),
-    Effect.ignore,
-  );
+  ).pipe(Effect.ignore);
 
 export const runDashboard = ({
   repoPath,
@@ -65,26 +81,23 @@ export const runDashboard = ({
   readonly repoPath: string;
   readonly port: number;
   readonly open: boolean;
-}): Effect.Effect<void, Error> =>
+}): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
     const config = yield* loadConfig(repoRoot);
     const dataPath = path.join(config.catalogPath, "index", "dashboard.json");
     if (!existsSync(dataPath)) {
-      return yield* Effect.fail(
-        new Error(
-          `No dashboard data at ${dataPath} — run \`repo-dive scan\` and \`repo-dive index\` first.`,
-        ),
-      );
+      return yield* new DashboardUnavailableError({
+        reason: `No dashboard data at ${dataPath} — run \`repo-dive scan\` and \`repo-dive index\` first.`,
+      });
     }
 
     const assetsDir = resolveAssetsDir();
     if (assetsDir === undefined) {
-      return yield* Effect.fail(
-        new Error(
+      return yield* new DashboardUnavailableError({
+        reason:
           "Dashboard assets not found — run `pnpm build` first (dist/dashboard is missing).",
-        ),
-      );
+      });
     }
 
     const server = http.createServer((request, response) => {
@@ -123,9 +136,9 @@ export const runDashboard = ({
     });
 
     // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- the callback effect genuinely succeeds with no value
-    yield* Effect.callback<void, Error>((resume) => {
+    yield* Effect.callback<void, ServerListenError>((resume) => {
       server.on("error", (error) => {
-        resume(Effect.fail(toError(error)));
+        resume(Effect.fail(new ServerListenError({ port, cause: error })));
       });
       server.listen(port, () => {
         resume(Effect.void);

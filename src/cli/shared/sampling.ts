@@ -1,30 +1,44 @@
+import { Data, Result } from "effect";
+
 import type { CommitMeta } from "./scan.ts";
 
 export type SamplingPolicy =
   "all" | "weekly" | "monthly" | "quarterly" | { readonly everyNth: number };
 
-export const parseSamplingPolicy = (input: string): SamplingPolicy | Error => {
+export class InvalidSamplingPolicyError extends Data.TaggedError(
+  "InvalidSamplingPolicyError",
+)<{
+  readonly input: string;
+}> {
+  override get message(): string {
+    return (
+      `Unknown sampling policy: ${this.input}. ` +
+      "Expected all, weekly, monthly, quarterly or every-nth:<n>."
+    );
+  }
+}
+
+export const parseSamplingPolicy = (
+  input: string,
+): Result.Result<SamplingPolicy, InvalidSamplingPolicyError> => {
   if (
     input === "all" ||
     input === "weekly" ||
     input === "monthly" ||
     input === "quarterly"
   ) {
-    return input;
+    return Result.succeed(input);
   }
 
   const everyNthMatch = /^every-nth:(\d+)$/.exec(input);
   if (everyNthMatch?.[1]) {
     const everyNth = Number(everyNthMatch[1]);
     if (everyNth >= 1) {
-      return { everyNth };
+      return Result.succeed({ everyNth });
     }
   }
 
-  return new Error(
-    `Unknown sampling policy: ${input}. ` +
-      "Expected all, weekly, monthly, quarterly or every-nth:<n>.",
-  );
+  return Result.fail(new InvalidSamplingPolicyError({ input }));
 };
 
 /** How a policy is spelled in CLI output (`collectors`, `scan`, `status`). */
