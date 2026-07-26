@@ -2,6 +2,12 @@
 
 Dive into a git repository's history: per-commit snapshots, an indexed metrics catalog and an interactive dashboard.
 
+[![npm version](https://img.shields.io/npm/v/repo-dive?logo=npm&color=3c7ef6&labelColor=333)](https://www.npmjs.com/package/repo-dive)
+[![npm downloads](https://img.shields.io/npm/dm/repo-dive?logo=npm&color=3c7ef6&labelColor=333)](https://www.npmjs.com/package/repo-dive)
+[![CI](https://img.shields.io/github/actions/workflow/status/kachkaev/repo-dive/ci.yaml?branch=main&label=CI&logo=github&color=3c7ef6&labelColor=333)](https://github.com/kachkaev/repo-dive/actions/workflows/ci.yaml)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-3c7ef6?labelColor=333)](LICENSE.md)
+[![MCP](https://img.shields.io/badge/MCP-ready-3c7ef6?logo=modelcontextprotocol&logoColor=white&labelColor=333)](#ai-agents-mcp)
+
 > **Still 0.x.**
 > The pipeline works end to end and has been run against repositories with tens of thousands of commits, but interfaces, the catalog format and the collector roster still move between minor versions — pin the version if you script against it.
 > Renamed from `repo-insighter` in 0.4.0.
