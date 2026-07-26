@@ -19,7 +19,7 @@ import type { ResolvedConfig } from "./config.ts";
 /** Dotfiles whose name ends in "ignore" — `.gitignore`, `.prettierignore`, … */
 const ignoreFileNamePattern = /^\..+ignore$/;
 
-/** Marks the line the `ignore-catalog` command appends. */
+/** Marks the line the `ignore` command appends. */
 const ignoreEntryComment = "# repo-dive catalog";
 
 /**
@@ -185,11 +185,12 @@ export const warnAboutIgnoreFiles = ({
     if (missing.length === 0) {
       return;
     }
+    const one = missing.length === 1;
     yield* Console.error(
       [
-        `\nWarning: ${ignoreEntryFor(catalogRelativePath)} is not covered by ${missing.join(", ")}.`,
-        "  Tools reading these files will walk the catalog instead of skipping it.",
-        "  Add the entry to each of them: npx repo-dive ignore-catalog",
+        `\nWarning: ${missing.join(", ")} ${one ? "does" : "do"} not cover ${ignoreEntryFor(catalogRelativePath)}.`,
+        `  The tools reading ${one ? "it" : "them"} will walk the catalog instead of skipping it.`,
+        "  Add the entry: npx repo-dive ignore",
       ].join("\n"),
     );
   });

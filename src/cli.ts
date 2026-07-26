@@ -6,7 +6,7 @@ import packageJson from "../package.json" with { type: "json" };
 import { collectorsCommand } from "./cli/collectors-command.ts";
 import { dashboardCommand } from "./cli/dashboard-command.ts";
 import { gcCommand } from "./cli/gc-command.ts";
-import { ignoreCatalogCommand } from "./cli/ignore-catalog-command.ts";
+import { ignoreCommand } from "./cli/ignore-command.ts";
 import { indexCommand } from "./cli/index-command.ts";
 import { mcpCommand } from "./cli/mcp-command.ts";
 import { queryCommand } from "./cli/query-command.ts";
@@ -64,7 +64,7 @@ const cli = Command.make("repo-dive", {
     statusCommand,
     collectorsCommand,
     gcCommand,
-    ignoreCatalogCommand,
+    ignoreCommand,
   ]),
 );
 

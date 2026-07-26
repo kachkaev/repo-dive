@@ -107,7 +107,7 @@ The catalog hides itself from git by writing a nested `.gitignore` holding `*`.
 That trick is git's alone: prettier, markdownlint, cspell, eslint, `docker build` and `npm pack` each read a single ignore file at the **root** of the repository and know nothing about nested ones.
 Unless the catalog is listed there too, its thousands of small files quietly become their input.
 
-So `scan`, `index` and `status` check every root ignore file — anything matching `.*ignore` — and warn on stderr about the ones that do not cover the catalog, pointing at [`repo-dive ignore-catalog`](02-cli.md), which appends the entry.
+So `scan`, `index` and `status` check every root ignore file — anything matching `.*ignore` — and warn on stderr about the ones that do not cover the catalog, pointing at [`repo-dive ignore`](02-cli.md), which appends the entry.
 Set `checkIgnoreFiles` to `false` to silence the warning.
 The check is skipped entirely when the catalog sits outside the repository, where nothing walking the repo can reach it.
 

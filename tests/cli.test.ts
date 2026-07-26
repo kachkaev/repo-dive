@@ -565,7 +565,7 @@ test.concurrent("mcp serves the cube over stdio", async () => {
 });
 
 test.concurrent(
-  "scan warns about ignore files that do not cover the catalog, and ignore-catalog fixes them",
+  "scan warns about ignore files that do not cover the catalog, and ignore fixes them",
   async () => {
     const repoPath = createFixtureRepo();
 
@@ -582,15 +582,10 @@ test.concurrent(
       );
       expect(firstScan.status, firstScan.stderr).toBe(0);
       expect(firstScan.stderr).toMatch(
-        /\.repo-dive\/ is not covered by \.gitignore, \.prettierignore/,
+        /\.gitignore, \.prettierignore do not cover \.repo-dive\//,
       );
 
-      const dryRun = await runCli(
-        "ignore-catalog",
-        "--repo",
-        repoPath,
-        "--dry-run",
-      );
+      const dryRun = await runCli("ignore", "--repo", repoPath, "--dry-run");
       expect(dryRun.status, dryRun.stderr).toBe(0);
       expect(dryRun.stdout).toMatch(/Would add \.repo-dive\/ to:/);
       expect(
@@ -598,7 +593,7 @@ test.concurrent(
         "--dry-run must not write",
       ).toBe("node_modules\n");
 
-      const applied = await runCli("ignore-catalog", "--repo", repoPath);
+      const applied = await runCli("ignore", "--repo", repoPath);
       expect(applied.status, applied.stderr).toBe(0);
       expect(applied.stdout).toMatch(/Added \.repo-dive\/ to:/);
       for (const name of [".gitignore", ".prettierignore"]) {
@@ -615,7 +610,7 @@ test.concurrent(
         "commit-meta",
       );
       expect(secondScan.status, secondScan.stderr).toBe(0);
-      expect(secondScan.stderr).not.toMatch(/is not covered by/);
+      expect(secondScan.stderr).not.toMatch(/do not cover/);
     } finally {
       rmSync(repoPath, { force: true, recursive: true });
     }
@@ -644,13 +639,13 @@ test.concurrent(
       );
       expect(scan.status, scan.stderr).toBe(0);
       expect(scan.stdout).toMatch(new RegExp(`Catalog: ${catalogPath}`));
-      expect(scan.stderr).not.toMatch(/is not covered by/);
+      expect(scan.stderr).not.toMatch(/does not cover|do not cover/);
       expect(existsSync(path.join(catalogPath, "catalog.json"))).toBe(true);
       expect(existsSync(path.join(repoPath, ".repo-dive"))).toBe(false);
 
-      const ignoreCatalog = await runCli("ignore-catalog", "--repo", repoPath);
-      expect(ignoreCatalog.status, ignoreCatalog.stderr).toBe(0);
-      expect(ignoreCatalog.stdout).toMatch(/outside/);
+      const ignore = await runCli("ignore", "--repo", repoPath);
+      expect(ignore.status, ignore.stderr).toBe(0);
+      expect(ignore.stdout).toMatch(/outside/);
       expect(readFileSync(path.join(repoPath, ".gitignore"), "utf8")).toBe(
         "node_modules\n",
       );

@@ -15,7 +15,7 @@ import { resolveRepoRoot } from "./scan.ts";
  * Lists the catalog in every ignore file at the repository root that does not
  * cover it yet, so the tools reading them stop walking the cache.
  */
-export const runIgnoreCatalog = ({
+export const runIgnore = ({
   repoPath,
   dryRun,
 }: {

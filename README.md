@@ -39,9 +39,9 @@ npx repo-dive status     # show catalog coverage
 npx repo-dive collectors # list available collectors
 npx repo-dive report     # export one shareable self-contained HTML file
 npx repo-dive query "SELECT metric, sum(value) FROM facts GROUP BY metric"
-npx repo-dive mcp            # serve the cube to AI agents (Model Context Protocol)
-npx repo-dive gc             # clean up the catalog interactively
-npx repo-dive ignore-catalog # keep other tools out of the catalog
+npx repo-dive mcp    # serve the cube to AI agents (Model Context Protocol)
+npx repo-dive gc     # clean up the catalog interactively
+npx repo-dive ignore # keep other tools out of the catalog
 ```
 
 `scan` walks the repository's history and runs collectors against every commit (or a sample, per collector), writing raw snapshots into a `.repo-dive/` catalog inside the analyzed repo.
@@ -59,7 +59,7 @@ Collectors so far:
 - **survival** — `git blame` line survival by extension, author and age cohort (sampled monthly)
 
 The catalog hides itself from git, but other tools that walk the repository (prettier, markdownlint, cspell, docker builds) each read one ignore file at its root.
-`scan` warns when the catalog is missing from those; `repo-dive ignore-catalog` adds it to every one of them.
+`scan` warns when the catalog is missing from those; `repo-dive ignore` adds it to every one of them.
 
 `index` normalizes raw snapshots into `.repo-dive/index/metrics.sqlite` (a facts-by-categories cube, rebuildable at any time) plus `dashboard.json`, and `dashboard` serves a local React app with interactive charts: languages over time, a GitHub-style commit calendar, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
 

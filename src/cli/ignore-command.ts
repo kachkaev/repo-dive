@@ -1,8 +1,8 @@
 import { Command, Flag } from "effect/unstable/cli";
 
-import { runIgnoreCatalog } from "./shared/ignore-catalog.ts";
+import { runIgnore } from "./shared/ignore.ts";
 
-export const ignoreCatalogCommand = Command.make("ignore-catalog", {
+export const ignoreCommand = Command.make("ignore", {
   repoPath: Flag.string("repo").pipe(
     Flag.withDefault("."),
     Flag.withDescription(
@@ -17,6 +17,6 @@ export const ignoreCatalogCommand = Command.make("ignore-catalog", {
     "Add the catalog folder to the repository's ignore files (.gitignore, .prettierignore, …) so other tools skip it",
   ),
   Command.withHandler((config) =>
-    runIgnoreCatalog({ repoPath: config.repoPath, dryRun: config.dryRun }),
+    runIgnore({ repoPath: config.repoPath, dryRun: config.dryRun }),
   ),
 );
