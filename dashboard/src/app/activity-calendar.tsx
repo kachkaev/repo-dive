@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import type { ContributorKind } from "../data.ts";
+import { ScrollArea } from "./shared/@ui-primitive/scroll-area.tsx";
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -681,8 +682,10 @@ export function CommitCalendar({
           ))}
         </ToggleGroup>
       )}
-      <div className="overflow-x-auto">
-        <div className="flex w-max min-w-full flex-col gap-3">
+      <ScrollArea>
+        {/* pb clears the overlay horizontal scrollbar (h-2.5) so it never
+            covers the last strip's bottom day row. */}
+        <div className="flex w-max min-w-full flex-col gap-3 pb-2.5">
           {layouts.map(({ title, layout }) => (
             <CalendarStrip
               key={title}
@@ -695,7 +698,7 @@ export function CommitCalendar({
             />
           ))}
         </div>
-      </div>
+      </ScrollArea>
       <div className="mt-2 flex items-center justify-between gap-4 text-xs text-(--text-secondary)">
         <span className="tabular-nums">
           {hovered ? describe(hovered) : rangeSummary}

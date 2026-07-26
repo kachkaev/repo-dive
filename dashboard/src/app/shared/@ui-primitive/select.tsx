@@ -116,7 +116,9 @@ export function SelectContent({
         <SelectPrimitive.Popup
           data-slot="select-content"
           className={cn(
-            "relative isolate z-50 max-h-(--available-height) min-w-(--anchor-width) origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-md border bg-popover py-1 text-popover-foreground shadow-md",
+            // border-border is load-bearing: Tailwind v4's bare `border`
+            // defaults to currentColor, which here is the popover foreground.
+            "relative isolate z-50 max-h-(--available-height) min-w-(--anchor-width) origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover py-1 text-popover-foreground shadow-md",
             className,
           )}
           {...props}
