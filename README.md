@@ -10,7 +10,7 @@ _Dive into a git repository's history: per-commit snapshots, an indexed metrics 
 
 ## What it does
 
-Point it at any git repository and get an explorable catalog of insights derived from its history:
+Point `repo-dive` at any git repository and get an explorable catalog of insights derived from its history:
 
 ```sh
 cd /path/to/your/repo
@@ -29,10 +29,10 @@ See [docs/specs](docs/specs/README.md) for the architecture and [docs/research/p
 
 ## Usage
 
-Run from inside the repository you want to analyze (or pass `--repo /path/to/repo`):
+Run from inside the repository you want to analyze (or pass `--repo /path/to/repo`).
+Node 22.13 or newer is required.
 
 ```sh
-cd /path/to/your/repo
 npx repo-dive            # the whole pipeline: scan + index + dashboard
 npx repo-dive scan       # collect snapshots into .repo-dive/
 npx repo-dive index      # roll up into the metrics cube + dashboard data
@@ -40,10 +40,10 @@ npx repo-dive dashboard  # serve the interactive dashboard
 npx repo-dive status     # show catalog coverage
 npx repo-dive collectors # list available collectors
 npx repo-dive report     # export one shareable self-contained HTML file
+npx repo-dive mcp        # serve the cube to AI agents (Model Context Protocol)
+npx repo-dive gc         # clean up the catalog interactively
+npx repo-dive ignore     # keep other tools out of the catalog
 npx repo-dive query "SELECT metric, sum(value) FROM facts GROUP BY metric"
-npx repo-dive mcp    # serve the cube to AI agents (Model Context Protocol)
-npx repo-dive gc     # clean up the catalog interactively
-npx repo-dive ignore # keep other tools out of the catalog
 ```
 
 `scan` walks the repository's history and runs collectors against every commit (or a sample, per collector), writing raw snapshots into a `.repo-dive/` catalog inside the analyzed repo.
@@ -55,7 +55,7 @@ Collectors so far:
 - **churn** — lines added/deleted per commit, by file extension
 - **file-types** — file count and bytes per extension at each commit's tree
 - **directives** — eslint-disable comments by rule (block disables tracked as gray areas) and `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck`
-- **dependencies** — total resolved packages from package-manager lockfiles, per package manager (pnpm, npm and yarn — classic and berry; version-aware and monorepo-aware, extensible to more managers), plus direct/dev/optional dependencies and the number of manifests read straight from `package.json` files
+- **dependencies** — resolved package totals from lockfiles, per package manager (pnpm, npm and yarn classic and berry), plus direct/dev/optional dependencies and manifest counts read straight from `package.json` files; version-aware, monorepo-aware and extensible to more managers
 - **todo-comments** — TODO/FIXME/HACK/XXX counts
 - **languages** — lines and file count per language across a commit's source files (lockfiles, minified bundles and generated data excluded)
 - **survival** — `git blame` line survival by extension, author and age cohort (sampled monthly)
@@ -63,7 +63,8 @@ Collectors so far:
 The catalog hides itself from git, but other tools that walk the repository (prettier, markdownlint, cspell, docker builds) each read one ignore file at its root.
 `scan` warns when the catalog is missing from those; `repo-dive ignore` adds it to every one of them.
 
-`index` normalizes raw snapshots into `.repo-dive/index/metrics.sqlite` (a facts-by-categories cube, rebuildable at any time) plus `dashboard.json`, and `dashboard` serves a local React app with interactive charts: languages over time, a GitHub-style commit calendar, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
+`index` normalizes raw snapshots into `.repo-dive/index/metrics.sqlite` — a facts-by-categories cube, rebuildable at any time — plus `dashboard.json`.
+`dashboard` then serves a local React app with interactive charts: languages over time, a GitHub-style commit calendar, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
 
 ## Configuration
 
@@ -100,7 +101,8 @@ export default defineConfig({
 ```
 
 `charts.weekStartsOn` sets the first day of the week in calendar-shaped charts such as the commit calendar (`"monday"` by default, `"sunday"` also supported).
-`contributors.aliases` merges the multiple identities one person commits under (work + personal email, GitHub noreply, name variants) so attribution, the contributors table and code-survival-by-contributor count them once; a group can also carry a `displayName`, a profile `url` and a `kind` (`human`/`bot`/`ai`, otherwise auto-derived — the dashboard badges bots and AI agents and lists them apart from humans).
+`contributors.aliases` merges the multiple identities one person commits under (work + personal email, GitHub noreply, name variants) so attribution, the contributors table and code-survival-by-contributor count them once.
+A group can also carry a `displayName`, a profile `url` and a `kind` — `human`/`bot`/`ai`, otherwise auto-derived, with the dashboard badging bots and AI agents and listing them apart from humans.
 `catalog.dir` moves the catalog; point it outside the repository (e.g. `"../repo-dive-catalogs/my-repo"`) to leave the analyzed working tree untouched altogether, ignore files included.
 Apart from `catalog`, which every command needs, the config is read by `index`.
 See [docs/specs/07-config.md](docs/specs/07-config.md) for details.
