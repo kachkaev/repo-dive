@@ -1,9 +1,9 @@
 ---
-name: authoring-dashboard-ui
-description: How to build dashboard UI (dashboard/src) — reuse the @ui-primitive shadcn components on Base UI, style through the semantic tokens in styles.css, and follow the repo's interaction conventions. Use when adding or restyling dashboard controls, popups, or layout, and especially when adding a new shadcn/Base UI primitive.
+name: editing-dashboard
+description: Conventions for the dashboard's UI (dashboard/src) — reuse the @ui-primitive shadcn components on Base UI, style through the semantic tokens in styles.css, and follow the repo's interaction conventions. Use for ANY change to dashboard markup, styling, or controls, however small — a className tweak counts — and especially when adding a new shadcn/Base UI primitive.
 ---
 
-# Authoring dashboard UI
+# Editing the dashboard UI
 
 The dashboard's interactive controls are canonical [shadcn](https://ui.shadcn.com) components built on `@base-ui/react`, living in [`dashboard/src/app/shared/@ui-primitive/`](../../../dashboard/src/app/shared/@ui-primitive).
 Reuse them (and the layout primitives) before hand-rolling anything; extend the set by porting more shadcn components the same way (see below).
