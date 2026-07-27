@@ -1,4 +1,5 @@
 {
   "extends": "@kachkaev/markdownlint-config",
-  "MD013": false
+  "MD013": false,
+  "MD036": false
 }
