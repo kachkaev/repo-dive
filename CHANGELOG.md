@@ -1,5 +1,48 @@
 # repo-dive
 
+## 0.7.0
+
+### Minor Changes
+
+- [#75](https://github.com/kachkaev/repo-dive/pull/75) [`8392a07`](https://github.com/kachkaev/repo-dive/commit/8392a075a89414d83e89f25df3812b00004e33f2) - Warn when ignore files miss the catalog, and make its location configurable. The catalog hides itself from git with a nested `.gitignore`, but prettier, markdownlint, cspell, eslint, `docker build` and `npm pack` each read a single ignore file at the repository root, so its thousands of files quietly became their input. `scan`, `index` and `status` now check every root `.*ignore` file and warn about the ones that do not cover the catalog; the new `repo-dive ignore` command appends the entry to each of them (`--dry-run` to preview; existing files are amended, none created). New `catalog` config section: `catalog.dir` moves the catalog anywhere — pointing it outside the repository leaves the analyzed working tree untouched and skips the ignore-file check altogether — and `catalog.checkIgnoreFiles: false` silences the warning.
+
+- [#77](https://github.com/kachkaev/repo-dive/pull/77) [`691f385`](https://github.com/kachkaev/repo-dive/commit/691f385a22d520dfca81f018a102d426ee9c6d73) - Count lines by language in-process instead of shelling out to `tokei`, so both halves of the "Lines by language" chart describe the same code.
+
+  With "shade by year written" off, the chart came from `tokei`, which counts every file it recognizes — lockfiles, minified bundles, generated data. With the toggle on, it came from `git blame`, which only covers scannable source files. A repo whose largest `.json` or `.yaml` file is a lockfile therefore showed a huge language band that vanished the moment the toggle was ticked, and the totals disagreed in both directions.
+
+  The `languages` collector now counts lines itself, over exactly the file set `survival` blames, using the blob cache the `directives` and `todo-comments` collectors already share. Toggling shading now keeps every stack and every total identical — only the shading changes. Along the way:
+
+  - **No external dependency.** `tokei` no longer needs to be installed, and the collector no longer needs a worktree checkout: it reads blobs from the object database like the collectors around it.
+  - **Denser and faster.** It samples every commit instead of monthly, so the chart has a point per commit rather than a step per month.
+  - **One language map.** The extension → language mapping used to live in the dashboard for the shaded view and inside `tokei` for the flat one; it is now a single map in the CLI that both views are labelled from.
+
+  Lockfiles, minified bundles, `node_modules`/`dist`/`vendor` and generated files are excluded, as they always were for blame-based views — the chart is about code someone wrote. The collector version is bumped, so run `scan` again to recount; `gc --stale` clears the superseded snapshots.
+
+- [#76](https://github.com/kachkaev/repo-dive/pull/76) [`3b6b208`](https://github.com/kachkaev/repo-dive/commit/3b6b208263c600c08afe13fcb3f74997e77196f8) - Sample the `survival` collector monthly instead of quarterly, so code-survival charts (by cohort, by contributor, by language) plot a point per month like the rest of the dashboard rather than four per year. Scans cost roughly 3× more blame snapshots as a result; pass `scan --sample quarterly` to get the old cadence back on large repositories. Existing quarterly snapshots stay in the catalog and are reused — re-run `scan` to fill in the months between them, then `index`.
+
+### Patch Changes
+
+- [#74](https://github.com/kachkaev/repo-dive/pull/74) [`ff7894b`](https://github.com/kachkaev/repo-dive/commit/ff7894bc65804dc1ca5dd74306863e6c5e108977) - Rebuild the dashboard's controls on shadcn-style Base UI primitives.
+  The commit-calendar range dropdown, the "Shade by year written" checkboxes and the contributor-kind filter chips now use canonical shadcn components (select, checkbox, label, toggle group) backed by `@base-ui/react`, so they are keyboard-accessible, consistently styled in both themes and ready to be reused by future controls.
+  The commit calendar scrolls inside a shadcn scroll area with a slim themed scrollbar instead of the chunky native one (most visible on Windows).
+  The primitives live in `dashboard/src/app/shared/@ui-primitive/` and pick up their colors from the existing palette via shadcn-style semantic tokens, so no visual re-theming is required.
+  Interaction cues are tidied up along the way: the pointer cursor is reserved for links, and non-interactive elements (like the contributor bars) no longer light up on hover.
+
+- [#79](https://github.com/kachkaev/repo-dive/pull/79) [`b4239be`](https://github.com/kachkaev/repo-dive/commit/b4239be4e6f4388d05e3d0bace2d7b9e474a30cb) - Fix the commit-calendar cell stacks bailing out of React Compiler, restoring their build-time memoization.
+  The stacked rectangles are now assembled with a plain loop instead of reassigning a captured offset inside a `.map()` callback, which the compiler rejects — the calendar renders identically but its cells no longer re-render without memoization.
+
+- [#73](https://github.com/kachkaev/repo-dive/pull/73) [`8d7ee24`](https://github.com/kachkaev/repo-dive/commit/8d7ee24b76d697e1b0fd7680011316b587f3dbb1) - Align Effect usage with v4 community best practices.
+  Errors are now tagged classes with typed error channels, platform services are provided once at the CLI entrypoint, and concurrent scans collect results instead of mutating shared counters.
+
+  User-visible fixes that come with the alignment:
+
+  - `--help` exits 0 instead of 1.
+  - Ctrl+C in `gc` prompts is a clean interrupt (exit code 130) instead of an "Aborted." error.
+  - `--no-open` is now the built-in negation of a standard `--open` boolean flag (both spellings work; the default is unchanged).
+  - Errors keep printing as one friendly line on stderr.
+
+  Existing catalogs are unaffected — no re-scan needed.
+
 ## 0.6.0
 
 ### Minor Changes

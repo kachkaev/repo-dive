@@ -71,3 +71,6 @@ The `0.0.1` entries never named a hash and were left as plain prose.
 
 - Every user-visible change lands with a changeset (`pnpm changeset`).
 - CI (`ci.yaml`) runs the full check suite on every push/PR; `release.yaml` re-verifies build, lint and tests before versioning/publishing.
+- CI also reports how big the published tarball would be (`pnpm report-package-size`, backed by `npm pack --dry-run`) in the job summary.
+  The baseline it compares against travels between runs as a GitHub Actions cache that only `main` writes to, so a pull request sees the growth its own changes introduce rather than the drift since its previous run.
+  Nothing fails on size — the report exists so that a jump from an added dependency or a bundle that stopped being tree-shaken is noticed before it ships.

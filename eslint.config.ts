@@ -21,6 +21,13 @@ export default defineConfig([
   },
 
   {
+    files: ["scripts/**/*.ts"],
+    rules: {
+      "@typescript-eslint/consistent-type-assertions": "off", // `npm pack --json` and the size baseline we wrote ourselves cross a trusted local boundary; a cast beats hand-validating tool output.
+    },
+  },
+
+  {
     files: ["src/**/*.ts"],
     rules: {
       "@typescript-eslint/explicit-module-boundary-types": "off", // Effect-heavy APIs infer large Effect<Success, Error, Requirements> signatures; repeating them adds noise.
