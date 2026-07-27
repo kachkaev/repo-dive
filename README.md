@@ -4,7 +4,7 @@ _Dive into a git repository's history: per-commit snapshots, an indexed metrics 
 
 [![npm version](https://img.shields.io/npm/v/repo-dive?logo=npm&color=3c7ef6&labelColor=333)](https://www.npmjs.com/package/repo-dive)
 [![npm downloads](https://img.shields.io/npm/dm/repo-dive?logo=npm&color=3c7ef6&labelColor=333)](https://www.npmjs.com/package/repo-dive)
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-3c7ef6?labelColor=333)](LICENSE.md)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-3c7ef6?logo=opensourceinitiative&logoColor=white&labelColor=333)](LICENSE.md)
 [![Effect](https://img.shields.io/badge/Effect-v4-3c7ef6?logo=effect&logoColor=white&labelColor=333)](https://effect.website)
 [![MCP](https://img.shields.io/badge/MCP-ready-3c7ef6?logo=modelcontextprotocol&logoColor=white&labelColor=333)](#ai-agents-mcp)
 
