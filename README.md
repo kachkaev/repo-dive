@@ -151,7 +151,7 @@ pnpm fix
 To see how heavy the published package would be:
 
 ```sh
-pnpm build && pnpm report:package-size
+pnpm build && pnpm report-package-size
 ```
 
 It prints the tarball and unpacked sizes with a per-file breakdown, comparing them against the previous measurement.

@@ -180,15 +180,15 @@ jobs:
           restore-keys: |
             package-size-
 
-      - name: Run pnpm report:package-size
+      - name: Run pnpm report-package-size
         if: ${{ success() || failure() }}
         run: |
-          if ! pnpm report:package-size; then
+          if ! pnpm report-package-size; then
             echo ''
             echo ''
             echo 'ℹ️ ℹ️ ℹ️'
             echo 'Measuring the publishable npm package failed.'
-            echo 'Try running `pnpm build && pnpm report:package-size` locally.'
+            echo 'Try running `pnpm build && pnpm report-package-size` locally.'
             echo 'ℹ️ ℹ️ ℹ️'
             exit 1
           fi

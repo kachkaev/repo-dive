@@ -69,7 +69,7 @@
     "lint:tsc": "tsc --noEmit && tsc -p dashboard --noEmit",
     "prepack": "pnpm build",
     "prepare": "node .husky/install.mjs",
-    "report:package-size": "node scripts/report-package-size.ts",
+    "report-package-size": "node scripts/report-package-size.ts",
     "test": "vitest run"
   },
   "lint-staged": {
