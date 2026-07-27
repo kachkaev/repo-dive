@@ -5,7 +5,7 @@ import path from "node:path";
 import { Console, Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
-import { catalogDirName } from "./catalog.ts";
+import { loadConfig } from "./config.ts";
 import {
   DashboardUnavailableError,
   openInBrowser,
@@ -29,12 +29,8 @@ export const runReport = ({
 }): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
-    const dataPath = path.join(
-      repoRoot,
-      catalogDirName,
-      "index",
-      "dashboard.json",
-    );
+    const { catalogPath } = yield* loadConfig(repoRoot);
+    const dataPath = path.join(catalogPath, "index", "dashboard.json");
     if (!existsSync(dataPath)) {
       return yield* new DashboardUnavailableError({
         reason: `No dashboard data at ${dataPath} — run \`repo-dive scan\` and \`repo-dive index\` first.`,
@@ -91,7 +87,7 @@ export const runReport = ({
     });
 
     const resolvedOutPath =
-      outPath ?? path.join(repoRoot, catalogDirName, "index", "report.html");
+      outPath ?? path.join(catalogPath, "index", "report.html");
     yield* Effect.tryPromise(() => writeFile(resolvedOutPath, html, "utf8"));
 
     yield* Console.log(

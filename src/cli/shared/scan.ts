@@ -23,6 +23,7 @@ import {
 } from "./collectors.ts";
 import { loadConfig } from "./config.ts";
 import { type CommandError, runGit } from "./git.ts";
+import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import {
   parseSamplingPolicy,
   sampleCommits,
@@ -183,7 +184,13 @@ const runCollector = ({
   ChildProcessSpawner.ChildProcessSpawner
 > =>
   collector
-    .collect({ repoRoot: catalog.repoRoot, sha, cacheKey, worktreePath })
+    .collect({
+      repoRoot: catalog.repoRoot,
+      catalogPath: catalog.rootPath,
+      sha,
+      cacheKey,
+      worktreePath,
+    })
     .pipe(
       Effect.mapError(
         (cause) =>
@@ -331,12 +338,16 @@ export const runScan = ({
     const selected =
       maxCommits === undefined ? commits : commits.slice(0, maxCommits);
 
-    const catalog = yield* openCatalog(repoRoot);
+    // Loaded before the catalog is opened: the config decides where it lives.
+    // One fingerprint per collector for the whole run follows from it too — the
+    // config is fixed, so it decides re-collection uniformly across commits.
+    const config = yield* loadConfig(repoRoot);
+    const catalog = yield* openCatalog({
+      repoRoot,
+      catalogPath: config.catalogPath,
+    });
     const summary = summarizeCommits(commits);
 
-    // One fingerprint per collector for the whole run: the config it depends on
-    // is fixed, so this decides re-collection uniformly across every commit.
-    const config = yield* loadConfig(repoRoot);
     const cacheKeys = new Map(
       collectors.map((collector) => [
         collector.name,
@@ -522,4 +533,6 @@ export const runScan = ({
         ].join("\n"),
       );
     }
+
+    yield* warnAboutIgnoreFiles({ repoRoot, config });
   });

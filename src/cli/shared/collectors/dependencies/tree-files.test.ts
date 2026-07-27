@@ -42,6 +42,7 @@ it.effect(
 
       const results = yield* scanTreeFilesWithBlobCache({
         repoRoot: repoPath,
+        catalogPath: path.join(repoPath, ".repo-dive"),
         sha,
         collectorName: "test",
         cacheKey: "v1",

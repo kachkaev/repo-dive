@@ -4,8 +4,8 @@ import path from "node:path";
 import { Data, DateTime, Effect } from "effect";
 
 import type { Collector } from "./collectors.ts";
+import { defaultCatalogDirName } from "./config.ts";
 
-export const catalogDirName = ".repo-dive";
 /** Catalog folder used before the tool was renamed from repo-insighter in 0.4.0. */
 const legacyCatalogDirName = ".repo-insighter";
 const catalogFormatVersion = 1;
@@ -35,7 +35,7 @@ type CollectorSidecar = {
 export const legacyCatalogHint = (legacyRootPath: string) =>
   `Found a catalog at ${legacyRootPath}, left by repo-insighter (this tool's former name). ` +
   "Rename it to keep everything already collected:\n" +
-  `  mv ${legacyCatalogDirName} ${catalogDirName}\n` +
+  `  mv ${legacyCatalogDirName} ${defaultCatalogDirName}\n` +
   "Or delete it to collect from scratch.";
 
 class LegacyCatalogError extends Data.TaggedError("LegacyCatalogError")<{
@@ -109,16 +109,28 @@ export const findLegacyCatalog = (
 };
 
 /**
- * Opens (creating if needed) the catalog folder at the root of the analyzed
- * repository. The catalog ignores itself via its own .gitignore.
+ * Opens (creating if needed) the catalog folder of the analyzed repository —
+ * `.repo-dive` at its root unless `catalog.dir` says otherwise. The catalog
+ * ignores itself via its own .gitignore; other tools' ignore files are the
+ * concern of `ignore-files.ts`.
  */
-export const openCatalog = (repoRoot: string): Effect.Effect<Catalog, Error> =>
+export const openCatalog = ({
+  repoRoot,
+  catalogPath,
+}: {
+  readonly repoRoot: string;
+  readonly catalogPath: string;
+}): Effect.Effect<Catalog, Error> =>
   Effect.gen(function* () {
-    const rootPath = path.join(repoRoot, catalogDirName);
+    const rootPath = catalogPath;
     const manifestPath = path.join(rootPath, "catalog.json");
     const manifest = yield* readJsonIfExists(manifestPath);
 
-    if (manifest === undefined) {
+    // A relocated catalog has no history under the former name to inherit.
+    if (
+      manifest === undefined &&
+      rootPath === path.resolve(repoRoot, defaultCatalogDirName)
+    ) {
       const legacyRootPath = yield* findLegacyCatalog(repoRoot);
       if (legacyRootPath !== undefined) {
         return yield* new LegacyCatalogError({ legacyRootPath });
@@ -128,9 +140,23 @@ export const openCatalog = (repoRoot: string): Effect.Effect<Catalog, Error> =>
     yield* Effect.tryPromise(() => mkdir(rootPath, { recursive: true }));
 
     if (manifest === undefined) {
-      yield* Effect.tryPromise(() =>
-        writeFile(path.join(rootPath, ".gitignore"), "*\n", "utf8"),
-      );
+      // `wx`: a .gitignore already sitting in a user-chosen `catalog.dir` is
+      // the user's file, not this scaffold's to overwrite.
+      yield* Effect.tryPromise(async () => {
+        try {
+          await writeFile(path.join(rootPath, ".gitignore"), "*\n", {
+            encoding: "utf8",
+            flag: "wx",
+          });
+        } catch (error) {
+          if (
+            !(error instanceof Error && "code" in error) ||
+            error.code !== "EEXIST"
+          ) {
+            throw error;
+          }
+        }
+      });
       const now = yield* DateTime.now;
       yield* writeJson(manifestPath, {
         formatVersion: catalogFormatVersion,
