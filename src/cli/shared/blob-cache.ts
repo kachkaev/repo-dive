@@ -2,8 +2,6 @@ import { existsSync, mkdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { catalogDirName } from "./catalog.ts";
-
 /**
  * Content-addressed cache for per-blob collector results. Identical blobs
  * appear in thousands of commits, so content-derived metrics (directives,
@@ -31,18 +29,18 @@ const openCaches = new Map<
 /** Bump when the table shape changes; a mismatch drops the cache and rebuilds. */
 const schemaVersion = 2;
 
-const blobCachePath = (repoRoot: string) =>
-  path.join(repoRoot, catalogDirName, "cache", "blob-cache.sqlite");
+const blobCachePath = (catalogPath: string) =>
+  path.join(catalogPath, "cache", "blob-cache.sqlite");
 
-export const getBlobCache = (repoRoot: string): BlobCache => {
-  const existing = openCaches.get(repoRoot);
+export const getBlobCache = (catalogPath: string): BlobCache => {
+  const existing = openCaches.get(catalogPath);
   if (existing) {
     return existing.cache;
   }
 
-  const cacheDir = path.join(repoRoot, catalogDirName, "cache");
+  const cacheDir = path.join(catalogPath, "cache");
   mkdirSync(cacheDir, { recursive: true });
-  const db = new DatabaseSync(blobCachePath(repoRoot));
+  const db = new DatabaseSync(blobCachePath(catalogPath));
   db.exec("PRAGMA journal_mode = WAL");
   // The result column is content-derived and cheap to recompute, so on any
   // schema change we simply drop it rather than migrate.
@@ -96,7 +94,7 @@ export const getBlobCache = (repoRoot: string): BlobCache => {
       }
     },
   };
-  openCaches.set(repoRoot, { db, cache });
+  openCaches.set(catalogPath, { db, cache });
   return cache;
 };
 
@@ -113,8 +111,8 @@ export type BlobCacheNamespace = {
 };
 
 /** Bytes the cache occupies, counting the write-ahead log SQLite keeps beside it. */
-const blobCacheSizeBytes = (repoRoot: string): number => {
-  const base = blobCachePath(repoRoot);
+const blobCacheSizeBytes = (catalogPath: string): number => {
+  const base = blobCachePath(catalogPath);
   return ["", "-wal", "-shm"]
     .map((suffix) => `${base}${suffix}`)
     .reduce(
@@ -125,17 +123,17 @@ const blobCacheSizeBytes = (repoRoot: string): number => {
 };
 
 /** Opens the cache file for maintenance, or `undefined` when there is none. */
-const openForMaintenance = (repoRoot: string): DatabaseSync | undefined => {
-  const filePath = blobCachePath(repoRoot);
+const openForMaintenance = (catalogPath: string): DatabaseSync | undefined => {
+  const filePath = blobCachePath(catalogPath);
   if (!existsSync(filePath)) {
     return undefined;
   }
   // A connection this process opened earlier would hold locks that block
   // VACUUM, and would keep serving rows this call is about to delete.
-  const open = openCaches.get(repoRoot);
+  const open = openCaches.get(catalogPath);
   if (open) {
     open.db.close();
-    openCaches.delete(repoRoot);
+    openCaches.delete(catalogPath);
   }
   const db = new DatabaseSync(filePath);
   const table = db
@@ -152,9 +150,9 @@ const openForMaintenance = (repoRoot: string): DatabaseSync | undefined => {
 
 /** What the cache currently holds, one row per (collector, fingerprint) pair. */
 export const listBlobCacheNamespaces = (
-  repoRoot: string,
+  catalogPath: string,
 ): BlobCacheNamespace[] => {
-  const db = openForMaintenance(repoRoot);
+  const db = openForMaintenance(catalogPath);
   if (!db) {
     return [];
   }
@@ -182,7 +180,7 @@ export const listBlobCacheNamespaces = (
  * a re-scan of the blobs involved — never any recorded data.
  */
 export const pruneBlobCacheNamespaces = (
-  repoRoot: string,
+  catalogPath: string,
   namespaces: ReadonlyArray<{
     readonly collector: string;
     readonly cacheKey: string;
@@ -191,8 +189,8 @@ export const pruneBlobCacheNamespaces = (
   if (namespaces.length === 0) {
     return 0;
   }
-  const sizeBefore = blobCacheSizeBytes(repoRoot);
-  const db = openForMaintenance(repoRoot);
+  const sizeBefore = blobCacheSizeBytes(catalogPath);
+  const db = openForMaintenance(catalogPath);
   if (!db) {
     return 0;
   }
@@ -216,5 +214,5 @@ export const pruneBlobCacheNamespaces = (
   } finally {
     db.close();
   }
-  return Math.max(0, sizeBefore - blobCacheSizeBytes(repoRoot));
+  return Math.max(0, sizeBefore - blobCacheSizeBytes(catalogPath));
 };

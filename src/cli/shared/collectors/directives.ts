@@ -168,9 +168,10 @@ export const directivesCollector: Collector = {
   version: "1",
   strategy: "tree",
   defaultSampling: "all",
-  collect: ({ repoRoot, sha, cacheKey }) =>
+  collect: ({ repoRoot, catalogPath, sha, cacheKey }) =>
     scanTreeWithBlobCache({
       repoRoot,
+      catalogPath,
       sha,
       collectorName: "directives",
       cacheKey,

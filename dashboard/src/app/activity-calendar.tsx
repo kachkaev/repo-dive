@@ -1,6 +1,13 @@
 import { useId, useState } from "react";
 
 import type { ContributorKind } from "../data.ts";
+import { ScrollArea } from "./shared/@ui-primitive/scroll-area.tsx";
+import {
+  kindColors,
+  type KindFilter,
+  KindFilterChips,
+  kindNouns,
+} from "./shared/contributor-kinds.tsx";
 import { formatMonth, monthShortNames } from "./shared/format.ts";
 
 export type WeekStart = "monday" | "sunday";
@@ -23,7 +30,7 @@ export type CalendarRange =
   | `year-${number}`;
 
 /** Which author kind the calendar shows; "all" stacks every kind per cell. */
-export type CalendarKindFilter = "all" | ContributorKind;
+export type CalendarKindFilter = KindFilter;
 
 const dayMs = 86_400_000;
 const binSize = 12;
@@ -36,26 +43,6 @@ const gapColumns = 2;
 const dayLabels: Record<WeekStart, string[]> = {
   monday: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
   sunday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-};
-
-/** The reserved contributor-kind colors (see styles.css). */
-const kindColors: Record<ContributorKind, string> = {
-  human: "var(--kind-human)",
-  bot: "var(--kind-bot)",
-  ai: "var(--kind-ai)",
-};
-
-const kindFilterLabels: Record<Exclude<CalendarKindFilter, "all">, string> = {
-  human: "Humans",
-  bot: "Bots",
-  ai: "AI agents",
-};
-
-/** Qualifies a count once a single kind is filtered: "4 bot commits". */
-const kindNouns: Record<Exclude<CalendarKindFilter, "all">, string> = {
-  human: "human",
-  bot: "bot",
-  ai: "AI-agent",
 };
 
 /**
@@ -317,17 +304,24 @@ function CellStack({
     parts.map((part) => part.value),
     cellSize,
   );
+  const segments: Array<{ part: StackPart; partHeight: number; topY: number }> =
+    [];
   let nextTopY = y + cellSize;
-  const rects = parts
-    .map((part, index) => ({ part, partHeight: heights[index] ?? 0 }))
-    .filter(({ partHeight }) => partHeight > 0)
-    .map(({ part, partHeight }) => {
-      nextTopY -= partHeight;
-      return (
+  for (const [index, part] of parts.entries()) {
+    const partHeight = heights[index] ?? 0;
+    if (partHeight <= 0) {
+      continue;
+    }
+    nextTopY -= partHeight;
+    segments.push({ part, partHeight, topY: nextTopY });
+  }
+  return (
+    <g opacity={levelOpacities[level]} clipPath={`url(#${clipId})`}>
+      {segments.map(({ part, partHeight, topY }) => (
         <g key={`${part.kind}-${String(part.hatched)}`}>
           <rect
             x={x}
-            y={nextTopY}
+            y={topY}
             width={cellSize}
             height={partHeight}
             fill={kindColors[part.kind]}
@@ -335,18 +329,14 @@ function CellStack({
           {part.hatched && (
             <rect
               x={x}
-              y={nextTopY}
+              y={topY}
               width={cellSize}
               height={partHeight}
               fill={`url(#${hatchId})`}
             />
           )}
         </g>
-      );
-    });
-  return (
-    <g opacity={levelOpacities[level]} clipPath={`url(#${clipId})`}>
-      {rects}
+      ))}
     </g>
   );
 }
@@ -630,52 +620,18 @@ export function CommitCalendar({
   const legendColor =
     kindFilter === "all" ? kindColors.human : kindColors[kindFilter];
 
-  const filterOptions: CalendarKindFilter[] = [
-    "all",
-    ...(["human", "bot", "ai"] as const).filter((kind) =>
-      presentKinds.has(kind),
-    ),
-  ];
-
   return (
     <div>
-      {presentKinds.size > 1 && (
-        <div
-          role="group"
-          aria-label="Filter calendar by contributor kind"
-          className="mb-3 flex flex-wrap gap-1.5"
-        >
-          {filterOptions.map((option) => (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={kindFilter === option}
-              onClick={() => {
-                onKindFilterChange(option);
-              }}
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${
-                kindFilter === option
-                  ? "border-(--text-muted) bg-(--surface-2) text-(--text-primary)"
-                  : "cursor-pointer border-(--grid-line) text-(--text-secondary) hover:text-(--text-primary)"
-              }`}
-            >
-              <span
-                className="inline-block size-2.5 rounded-xs"
-                style={{
-                  background:
-                    option === "all"
-                      ? // Mirrors a cell's stacking order, top-down.
-                        `linear-gradient(to bottom, ${kindColors.human} 0 34%, ${kindColors.ai} 34% 67%, ${kindColors.bot} 67% 100%)`
-                      : kindColors[option],
-                }}
-              />
-              {option === "all" ? "All" : kindFilterLabels[option]}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="overflow-x-auto">
-        <div className="flex w-max min-w-full flex-col gap-3">
+      <KindFilterChips
+        label="Filter calendar by contributor kind"
+        value={kindFilter}
+        onChange={onKindFilterChange}
+        presentKinds={presentKinds}
+      />
+      <ScrollArea>
+        {/* pb clears the overlay horizontal scrollbar (h-2.5) so it never
+            covers the last strip's bottom day row. */}
+        <div className="flex w-max min-w-full flex-col gap-3 pb-2.5">
           {layouts.map(({ title, layout }) => (
             <CalendarStrip
               key={title}
@@ -688,7 +644,7 @@ export function CommitCalendar({
             />
           ))}
         </div>
-      </div>
+      </ScrollArea>
       <div className="mt-2 flex items-center justify-between gap-4 text-xs text-(--text-secondary)">
         <span className="tabular-nums">
           {hovered ? describe(hovered) : rangeSummary}

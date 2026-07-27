@@ -451,7 +451,7 @@ export function TimeSeriesChart({
                 className={`px-2 py-0.5 ${
                   percentMode === option.percent
                     ? "bg-(--surface-2) font-medium"
-                    : "cursor-pointer text-(--text-muted) hover:text-(--text-secondary)"
+                    : "text-(--text-muted) hover:text-(--text-secondary)"
                 }`}
               >
                 {option.label}

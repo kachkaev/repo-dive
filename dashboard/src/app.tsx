@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import {
   type CalendarKindFilter,
@@ -6,7 +6,26 @@ import {
   CommitCalendar,
 } from "./app/activity-calendar.tsx";
 import { BarList } from "./app/bar-list.tsx";
+import {
+  ContributorBars,
+  type ContributorBarsItem,
+} from "./app/contributor-bars.tsx";
 import { DivergingBars } from "./app/diverging-bars.tsx";
+import { Checkbox } from "./app/shared/@ui-primitive/checkbox.tsx";
+import { Label } from "./app/shared/@ui-primitive/label.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./app/shared/@ui-primitive/select.tsx";
+import {
+  kindBadge,
+  kindColors,
+  type KindFilter,
+  KindFilterChips,
+} from "./app/shared/contributor-kinds.tsx";
 import {
   formatBytes,
   formatCount,
@@ -15,7 +34,7 @@ import {
 } from "./app/shared/format.ts";
 import { DataTable, Section, StatTile } from "./app/shared/primitives.tsx";
 import { type TimePoint, TimeSeriesChart } from "./app/time-stack-chart.tsx";
-import type { DashboardData } from "./data.ts";
+import type { ContributorKind, DashboardData } from "./data.ts";
 
 const categoricalColors = Array.from(
   { length: 20 },
@@ -270,36 +289,29 @@ function YearShadeToggle({
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  const id = useId();
   return (
-    <label className="mb-3 flex w-fit items-center gap-2 text-xs text-(--text-secondary) select-none">
-      <input
-        type="checkbox"
+    <div className="mb-3 flex w-fit items-center gap-2">
+      <Checkbox
+        id={id}
         checked={checked}
-        onChange={(event) => {
-          onChange(event.target.checked);
+        onCheckedChange={(value) => {
+          onChange(value);
         }}
-        className="size-3.5 accent-(--series-1)"
+        className="size-3.5"
       />
-      Shade by year written
-    </label>
+      <Label
+        htmlFor={id}
+        className="text-xs font-normal text-(--text-secondary)"
+      >
+        Shade by year written
+      </Label>
+    </div>
   );
 }
 
 /** Falls back when serving a dashboard.json written before configurable caps. */
 const defaultMaxContributorsInCharts = 10;
-
-/** Icon + label for non-human contributor kinds; humans get no badge. */
-const kindBadge: Record<"bot" | "ai", { icon: string; title: string }> = {
-  bot: { icon: "🤖", title: "Bot" },
-  ai: { icon: "✨", title: "AI agent" },
-};
-
-/** The reserved contributor-kind colors (see styles.css). */
-const kindColors = {
-  human: "var(--kind-human)",
-  bot: "var(--kind-bot)",
-  ai: "var(--kind-ai)",
-} as const;
 
 /**
  * Survival series that indexing folds non-human contributors into (must match
@@ -359,12 +371,6 @@ const survivalBaseColorOf = (label: string, rank: number): string =>
 export function App({ data }: { data: DashboardData }) {
   const maxContributorsInCharts =
     data.config?.contributors.maxInCharts ?? defaultMaxContributorsInCharts;
-  const humanContributors = data.contributors.filter(
-    (contributor) => (contributor.kind ?? "human") === "human",
-  );
-  const nonHumanContributors = data.contributors.filter(
-    (contributor) => contributor.kind === "bot" || contributor.kind === "ai",
-  );
   const latestLanguages = data.languages.at(-1);
   const latestDirectives = data.directives.at(-1);
   const latestFileTypes = data.fileTypes.at(-1);
@@ -377,6 +383,58 @@ export function App({ data }: { data: DashboardData }) {
   // Lifted out of CommitCalendar so it survives the remount on range change.
   const [calendarKindFilter, setCalendarKindFilter] =
     useState<CalendarKindFilter>("all");
+  const [contributorKindFilter, setContributorKindFilter] =
+    useState<KindFilter>("all");
+  const calendarRangeSelectId = useId();
+
+  // The contributor list spans the whole history: it is already sampled by
+  // contributor (capped per kind at index time), so sampling it by time too
+  // would only blur what the bars are for.
+  const contributorItems: ContributorBarsItem[] = data.contributors.map(
+    (contributor) => ({
+      // Email alone isn't unique: bots and AI agents are identified by name too
+      // (several Claude releases share noreply@anthropic.com), matching how
+      // indexing buckets them.
+      id: `${contributor.name} <${contributor.email}>`,
+      label: contributor.name || contributor.email,
+      href: contributor.url,
+      kind: contributor.kind ?? "human",
+      authored: contributor.commits,
+      assistedBy: contributor.assistedBy ?? {},
+      assisted: contributor.assisted ?? {},
+    }),
+  );
+  const contributorKinds = new Set<ContributorKind>(
+    contributorItems.map((item) => item.kind),
+  );
+  const filteredContributorItems = contributorItems
+    .filter(
+      (item) =>
+        contributorKindFilter === "all" || item.kind === contributorKindFilter,
+    )
+    .slice(0, maxContributorsInCharts * 2);
+
+  // Fixed ranges first, then one entry per year of history, newest first.
+  const calendarRangeItems: Array<{ value: CalendarRange; label: string }> = [
+    { value: "last-12-months", label: "Last 12 months" },
+    { value: "this-year", label: "This year" },
+    { value: "last-3-years", label: "Last 3 years" },
+    { value: "all-years", label: "All years" },
+    ...(data.repo.firstCommitDate
+      ? Array.from(
+          {
+            length:
+              Number(data.generatedAt.slice(0, 4)) -
+              Number(data.repo.firstCommitDate.slice(0, 4)) +
+              1,
+          },
+          (_, index) => Number(data.generatedAt.slice(0, 4)) - index,
+        ).map((year) => ({
+          value: `year-${year}` as const,
+          label: `${year}`,
+        }))
+      : []),
+  ];
 
   // Repo inception, used to anchor charts whose series start mid-history (e.g.
   // dependencies, tracked only once a lockfile exists) to the full timeline.
@@ -791,34 +849,45 @@ export function App({ data }: { data: DashboardData }) {
           title="Commit calendar"
           subtitle="commits per day; days bucketed by the author's local date"
           controls={
-            <label className="mb-3 flex w-fit items-center gap-2 text-xs text-(--text-secondary)">
-              Range
-              <select
-                value={calendarRange}
-                onChange={(event) => {
-                  setCalendarRange(event.target.value as CalendarRange);
-                }}
-                className="rounded-md border border-(--grid-line) bg-(--surface-1) px-2 py-1"
+            <div className="mb-3 flex w-fit items-center gap-2">
+              <Label
+                htmlFor={calendarRangeSelectId}
+                className="text-xs font-normal text-(--text-secondary)"
               >
-                <option value="last-12-months">Last 12 months</option>
-                <option value="this-year">This year</option>
-                <option value="last-3-years">Last 3 years</option>
-                <option value="all-years">All years</option>
-                {Array.from(
-                  {
-                    length:
-                      Number(data.generatedAt.slice(0, 4)) -
-                      Number(data.repo.firstCommitDate.slice(0, 4)) +
-                      1,
-                  },
-                  (_, index) => Number(data.generatedAt.slice(0, 4)) - index,
-                ).map((year) => (
-                  <option key={year} value={`year-${year}`}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </label>
+                Range
+              </Label>
+              <Select
+                value={calendarRange}
+                onValueChange={(value) => {
+                  // null is the "cleared" value; the range select always has one.
+                  if (value !== null) {
+                    setCalendarRange(value);
+                  }
+                }}
+                items={calendarRangeItems}
+              >
+                <SelectTrigger
+                  id={calendarRangeSelectId}
+                  size="sm"
+                  // No height override: the sm variant's data-[size=sm]:h-8
+                  // out-specifies any bare h-* utility passed here.
+                  className="px-2 py-1 text-xs"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {calendarRangeItems.map((item) => (
+                    <SelectItem
+                      key={item.value}
+                      value={item.value}
+                      className="text-xs"
+                    >
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           }
         >
           <CommitCalendar
@@ -913,26 +982,19 @@ export function App({ data }: { data: DashboardData }) {
         </Section>
       )}
 
-      {data.aiIdentities.length > 0 && (
-        <Section
-          title="AI co-authors"
-          subtitle="commits co-authored per AI identity"
-        >
-          <BarList
-            items={data.aiIdentities.map((row) => ({
-              id: row.identity,
-              label: row.identity,
-              value: row.commits,
-            }))}
-            color={kindColors.ai}
-          />
-        </Section>
-      )}
-
       <Section
         title="Contributors"
-        subtitle="human contributors by commit count"
+        subtitle="whole history; per contributor: commits authored above, commits co-authored for others below — hatching marks cross-kind collaboration"
+        controls={
+          <KindFilterChips
+            label="Filter contributors by kind"
+            value={contributorKindFilter}
+            onChange={setContributorKindFilter}
+            presentKinds={contributorKinds}
+          />
+        }
       >
+        <ContributorBars items={filteredContributorItems} />
         <DataTable
           caption={`All ${data.contributors.length} listed contributors`}
           header={["contributor", "commits", "added", "deleted"]}
@@ -971,33 +1033,6 @@ export function App({ data }: { data: DashboardData }) {
             formatCount(contributor.deleted),
           ])}
         />
-        <BarList
-          color={kindColors.human}
-          items={humanContributors
-            .slice(0, maxContributorsInCharts * 2)
-            .map((contributor) => ({
-              id: contributor.email,
-              label: contributor.name || contributor.email,
-              value: contributor.commits,
-              href: contributor.url,
-            }))}
-        />
-        {nonHumanContributors.length > 0 && (
-          <>
-            <h3 className="mt-6 mb-2 text-sm font-medium text-(--text-secondary)">
-              Bots &amp; AI agents
-            </h3>
-            <BarList
-              items={nonHumanContributors.map((contributor) => ({
-                id: contributor.email,
-                label: `${kindBadge[contributor.kind === "ai" ? "ai" : "bot"].icon} ${contributor.name || contributor.email}`,
-                value: contributor.commits,
-                href: contributor.url,
-                color: kindColors[contributor.kind === "ai" ? "ai" : "bot"],
-              }))}
-            />
-          </>
-        )}
       </Section>
     </main>
   );

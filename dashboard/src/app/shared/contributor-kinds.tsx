@@ -1,4 +1,5 @@
 import type { ContributorKind } from "../../data.ts";
+import { ToggleGroup, ToggleGroupItem } from "./@ui-primitive/toggle-group.tsx";
 
 /** The reserved contributor-kind colors (see styles.css). */
 export const kindColors: Record<ContributorKind, string> = {
@@ -58,7 +59,7 @@ export function KindFilterChips({
   presentKinds: ReadonlySet<ContributorKind>;
 }) {
   if (presentKinds.size <= 1) {
-    return undefined;
+    return;
   }
 
   const options: KindFilter[] = [
@@ -67,24 +68,27 @@ export function KindFilterChips({
   ];
 
   return (
-    <div
-      role="group"
+    <ToggleGroup
+      value={[value]}
+      onValueChange={(groupValue) => {
+        // Single-select semantics on an array-valued group: re-clicking the
+        // pressed chip yields [] — keep the current filter (one is always
+        // active) rather than allowing an empty selection.
+        const next = groupValue.at(-1);
+        if (typeof next === "string") {
+          onChange(next as KindFilter);
+        }
+      }}
       aria-label={label}
-      className="mb-3 flex flex-wrap gap-1.5"
+      variant="outline"
+      size="sm"
+      className="mb-3 flex-wrap gap-1.5"
     >
       {options.map((option) => (
-        <button
+        <ToggleGroupItem
           key={option}
-          type="button"
-          aria-pressed={value === option}
-          onClick={() => {
-            onChange(option);
-          }}
-          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${
-            value === option
-              ? "border-(--text-muted) bg-(--surface-2) text-(--text-primary)"
-              : "cursor-pointer border-(--grid-line) text-(--text-secondary) hover:text-(--text-primary)"
-          }`}
+          value={option}
+          className="h-auto gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-normal text-(--text-secondary) shadow-none hover:bg-transparent hover:text-(--text-primary) data-pressed:border-(--text-muted) data-pressed:text-(--text-primary)"
         >
           <span
             className="inline-block size-2.5 rounded-xs"
@@ -94,8 +98,8 @@ export function KindFilterChips({
             }}
           />
           {option === "all" ? "All" : kindLabels[option]}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

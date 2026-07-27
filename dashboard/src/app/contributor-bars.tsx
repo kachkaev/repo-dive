@@ -44,6 +44,9 @@ const gridTemplate = "1fr 3rem 2.75rem 2.75rem 2.75rem";
 const sumCounts = (counts: Partial<Record<ContributorKind, number>>): number =>
   Object.values(counts).reduce((total, count) => total + count, 0);
 
+const totalOf = (spans: ReadonlyArray<{ value: number }>): number =>
+  spans.reduce((total, span) => total + span.value, 0);
+
 /**
  * One bar: a base split into colored segments, overlaid with a hatch.
  *
@@ -71,17 +74,27 @@ function Bar({
   title: string;
 }) {
   const width = total === 0 ? 0 : Math.max(0.5, (total / max) * 100);
+  const denominator = Math.max(total, 1);
   // A commit helped by two kinds at once counts under both, so the spans can
   // sum above the bar. Scale them down together in that case: the exact
   // per-kind numbers live in the columns, and the tail stays inside the bar.
-  const hatchTotal = sumCounts(
-    Object.fromEntries(hatchSpans.map(({ kind, value }) => [kind, value])),
-  );
+  const hatchTotal = totalOf(hatchSpans);
   const hatchScale =
     hatchTotal > total && hatchTotal > 0 ? total / hatchTotal : 1;
 
-  let baseOffset = 0;
-  let hatchOffset = 0;
+  // Offsets are derived per piece rather than accumulated into a variable the
+  // map callbacks close over — that pattern silently bails React Compiler.
+  const basePieces = segments.map((segment, index) => ({
+    ...segment,
+    offsetPercent: (totalOf(segments.slice(0, index)) / denominator) * 100,
+    widthPercent: (segment.value / denominator) * 100,
+  }));
+  const hatchPieces = hatchSpans.map((span, index) => ({
+    ...span,
+    offsetPercent:
+      ((totalOf(hatchSpans.slice(0, index)) * hatchScale) / denominator) * 100,
+    widthPercent: ((span.value * hatchScale) / denominator) * 100,
+  }));
 
   return (
     <span
@@ -92,38 +105,30 @@ function Bar({
         className="absolute inset-y-0 left-0 overflow-hidden rounded-xs opacity-90 group-hover:opacity-100"
         style={{ width: `${width}%`, background: baseColor }}
       >
-        {segments.map(({ kind, value }) => {
-          const left = (baseOffset / Math.max(total, 1)) * 100;
-          baseOffset += value;
-          return (
-            <span
-              key={kind}
-              className="absolute inset-y-0"
-              style={{
-                left: `${left}%`,
-                width: `${(value / Math.max(total, 1)) * 100}%`,
-                background: kindColors[kind],
-              }}
-            />
-          );
-        })}
-        {hatchSpans.map(({ kind, value }) => {
-          const span = (value * hatchScale) / Math.max(total, 1);
-          hatchOffset += span;
-          return (
-            <span
-              key={kind}
-              className="absolute inset-y-0"
-              style={{
-                // Anchored to the right so the hatched tail always ends at the
-                // bar's tip, whichever kinds are present.
-                right: `${(hatchOffset - span) * 100}%`,
-                width: `${span * 100}%`,
-                backgroundImage: hatchOf(hatchColorOf(kind)),
-              }}
-            />
-          );
-        })}
+        {basePieces.map((piece) => (
+          <span
+            key={piece.kind}
+            className="absolute inset-y-0"
+            style={{
+              left: `${piece.offsetPercent}%`,
+              width: `${piece.widthPercent}%`,
+              background: kindColors[piece.kind],
+            }}
+          />
+        ))}
+        {hatchPieces.map((piece) => (
+          <span
+            key={piece.kind}
+            className="absolute inset-y-0"
+            style={{
+              // Anchored to the right so the hatched tail always ends at the
+              // bar's tip, whichever kinds are present.
+              right: `${piece.offsetPercent}%`,
+              width: `${piece.widthPercent}%`,
+              backgroundImage: hatchOf(hatchColorOf(piece.kind)),
+            }}
+          />
+        ))}
       </span>
     </span>
   );

@@ -10,7 +10,7 @@ import {
   type ChildProcessSpawner,
 } from "effect/unstable/process";
 
-import { catalogDirName } from "./catalog.ts";
+import { loadConfig } from "./config.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
 export class DashboardUnavailableError extends Data.TaggedError(
@@ -84,12 +84,8 @@ export const runDashboard = ({
 }): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
-    const dataPath = path.join(
-      repoRoot,
-      catalogDirName,
-      "index",
-      "dashboard.json",
-    );
+    const config = yield* loadConfig(repoRoot);
+    const dataPath = path.join(config.catalogPath, "index", "dashboard.json");
     if (!existsSync(dataPath)) {
       return yield* new DashboardUnavailableError({
         reason: `No dashboard data at ${dataPath} — run \`repo-dive scan\` and \`repo-dive index\` first.`,

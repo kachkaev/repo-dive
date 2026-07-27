@@ -24,6 +24,9 @@ export const defaultMaxInCharts = 10;
 
 export const defaultWeekStartsOn: WeekStart = "monday";
 
+/** Catalog folder, relative to the analyzed repository's root, unless configured otherwise. */
+export const defaultCatalogDirName = ".repo-dive";
+
 /**
  * Default port for the dashboard server. 2141 spells "DIVE" in Scrabble tile
  * values (D=2, I=1, V=4, E=1) — a nod to the project name. It sits in the
@@ -87,6 +90,16 @@ export type ResolvedConfig = {
   readonly maxInCharts: number;
   /** Which day calendar-shaped dashboard charts start the week on. */
   readonly weekStartsOn: WeekStart;
+  /** Absolute path of the catalog folder for this repository. */
+  readonly catalogPath: string;
+  /**
+   * The catalog's path relative to the repository root, in POSIX form and
+   * without a trailing slash — or `undefined` when it sits outside the
+   * repository, where no tool walking the repo can stumble into it.
+   */
+  readonly catalogRelativePath: string | undefined;
+  /** Whether to warn about root ignore files that do not cover the catalog. */
+  readonly checkIgnoreFiles: boolean;
 };
 
 /** Internal per-group metadata keyed by every email (and handle) in the group. */
@@ -113,16 +126,6 @@ const bareResolveContributor = (
     url: entry?.url,
     kind: entry?.kind ?? deriveContributorKind(`${name ?? ""} <${email}>`),
   };
-};
-
-/** The zero-config resolution: no aliases, default chart cap. */
-const defaultResolvedConfig: ResolvedConfig = {
-  // Wrapped (not a bare reference) to defer the cross-module lookup to call
-  // time — `indexing.ts` and this module import each other.
-  resolveContributor: (email, name) =>
-    bareResolveContributor(new Map(), email, name),
-  maxInCharts: defaultMaxInCharts,
-  weekStartsOn: defaultWeekStartsOn,
 };
 
 const configError = (message: string): Error =>
@@ -283,8 +286,68 @@ const parseWeekStartsOn = (value: unknown): WeekStart => {
   throw configError('`charts.weekStartsOn` must be "monday" or "sunday".');
 };
 
-/** Validates a raw imported config value and turns it into a {@link ResolvedConfig}. */
-export const resolveConfig = (raw: unknown): ResolvedConfig => {
+/**
+ * Resolves `catalog.dir` against the repository root. `gc` deletes whole
+ * subtrees under the result, so the two placements that would take the
+ * repository down with them are rejected outright rather than trusted.
+ */
+const parseCatalogPath = (value: unknown, repoRoot: string): string => {
+  if (
+    value !== undefined &&
+    (typeof value !== "string" || value.trim() === "")
+  ) {
+    throw configError("`catalog.dir` must be a non-empty string.");
+  }
+  const catalogPath = path.resolve(
+    repoRoot,
+    value === undefined ? defaultCatalogDirName : value.trim(),
+  );
+  if (catalogPath === path.resolve(repoRoot)) {
+    throw configError("`catalog.dir` must not be the repository root itself.");
+  }
+  const relative = path.relative(repoRoot, catalogPath);
+  if (relative === ".git" || relative.startsWith(`.git${path.sep}`)) {
+    throw configError("`catalog.dir` must not be inside `.git`.");
+  }
+  return catalogPath;
+};
+
+/**
+ * The catalog's location as seen from inside the repository, or `undefined`
+ * when it is stored elsewhere — the case where nothing walking the repository
+ * can trip over it.
+ */
+const relativeCatalogPath = (
+  repoRoot: string,
+  catalogPath: string,
+): string | undefined => {
+  const relative = path.relative(repoRoot, catalogPath);
+  return relative === "" ||
+    relative.startsWith("..") ||
+    path.isAbsolute(relative)
+    ? undefined
+    : relative.split(path.sep).join("/");
+};
+
+const parseCheckIgnoreFiles = (value: unknown): boolean => {
+  if (value === undefined) {
+    return true;
+  }
+  if (typeof value !== "boolean") {
+    throw configError("`catalog.checkIgnoreFiles` must be a boolean.");
+  }
+  return value;
+};
+
+/**
+ * Validates a raw imported config value and turns it into a
+ * {@link ResolvedConfig}. `repoRoot` is needed because the catalog's location
+ * is configurable and only meaningful relative to the analyzed repository.
+ */
+export const resolveConfig = (
+  raw: unknown,
+  repoRoot: string,
+): ResolvedConfig => {
   if (!isPlainObject(raw)) {
     throw configError("the default export must be an object.");
   }
@@ -305,12 +368,27 @@ export const resolveConfig = (raw: unknown): ResolvedConfig => {
   const weekStartsOn = parseWeekStartsOn(
     charts === undefined ? undefined : prop(charts, "weekStartsOn"),
   );
+  const catalog = prop(raw, "catalog");
+  if (catalog !== undefined && !isPlainObject(catalog)) {
+    throw configError("`catalog` must be an object.");
+  }
+  const catalogPath = parseCatalogPath(
+    catalog === undefined ? undefined : prop(catalog, "dir"),
+    repoRoot,
+  );
 
   return {
+    // Wrapped (not a bare reference) to defer the cross-module lookup to call
+    // time — `indexing.ts` and this module import each other.
     resolveContributor: (email, name) =>
       bareResolveContributor(aliasMap, email, name),
     maxInCharts,
     weekStartsOn,
+    catalogPath,
+    catalogRelativePath: relativeCatalogPath(repoRoot, catalogPath),
+    checkIgnoreFiles: parseCheckIgnoreFiles(
+      catalog === undefined ? undefined : prop(catalog, "checkIgnoreFiles"),
+    ),
   };
 };
 
@@ -346,7 +424,7 @@ export const loadConfig = (
         error instanceof Error ? error : new Error(String(error)),
     });
     if (configPath === undefined) {
-      return defaultResolvedConfig;
+      return resolveConfig({}, repoRoot);
     }
 
     const raw = yield* Effect.tryPromise({
@@ -371,7 +449,7 @@ export const loadConfig = (
     }
 
     return yield* Effect.try({
-      try: () => resolveConfig(raw),
+      try: () => resolveConfig(raw, repoRoot),
       catch: (error) =>
         error instanceof Error ? error : new Error(String(error)),
     });

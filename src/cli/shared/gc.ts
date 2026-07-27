@@ -10,7 +10,7 @@ import {
   listBlobCacheNamespaces,
   pruneBlobCacheNamespaces,
 } from "./blob-cache.ts";
-import { catalogDirName, readCollectorCacheKey } from "./catalog.ts";
+import { readCollectorCacheKey } from "./catalog.ts";
 import {
   builtInCollectors,
   collectorCacheKey,
@@ -66,7 +66,8 @@ const buildPlan = (
   repoRoot: string,
 ): Effect.Effect<GcPlan, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
-    const catalogPath = path.join(repoRoot, catalogDirName);
+    const config = yield* loadConfig(repoRoot);
+    const catalogPath = config.catalogPath;
     const commitsPath = path.join(catalogPath, "commits");
     const catalogShas = yield* readdirIfExists(commitsPath);
 
@@ -77,7 +78,6 @@ const buildPlan = (
     );
     const firstParentShas = yield* listFirstParentShas(repoRoot);
 
-    const config = yield* loadConfig(repoRoot);
     const currentCacheKeys = new Map(
       builtInCollectors.map((collector) => [
         collector.name,
@@ -150,7 +150,7 @@ const buildPlan = (
       ),
     );
     const staleCacheNamespaces = (yield* Effect.try(() =>
-      listBlobCacheNamespaces(repoRoot),
+      listBlobCacheNamespaces(catalogPath),
     )).filter(
       (namespace) =>
         !liveNamespaces.has(`${namespace.collector}:${namespace.cacheKey}`),
@@ -413,7 +413,7 @@ export const runGc = ({
     const pruned = yield* pruneEmptyCommitDirs(plan.commitsPath);
     const cacheBytesReclaimed = pruneCacheNamespaces
       ? yield* Effect.try(() =>
-          pruneBlobCacheNamespaces(repoRoot, plan.staleCacheNamespaces),
+          pruneBlobCacheNamespaces(plan.catalogPath, plan.staleCacheNamespaces),
         )
       : 0;
 

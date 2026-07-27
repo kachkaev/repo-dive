@@ -6,7 +6,6 @@ import { Console, Data, Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import type { ContributorKind } from "../../config.ts";
-import { catalogDirName } from "./catalog.ts";
 import {
   builtInCollectors,
   describesTreeState,
@@ -17,6 +16,7 @@ import {
   normalizeContributorName,
   type ResolvedConfig,
 } from "./config.ts";
+import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import { languageOfExtension } from "./languages.ts";
 import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
@@ -338,19 +338,38 @@ const buildDashboardData = (
   };
   const contributorMap = new Map<string, ContributorBucket>();
   /**
-   * Fetches or creates a person's bucket. `observedName` is the name as spelled
-   * on this commit (author line or trailer): a configured displayName wins,
-   * otherwise the latest non-empty spelling sticks, tidied so a bot's `[bot]`
-   * suffix doesn't double up with its kind badge.
+   * The name as spelled on this commit (author line or trailer): a configured
+   * displayName wins, otherwise the observed spelling, tidied so a bot's
+   * `[bot]` suffix doesn't double up with its kind badge.
+   */
+  const nameOf = (
+    resolved: ReturnType<typeof config.resolveContributor>,
+    observedName: string,
+  ): string =>
+    resolved.displayName ??
+    (observedName ? normalizeContributorName(observedName) : resolved.label);
+
+  /**
+   * Fetches or creates a contributor's bucket.
+   *
+   * Humans key off their canonical email alone, so an alias group folds every
+   * spelling of one person together. Bots and AI agents key off their name too:
+   * they share vendor noreply addresses — "Claude Fable 5" and "Claude Opus
+   * 4.8" are both `<noreply@anthropic.com>` — and for them the name carries the
+   * identity worth telling apart. Giving such a group a `displayName` in the
+   * config merges them back into one.
    */
   const bucketFor = (
     resolved: ReturnType<typeof config.resolveContributor>,
     observedName: string,
   ): ContributorBucket => {
-    const key = resolved.canonicalEmail.toLowerCase();
+    const name = nameOf(resolved, observedName);
+    const email = resolved.canonicalEmail.toLowerCase();
+    const key =
+      resolved.kind === "human" ? email : `${name.toLowerCase()} ${email}`;
     const bucket = contributorMap.get(key) ?? {
       email: resolved.canonicalEmail,
-      name: resolved.label,
+      name,
       url: resolved.url,
       kind: resolved.kind,
       commits: 0,
@@ -359,9 +378,8 @@ const buildDashboardData = (
       assistedBy: {},
       assisted: {},
     };
-    bucket.name =
-      resolved.displayName ??
-      (observedName ? normalizeContributorName(observedName) : bucket.name);
+    // Humans keep the latest spelling; a non-human's is pinned by its key.
+    bucket.name = name;
     contributorMap.set(key, bucket);
     return bucket;
   };
@@ -376,31 +394,28 @@ const buildDashboardData = (
       commit.authorEmail,
       commit.authorName,
     );
-    const authorKey = author.canonicalEmail.toLowerCase();
     const authorBucket = bucketFor(author, commit.authorName);
     authorBucket.commits += 1;
     authorBucket.added += row.added;
     authorBucket.deleted += row.deleted;
 
-    // Only cross-kind help is recorded. A human thanking a human (or one agent
-    // crediting another) is ordinary collaboration; what these bars are for is
-    // the traffic *between* kinds. Self-credit is skipped for the same reason.
-    const helperKeys = new Set<string>();
-    const helperKinds = new Set<ContributorKind>();
+    // Only cross-kind help is recorded: a human thanking a human (or one agent
+    // crediting another) is ordinary collaboration, and what these bars show is
+    // the traffic *between* kinds. Crediting yourself is same-kind by
+    // definition, so that one check covers it too. The set dedupes a trailer
+    // repeated within one commit — help given twice is still one commit helped.
+    const helpers = new Set<ContributorBucket>();
     for (const identity of coAuthorsOf(commit)) {
       const { name, resolved } = resolveCoAuthor(identity);
-      const helperKey = resolved.canonicalEmail.toLowerCase();
-      if (
-        helperKey === authorKey ||
-        resolved.kind === author.kind ||
-        helperKeys.has(helperKey)
-      ) {
-        continue;
+      if (resolved.kind !== author.kind) {
+        helpers.add(bucketFor(resolved, name));
       }
-      helperKeys.add(helperKey);
-      helperKinds.add(resolved.kind);
-      const helper = bucketFor(resolved, name);
+    }
+
+    const helperKinds = new Set<ContributorKind>();
+    for (const helper of helpers) {
       helper.assisted[author.kind] = (helper.assisted[author.kind] ?? 0) + 1;
+      helperKinds.add(helper.kind);
     }
     // Counted once per helper *kind*, so one commit credited to two agents is
     // one AI-assisted commit rather than two.
@@ -538,7 +553,7 @@ export const runIndex = ({
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
     const config = yield* loadConfig(repoRoot);
-    const catalogPath = path.join(repoRoot, catalogDirName);
+    const catalogPath = config.catalogPath;
     const commitsPath = path.join(catalogPath, "commits");
     const registry = new Map(
       builtInCollectors.map((collector) => [collector.name, collector]),
@@ -650,4 +665,6 @@ export const runIndex = ({
           : []),
       ].join("\n"),
     );
+
+    yield* warnAboutIgnoreFiles({ repoRoot, config });
   });

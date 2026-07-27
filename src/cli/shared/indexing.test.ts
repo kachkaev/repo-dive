@@ -30,11 +30,12 @@ test("parseIdentity keeps a name-only trailer usable", () => {
 // Co-authors are classified by the very same derivation authors go through
 // (this replaced a separate `isAiCoAuthor` heuristic), so a trailer has to
 // survive the round trip through `parseIdentity` with its kind intact.
+const kindOf = (trailer: string) => {
+  const { name, email } = parseIdentity(trailer);
+  return deriveContributorKind(`${name} <${email}>`);
+};
+
 test("a co-author trailer keeps its kind through parseIdentity", () => {
-  const kindOf = (trailer: string) => {
-    const { name, email } = parseIdentity(trailer);
-    return deriveContributorKind(`${name} <${email}>`);
-  };
   expect(kindOf("Claude Fable 5 <noreply@anthropic.com>")).toBe("ai");
   expect(kindOf("GitHub Copilot <copilot@github.com>")).toBe("ai");
   expect(kindOf("Alice Example <alice@example.com>")).toBe("human");

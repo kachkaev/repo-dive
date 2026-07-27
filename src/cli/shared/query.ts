@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { Console, Effect, Schema } from "effect";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
-import { catalogDirName } from "./catalog.ts";
+import { loadConfig } from "./config.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
 /**
@@ -33,11 +33,11 @@ export type QueryResult = {
  * accepted, so the cube can never be mutated through this path.
  */
 const executeQuery = (
-  repoRoot: string,
+  catalogPath: string,
   sql: string,
   maxRows = 1000,
 ): QueryResult => {
-  const dbPath = path.join(repoRoot, catalogDirName, "index", "metrics.sqlite");
+  const dbPath = path.join(catalogPath, "index", "metrics.sqlite");
   if (!existsSync(dbPath)) {
     throw new Error(
       `No metrics cube at ${dbPath} — run \`repo-dive scan\` and \`repo-dive index\` first.`,
@@ -109,12 +109,12 @@ const formatTable = (result: QueryResult): string => {
 
 /** {@link executeQuery} lifted into Effect with a typed failure. */
 export const query = (
-  repoRoot: string,
+  catalogPath: string,
   sql: string,
   maxRows?: number,
 ): Effect.Effect<QueryResult, QueryError> =>
   Effect.try({
-    try: () => executeQuery(repoRoot, sql, maxRows),
+    try: () => executeQuery(catalogPath, sql, maxRows),
     catch: (cause) =>
       new QueryError({
         reason: cause instanceof Error ? cause.message : String(cause),
@@ -132,7 +132,8 @@ export const runQuery = ({
 }): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
-    const result = yield* query(repoRoot, sql);
+    const { catalogPath } = yield* loadConfig(repoRoot);
+    const result = yield* query(catalogPath, sql);
     yield* Console.log(
       json ? JSON.stringify(result.rows, undefined, 2) : formatTable(result),
     );

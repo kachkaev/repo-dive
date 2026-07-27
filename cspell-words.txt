@@ -7,6 +7,7 @@ cloc
 COCOMO
 codegen
 coderabbit
+cva
 Datasette
 DDL
 dedupe
@@ -60,6 +61,7 @@ repoinsights
 rollups
 scc
 scriptable
+shadcn
 shm
 Sigstore
 simonw

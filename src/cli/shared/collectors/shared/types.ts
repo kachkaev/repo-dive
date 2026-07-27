@@ -7,6 +7,8 @@ import type { SamplingPolicy } from "../../sampling.ts";
 
 type CollectContext = {
   readonly repoRoot: string;
+  /** The catalog this run writes to — where content caches belong. */
+  readonly catalogPath: string;
   readonly sha: string;
   /**
    * The collector's cache fingerprint for this run — a short hash of its
