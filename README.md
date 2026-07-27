@@ -148,6 +148,15 @@ pnpm lint
 pnpm fix
 ```
 
+To see how heavy the published package would be:
+
+```sh
+pnpm build && pnpm report-package-size
+```
+
+It prints the tarball and unpacked sizes with a per-file breakdown, comparing them against the previous measurement.
+CI runs the same report on every push and adds it to the job summary, comparing against the latest `main`.
+
 ## Acknowledgements
 
 Thanks to [@WillJack20](https://github.com/WillJack20) for suggesting the name **repo-dive**.
