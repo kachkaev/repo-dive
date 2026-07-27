@@ -51,7 +51,13 @@ function measure(): Measurement {
   const stdout = execFileSync(
     "npm",
     ["pack", "--dry-run", "--json", "--ignore-scripts"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+    {
+      encoding: "utf8",
+      // npm 10 (bundled with Node 22) still runs `prepare` when packing a
+      // directory, because the flag does not reach pacote. The env var does.
+      env: { ...process.env, npm_config_ignore_scripts: "true" },
+      stdio: ["ignore", "pipe", "inherit"],
+    },
   );
 
   const [result] = JSON.parse(stdout) as NpmPackResult[];
