@@ -365,7 +365,12 @@ test.concurrent(
     const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-alias-"));
     runGit(repoPath, "init", "-b", "main");
 
-    function commitAs(email: string, name: string, subject: string) {
+    function commitAs(
+      email: string,
+      name: string,
+      subject: string,
+      coAuthors: string[] = [],
+    ) {
       const identity = {
         ...commitEnvironment,
         GIT_AUTHOR_EMAIL: email,
@@ -376,12 +381,23 @@ test.concurrent(
       // `.md` rather than `.txt`: only source files are blamed for survival.
       writeFileSync(path.join(repoPath, "file.md"), `${subject}\n`);
       runGitAs(repoPath, identity, "add", ".");
-      runGitAs(repoPath, identity, "commit", "-m", subject);
+      const message = [
+        subject,
+        ...(coAuthors.length > 0
+          ? ["", ...coAuthors.map((entry) => `Co-authored-by: ${entry}`)]
+          : []),
+      ].join("\n");
+      runGitAs(repoPath, identity, "commit", "-m", message);
     }
 
     try {
       commitAs("alice@work.example", "Alice", "first");
-      commitAs("alice@personal.example", "Alice", "second");
+      // Co-authored across kinds, and by an alias of the author herself — the
+      // agent's help counts, Alice crediting Alice does not.
+      commitAs("alice@personal.example", "Alice", "second", [
+        "Claude <noreply@anthropic.com>",
+        "Alice <alice@work.example>",
+      ]);
       // A bot identity — its kind should be auto-derived without config.
       commitAs(
         "29139614+renovate[bot]@users.noreply.github.com",
@@ -453,6 +469,30 @@ test.concurrent(
       const bot = contributors.find((row) => stringAt(row, "kind") === "bot");
       expect(bot, "renovate should be auto-classified as a bot").toBeTruthy();
       expect(stringAt(bot, "email")).toBe("renovate[bot]");
+
+      // Cross-kind co-authorship, recorded from both ends of the same edge.
+      expect(
+        recordAt(alice, "assistedBy"),
+        "one of Alice's commits was co-authored by an AI agent",
+      ).toEqual({ ai: 1 });
+      expect(
+        alice,
+        "human-to-human credit (here, an alias of herself) is not cross-kind",
+      ).not.toHaveProperty("assisted");
+
+      const agent = contributors.find((row) => stringAt(row, "kind") === "ai");
+      expect(
+        recordAt(agent, "assisted"),
+        "the agent helped a human once",
+      ).toEqual({ human: 1 });
+      expect(
+        agent,
+        "nobody co-authored the agent's own commit",
+      ).not.toHaveProperty("assistedBy");
+      expect(
+        bot,
+        "the bot neither gave nor received cross-kind help",
+      ).not.toHaveProperty("assisted");
 
       // Each commit row carries its author's kind, so the dashboard can split
       // the calendar and monthly charts without re-deriving kinds client-side.

@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { Console, Data, Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
+import type { ContributorKind } from "../../config.ts";
 import {
   builtInCollectors,
   describesTreeState,
@@ -30,30 +31,33 @@ class NoCollectedCommitsError extends Data.TaggedError(
 }
 
 /**
- * Heuristic for AI coding assistants appearing as commit co-authors.
- * Automation bots (renovate, dependabot, github-actions, …) are deliberately
- * not "AI": they don't reflect assisted authorship.
- */
-export const isAiCoAuthor = (coAuthor: string): boolean =>
-  !/renovate|dependabot|github-actions/i.test(coAuthor) &&
-  /claude|copilot|cursor|chatgpt|openai|gemini|aider|devin|coderabbit|codegen|sweep|windsurf/i.test(
-    coAuthor,
-  );
-
-/**
  * Series labels non-human contributors fold into in survival data. The
  * dashboard matches these literal strings to color the bands with the
  * reserved kind colors, so change them in both places or not at all.
  */
 const kindGroupLabels = { bot: "Bots", ai: "AI agents" } as const;
 
-/** "Claude Fable 5 <noreply@anthropic.com>" → "Claude Fable 5" */
-export const coAuthorIdentity = (coAuthor: string): string => {
-  const angleIndex = coAuthor.indexOf("<");
-  const name = (
-    angleIndex === -1 ? coAuthor : coAuthor.slice(0, angleIndex)
-  ).trim();
-  return name || coAuthor.trim();
+/**
+ * Splits a `Co-authored-by:` trailer into its parts:
+ * `"Claude Fable 5 <noreply@anthropic.com>"` → name + email.
+ *
+ * Keeping the email (rather than the display name alone) is what lets a
+ * co-author resolve through the very same `resolveContributor` an author goes
+ * through — so alias groups, `displayName`/`url` overrides and kind derivation
+ * apply identically whether a person wrote a commit or helped with one.
+ */
+export const parseIdentity = (
+  identity: string,
+): { name: string; email: string } => {
+  const open = identity.indexOf("<");
+  const close = identity.lastIndexOf(">");
+  if (open === -1 || close < open) {
+    return { name: identity.trim(), email: "" };
+  }
+  return {
+    name: identity.slice(0, open).trim(),
+    email: identity.slice(open + 1, close).trim(),
+  };
 };
 
 type CommitFacts = {
@@ -124,22 +128,34 @@ const buildDashboardData = (
   commits: readonly CommitFacts[], // oldest first
   config: ResolvedConfig,
 ) => {
-  const aiCoAuthorsOf = (commit: CommitFacts): string[] =>
+  /** The raw `"Name <email>"` trailers on a commit, in the order git listed them. */
+  const coAuthorsOf = (commit: CommitFacts): string[] =>
     [...commit.factsByCollector.values()]
       .flat()
-      .filter(
-        (fact) =>
-          fact.metric === "commits.coAuthor" &&
-          isAiCoAuthor(fact.categories?.["coAuthor"] ?? ""),
-      )
-      .map((fact) => coAuthorIdentity(fact.categories?.["coAuthor"] ?? ""));
+      .filter((fact) => fact.metric === "commits.coAuthor")
+      .map((fact) => fact.categories?.["coAuthor"] ?? "");
+
+  /**
+   * A co-author resolved the same way an author is. An identity with no email
+   * (a bare `Co-authored-by: Some Name`) keys off its name instead, so those
+   * don't all collapse into one empty-email bucket.
+   */
+  const resolveCoAuthor = (identity: string) => {
+    const { name, email } = parseIdentity(identity);
+    return {
+      name,
+      resolved: config.resolveContributor(email || name, name),
+    };
+  };
 
   const commitRows = commits.map((commit) => ({
     sha: commit.sha.slice(0, 10),
     date: commit.date,
     author: commit.authorEmail,
     kind: config.resolveContributor(commit.authorEmail, commit.authorName).kind,
-    ai: aiCoAuthorsOf(commit).length > 0,
+    ai: coAuthorsOf(commit).some(
+      (identity) => resolveCoAuthor(identity).resolved.kind === "ai",
+    ),
     added: sumMetric(commit, "churn.added"),
     deleted: sumMetric(commit, "churn.deleted"),
   }));
@@ -303,63 +319,145 @@ const buildDashboardData = (
       };
     });
 
-  const contributorMap = new Map<
-    string,
-    {
-      email: string;
-      name: string;
-      url: string | undefined;
-      kind: string;
-      commits: number;
-      added: number;
-      deleted: number;
-    }
-  >();
+  // One bucket per person, whether they authored commits, only ever helped
+  // with someone else's, or both — humans, bots and AI agents all measured the
+  // same way. `assistedBy` / `assisted` are the two halves of the same
+  // cross-kind edge, recorded from each end.
+  type ContributorBucket = {
+    email: string;
+    name: string;
+    url: string | undefined;
+    kind: ContributorKind;
+    commits: number;
+    added: number;
+    deleted: number;
+    /** Own commits carrying at least one co-author of that (other) kind. */
+    assistedBy: Partial<Record<ContributorKind, number>>;
+    /** Commits by an author of that (other) kind that this person co-authored. */
+    assisted: Partial<Record<ContributorKind, number>>;
+  };
+  const contributorMap = new Map<string, ContributorBucket>();
+  /**
+   * The name as spelled on this commit (author line or trailer): a configured
+   * displayName wins, otherwise the observed spelling, tidied so a bot's
+   * `[bot]` suffix doesn't double up with its kind badge.
+   */
+  const nameOf = (
+    resolved: ReturnType<typeof config.resolveContributor>,
+    observedName: string,
+  ): string =>
+    resolved.displayName ??
+    (observedName ? normalizeContributorName(observedName) : resolved.label);
+
+  /**
+   * Fetches or creates a contributor's bucket.
+   *
+   * Humans key off their canonical email alone, so an alias group folds every
+   * spelling of one person together. Bots and AI agents key off their name too:
+   * they share vendor noreply addresses — "Claude Fable 5" and "Claude Opus
+   * 4.8" are both `<noreply@anthropic.com>` — and for them the name carries the
+   * identity worth telling apart. Giving such a group a `displayName` in the
+   * config merges them back into one.
+   */
+  const bucketFor = (
+    resolved: ReturnType<typeof config.resolveContributor>,
+    observedName: string,
+  ): ContributorBucket => {
+    const name = nameOf(resolved, observedName);
+    const email = resolved.canonicalEmail.toLowerCase();
+    const key =
+      resolved.kind === "human" ? email : `${name.toLowerCase()} ${email}`;
+    const bucket = contributorMap.get(key) ?? {
+      email: resolved.canonicalEmail,
+      name,
+      url: resolved.url,
+      kind: resolved.kind,
+      commits: 0,
+      added: 0,
+      deleted: 0,
+      assistedBy: {},
+      assisted: {},
+    };
+    // Humans keep the latest spelling; a non-human's is pinned by its key.
+    bucket.name = name;
+    contributorMap.set(key, bucket);
+    return bucket;
+  };
+
   for (const [index, commit] of commits.entries()) {
     const row = commitRows[index];
     if (!row) {
       continue;
     }
     // Resolve first so aliases of one person land in a single bucket.
-    const resolved = config.resolveContributor(
+    const author = config.resolveContributor(
       commit.authorEmail,
       commit.authorName,
     );
-    const key = resolved.canonicalEmail.toLowerCase();
-    const bucket = contributorMap.get(key) ?? {
-      email: resolved.canonicalEmail,
-      name: resolved.label,
-      url: resolved.url,
-      kind: resolved.kind,
-      commits: 0,
-      added: 0,
-      deleted: 0,
-    };
-    // A configured displayName wins; otherwise keep the latest non-empty name,
-    // tidied so a bot's `[bot]` suffix doesn't double up with its kind badge.
-    bucket.name =
-      resolved.displayName ??
-      (commit.authorName
-        ? normalizeContributorName(commit.authorName)
-        : bucket.name);
-    bucket.commits += 1;
-    bucket.added += row.added;
-    bucket.deleted += row.deleted;
-    contributorMap.set(key, bucket);
-  }
-  const contributors = [...contributorMap.values()]
-    .toSorted((left, right) => right.commits - left.commits)
-    .slice(0, 25);
+    const authorBucket = bucketFor(author, commit.authorName);
+    authorBucket.commits += 1;
+    authorBucket.added += row.added;
+    authorBucket.deleted += row.deleted;
 
-  const aiIdentityMap = new Map<string, number>();
-  for (const commit of commits) {
-    for (const identity of new Set(aiCoAuthorsOf(commit))) {
-      aiIdentityMap.set(identity, (aiIdentityMap.get(identity) ?? 0) + 1);
+    // Only cross-kind help is recorded: a human thanking a human (or one agent
+    // crediting another) is ordinary collaboration, and what these bars show is
+    // the traffic *between* kinds. Crediting yourself is same-kind by
+    // definition, so that one check covers it too. The set dedupes a trailer
+    // repeated within one commit — help given twice is still one commit helped.
+    const helpers = new Set<ContributorBucket>();
+    for (const identity of coAuthorsOf(commit)) {
+      const { name, resolved } = resolveCoAuthor(identity);
+      if (resolved.kind !== author.kind) {
+        helpers.add(bucketFor(resolved, name));
+      }
+    }
+
+    const helperKinds = new Set<ContributorKind>();
+    for (const helper of helpers) {
+      helper.assisted[author.kind] = (helper.assisted[author.kind] ?? 0) + 1;
+      helperKinds.add(helper.kind);
+    }
+    // Counted once per helper *kind*, so one commit credited to two agents is
+    // one AI-assisted commit rather than two.
+    for (const kind of helperKinds) {
+      authorBucket.assistedBy[kind] = (authorBucket.assistedBy[kind] ?? 0) + 1;
     }
   }
-  const aiIdentities = [...aiIdentityMap.entries()]
-    .toSorted(([, left], [, right]) => right - left)
-    .map(([identity, commitCount]) => ({ identity, commits: commitCount }));
+
+  const sumCounts = (
+    counts: Partial<Record<ContributorKind, number>>,
+  ): number => Object.values(counts).reduce((total, count) => total + count, 0);
+  /** Ranking weight: authoring and helping both count as taking part. */
+  const involvementOf = (bucket: ContributorBucket): number =>
+    bucket.commits + sumCounts(bucket.assisted);
+  /** Emitted as absent rather than `{}` so the JSON stays lean. */
+  const countsOrUndefined = (
+    counts: Partial<Record<ContributorKind, number>>,
+  ) => (Object.keys(counts).length === 0 ? undefined : counts);
+
+  // Capped per kind rather than overall, at exactly what the dashboard's bar
+  // list shows: a repo with hundreds of humans would otherwise crowd out the
+  // handful of agents and bots the kind filter exists to reveal.
+  const perKindCap = config.maxInCharts * 2;
+  const keptPerKind: Record<ContributorKind, number> = {
+    human: 0,
+    bot: 0,
+    ai: 0,
+  };
+  const contributors = [...contributorMap.values()]
+    .toSorted((left, right) => involvementOf(right) - involvementOf(left))
+    .filter((bucket) => {
+      if (keptPerKind[bucket.kind] >= perKindCap) {
+        return false;
+      }
+      keptPerKind[bucket.kind] += 1;
+      return true;
+    })
+    .map((bucket) => ({
+      ...bucket,
+      assistedBy: countsOrUndefined(bucket.assistedBy),
+      assisted: countsOrUndefined(bucket.assisted),
+    }));
 
   return {
     generatedAt: new Date().toISOString(),
@@ -382,7 +480,6 @@ const buildDashboardData = (
     topRules,
     survival,
     contributors,
-    aiIdentities,
   };
 };
 

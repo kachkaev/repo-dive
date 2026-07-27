@@ -3,9 +3,11 @@ import { useId, useState } from "react";
 import type { ContributorKind } from "../data.ts";
 import { ScrollArea } from "./shared/@ui-primitive/scroll-area.tsx";
 import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "./shared/@ui-primitive/toggle-group.tsx";
+  kindColors,
+  type KindFilter,
+  KindFilterChips,
+  kindNouns,
+} from "./shared/contributor-kinds.tsx";
 import { formatMonth, monthShortNames } from "./shared/format.ts";
 
 export type WeekStart = "monday" | "sunday";
@@ -28,7 +30,7 @@ export type CalendarRange =
   | `year-${number}`;
 
 /** Which author kind the calendar shows; "all" stacks every kind per cell. */
-export type CalendarKindFilter = "all" | ContributorKind;
+export type CalendarKindFilter = KindFilter;
 
 const dayMs = 86_400_000;
 const binSize = 12;
@@ -41,26 +43,6 @@ const gapColumns = 2;
 const dayLabels: Record<WeekStart, string[]> = {
   monday: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
   sunday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-};
-
-/** The reserved contributor-kind colors (see styles.css). */
-const kindColors: Record<ContributorKind, string> = {
-  human: "var(--kind-human)",
-  bot: "var(--kind-bot)",
-  ai: "var(--kind-ai)",
-};
-
-const kindFilterLabels: Record<Exclude<CalendarKindFilter, "all">, string> = {
-  human: "Humans",
-  bot: "Bots",
-  ai: "AI agents",
-};
-
-/** Qualifies a count once a single kind is filtered: "4 bot commits". */
-const kindNouns: Record<Exclude<CalendarKindFilter, "all">, string> = {
-  human: "human",
-  bot: "bot",
-  ai: "AI-agent",
 };
 
 /**
@@ -638,53 +620,14 @@ export function CommitCalendar({
   const legendColor =
     kindFilter === "all" ? kindColors.human : kindColors[kindFilter];
 
-  const filterOptions: CalendarKindFilter[] = [
-    "all",
-    ...(["human", "bot", "ai"] as const).filter((kind) =>
-      presentKinds.has(kind),
-    ),
-  ];
-
   return (
     <div>
-      {presentKinds.size > 1 && (
-        <ToggleGroup
-          value={[kindFilter]}
-          onValueChange={(groupValue) => {
-            // Single-select semantics on an array-valued group: re-clicking the
-            // pressed chip yields [] — keep the current filter (one is always
-            // active) rather than allowing an empty selection.
-            const next = groupValue.at(-1);
-            if (typeof next === "string") {
-              onKindFilterChange(next as CalendarKindFilter);
-            }
-          }}
-          aria-label="Filter calendar by contributor kind"
-          variant="outline"
-          size="sm"
-          className="mb-3 flex-wrap gap-1.5"
-        >
-          {filterOptions.map((option) => (
-            <ToggleGroupItem
-              key={option}
-              value={option}
-              className="h-auto gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-normal text-(--text-secondary) shadow-none hover:bg-transparent hover:text-(--text-primary) data-pressed:border-(--text-muted) data-pressed:text-(--text-primary)"
-            >
-              <span
-                className="inline-block size-2.5 rounded-xs"
-                style={{
-                  background:
-                    option === "all"
-                      ? // Mirrors a cell's stacking order, top-down.
-                        `linear-gradient(to bottom, ${kindColors.human} 0 34%, ${kindColors.ai} 34% 67%, ${kindColors.bot} 67% 100%)`
-                      : kindColors[option],
-                }}
-              />
-              {option === "all" ? "All" : kindFilterLabels[option]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      )}
+      <KindFilterChips
+        label="Filter calendar by contributor kind"
+        value={kindFilter}
+        onChange={onKindFilterChange}
+        presentKinds={presentKinds}
+      />
       <ScrollArea>
         {/* pb clears the overlay horizontal scrollbar (h-2.5) so it never
             covers the last strip's bottom day row. */}

@@ -57,28 +57,33 @@ Malformed config fails `index` with a friendly message rather than silently degr
 
 People show up under multiple identities — work and personal email, GitHub `noreply` addresses, name variants.
 A group is either a plain array of emails or an object `{ emails, displayName?, url?, kind? }`; the **first email is canonical** and the rest fold into it before the cube's dashboard data is built.
-Merging applies to commit-count and churn attribution, the contributors table, and code-survival-by-contributor.
+Merging applies to commit-count and churn attribution, the contributors table, cross-kind co-authorship and code-survival-by-contributor.
 An email may appear in at most one group.
 
-Emails are matched against each commit author's email in either its raw form or its prettified GitHub-noreply handle — so listing `alice` matches `12345+alice@users.noreply.github.com`, i.e. you can use the handle shown in the report.
+Emails are matched against each commit author's email — and against the email in every `Co-authored-by:` trailer — in either its raw form or its prettified GitHub-noreply handle, so listing `alice` matches `12345+alice@users.noreply.github.com`, i.e. you can use the handle shown in the report.
 
 - `displayName` overrides the name shown in the per-contributor charts and the contributors table (the email column still shows the prettified canonical email).
 - `url` makes that name a link (e.g. to a GitHub profile).
 - `kind` is one of `"human"`, `"bot"` or `"ai"` (see below).
 
-(Unifying AI assistant name variants through aliases is out of scope for now.)
-
 ### Contributor kinds
 
 Every contributor has a **kind**: `human` (the default), `bot` (automation like renovate, dependabot, github-actions) or `ai` (AI coding agents like Copilot, Claude, Cursor, …).
-When a group omits `kind` — or for contributors with no alias group at all — the kind is derived from the commit author's name and email; anything unrecognized is a human.
-The dashboard badges bots (🤖) and AI agents (✨) with an icon and lists them separately from human contributors.
+When a group omits `kind` — or for contributors with no alias group at all — the kind is derived from the name and email; anything unrecognized is a human.
+Co-authors are classified the same way as authors, so an agent that only ever appears in trailers still gets its own row.
+
+Identity resolution differs by kind.
+Humans are identified by their canonical email, so every spelling of one person folds together.
+Bots and AI agents are identified by name **and** email, because they share vendor `noreply` addresses — `Claude Fable 5` and `Claude Opus 4.8` both commit as `<noreply@anthropic.com>` and are worth telling apart.
+To merge such variants into one row, give them an alias group with a `displayName`.
+
+The dashboard badges bots (🤖) and AI agents (✨) with an icon and colors every kind with its reserved color.
 
 ### `contributors.maxInCharts`
 
 How many contributors the per-contributor charts keep before folding the remainder into an "Other" band.
 Defaults to `10`, must be an integer between 1 and 100.
-The stacked survival-by-contributor area keeps up to `maxInCharts` series; the contributors bar list keeps twice that.
+The stacked survival-by-contributor area keeps up to `maxInCharts` series; the contributors bar list keeps twice that, per kind — so a repo with hundreds of humans can't crowd out its handful of agents and bots.
 The categorical palette provides 20 distinct colors and cycles beyond that.
 
 ## `charts`
