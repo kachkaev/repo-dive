@@ -97,12 +97,10 @@ function Bar({
   }));
 
   return (
-    <span
-      className="relative h-4 w-full rounded-xs bg-(--surface-2)"
-      title={title}
-    >
+    <span className="relative h-4 w-full rounded-xs bg-muted" title={title}>
+      {/* No hover feedback: a bar is static content, not a click target. */}
       <span
-        className="absolute inset-y-0 left-0 overflow-hidden rounded-xs opacity-90 group-hover:opacity-100"
+        className="absolute inset-y-0 left-0 overflow-hidden rounded-xs"
         style={{ width: `${width}%`, background: baseColor }}
       >
         {basePieces.map((piece) => (
@@ -139,7 +137,7 @@ function CountCell({ value }: { value: number | undefined }) {
   return (
     <span className="text-right text-xs tabular-nums text-(--text-secondary)">
       {value === undefined || value === 0 ? (
-        <span className="text-(--text-muted)">·</span>
+        <span className="text-muted-foreground">·</span>
       ) : (
         formatCount(value)
       )}
@@ -155,7 +153,7 @@ function CountCell({ value }: { value: number | undefined }) {
  */
 export function ContributorBars({ items }: { items: ContributorBarsItem[] }) {
   if (items.length === 0) {
-    return <p className="text-sm text-(--text-muted)">Nothing to show.</p>;
+    return <p className="text-sm text-muted-foreground">Nothing to show.</p>;
   }
 
   const max = Math.max(
@@ -166,7 +164,7 @@ export function ContributorBars({ items }: { items: ContributorBarsItem[] }) {
   return (
     <div className="space-y-4">
       <div
-        className="grid items-end gap-x-3 pl-1 text-[0.65rem] text-(--text-muted)"
+        className="grid items-end gap-x-3 pl-1 text-[0.65rem] text-muted-foreground"
         style={{ gridTemplateColumns: gridTemplate }}
       >
         <span>authored above, assisted below</span>
@@ -195,7 +193,7 @@ export function ContributorBars({ items }: { items: ContributorBarsItem[] }) {
             item.kind === "human" ? undefined : kindBadge[item.kind];
 
           return (
-            <li key={item.id} className="group space-y-1">
+            <li key={item.id} className="space-y-1">
               <div className="flex items-center gap-1.5 text-sm">
                 {badge ? (
                   <span title={badge.title} className="select-none">
@@ -271,7 +269,7 @@ export function ContributorBars({ items }: { items: ContributorBarsItem[] }) {
                 />
                 <span className="text-right text-xs font-medium tabular-nums">
                   {assistedTotal === 0 ? (
-                    <span className="text-(--text-muted)">·</span>
+                    <span className="text-muted-foreground">·</span>
                   ) : (
                     formatCount(assistedTotal)
                   )}
