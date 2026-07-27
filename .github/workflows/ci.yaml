@@ -168,3 +168,34 @@ jobs:
             echo 'ℹ️ ℹ️ ℹ️'
             exit 1
           fi
+
+      # The baseline is saved by runs on main only, so a pull request compares
+      # against the latest main rather than against its own previous run.
+      - name: Load npm package size baseline
+        if: ${{ success() || failure() }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: package-size-${{ github.run_id }}
+          path: node_modules/.cache/package-size
+          restore-keys: |
+            package-size-
+
+      - name: Run pnpm report:package-size
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm report:package-size; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Measuring the publishable npm package failed.'
+            echo 'Try running `pnpm build && pnpm report:package-size` locally.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
+      - name: Save npm package size baseline
+        if: ${{ success() && github.ref == 'refs/heads/main' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: package-size-${{ github.run_id }}
+          path: node_modules/.cache/package-size
