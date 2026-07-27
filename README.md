@@ -1,6 +1,6 @@
 # repo-dive
 
-_Dive into a git repository's history: per-commit snapshots, an indexed metrics catalog and an interactive dashboard._
+_Dive into a git repo's history: per-commit snapshots, an indexed metrics catalog and an interactive dashboard_ <!-- markdownlint-disable-line MD036 -- a tagline, not a heading -->
 
 [![npm version](https://img.shields.io/npm/v/repo-dive?logo=npm&color=3c7ef6&labelColor=333)](https://www.npmjs.com/package/repo-dive)
 [![npm downloads](https://img.shields.io/npm/dm/repo-dive?logo=npm&color=3c7ef6&labelColor=333)](https://www.npmjs.com/package/repo-dive)
