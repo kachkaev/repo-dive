@@ -111,7 +111,7 @@
     "cspell": "10.0.1",
     "d3-array": "3.2.4",
     "effect": "4.0.0-beta.101",
-    "eslint": "9.39.5",
+    "eslint": "10.8.0",
     "husky": "9.1.7",
     "knip": "6.29.0",
     "lint-staged": "17.2.0",
