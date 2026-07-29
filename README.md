@@ -27,6 +27,19 @@ Everything is local-first, incremental and resumable: results live in a catalog 
 
 See [docs/specs](docs/specs/README.md) for the architecture and [docs/research/prior-art.md](docs/research/prior-art.md) for a survey of existing tools and why none of them fills this niche.
 
+## Examples
+
+Live dashboards for a few popular repositories, produced by running the tool on their full history:
+
+- [curl](https://kachkaev.github.io/repo-dive/examples/curl/) (C, since 1999)
+- [ollama](https://kachkaev.github.io/repo-dive/examples/ollama/) (Go, since 2023)
+- [prettier](https://kachkaev.github.io/repo-dive/examples/prettier/) (JavaScript, since 2016)
+- [react](https://kachkaev.github.io/repo-dive/examples/react/) (JavaScript, since 2013)
+- [transformers](https://kachkaev.github.io/repo-dive/examples/transformers/) (Python, since 2018)
+- [vite](https://kachkaev.github.io/repo-dive/examples/vite/) (TypeScript, since 2020)
+
+Each one is a single self-contained HTML file exported with `repo-dive report` and redeployed weekly by [a scheduled workflow](.github/workflows/examples.yaml) — see [examples](examples/README.md) for how they are defined.
+
 ## Usage
 
 Run from inside the repository you want to analyze (or pass `--repo /path/to/repo`).

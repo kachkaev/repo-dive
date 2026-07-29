@@ -48,6 +48,7 @@ mts
 multiset
 npmjs
 numstat
+ollama
 onefetch
 oxc
 Picci
@@ -61,6 +62,7 @@ repoinsights
 rollups
 scc
 scriptable
+sed
 shadcn
 shm
 Sigstore
@@ -76,6 +78,7 @@ tsc
 uncazzy
 undashed
 unscanned
+utf
 VCS
 VCSs
 visx
