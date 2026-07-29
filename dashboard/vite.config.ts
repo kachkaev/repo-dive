@@ -7,6 +7,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   root: import.meta.dirname,
+  // Relative asset URLs, so a copy of dist/dashboard next to a dashboard.json
+  // works from any directory of any static host, not only the domain root.
+  base: "./",
   plugins: [
     react(),
     // React Compiler auto-memoizes components so the charts' hover state
