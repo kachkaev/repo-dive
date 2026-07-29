@@ -48,6 +48,7 @@ mts
 multiset
 npmjs
 numstat
+ollama
 onefetch
 oxc
 Picci
