@@ -9,7 +9,7 @@ The [examples workflow](../.github/workflows/examples.yaml) rebuilds them weekly
 
   ```json
   {
-    "repo": "https://github.com/expressjs/express"
+    "repo": "https://github.com/prettier/prettier"
   }
   ```
 

@@ -31,7 +31,7 @@ See [docs/specs](docs/specs/README.md) for the architecture and [docs/research/p
 
 Live dashboards for a few popular repositories, produced by running the tool on their full history:
 
-- [express](https://kachkaev.github.io/repo-dive/examples/express/)
+- [prettier](https://kachkaev.github.io/repo-dive/examples/prettier/)
 - [react](https://kachkaev.github.io/repo-dive/examples/react/)
 - [vite](https://kachkaev.github.io/repo-dive/examples/vite/)
 - [zod](https://kachkaev.github.io/repo-dive/examples/zod/)
