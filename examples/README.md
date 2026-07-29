@@ -23,3 +23,8 @@ The directory name becomes the URL slug, so keep it short and lowercase.
 1.  Create `examples/<name>/example.json` with the repository URL.
 1.  Optionally add `examples/<name>/repo-dive.config.ts`.
 1.  Open a pull request; once merged, the workflow picks the example up on its next run (or trigger it manually from the Actions tab).
+
+## Trying a repository first
+
+To size up a candidate without cloning anything locally, run the [report workflow](../.github/workflows/report.yaml) from the Actions tab with the repository's clone URL.
+It uploads the self-contained report as a non-zipped artifact, so once the run finishes, `index.html` opens right in the browser from the run page.
