@@ -27,6 +27,17 @@ Everything is local-first, incremental and resumable: results live in a catalog 
 
 See [docs/specs](docs/specs/README.md) for the architecture and [docs/research/prior-art.md](docs/research/prior-art.md) for a survey of existing tools and why none of them fills this niche.
 
+## Examples
+
+Live dashboards for a few popular repositories, produced by running the tool on their full history:
+
+- [express](https://kachkaev.github.io/repo-dive/examples/express/)
+- [react](https://kachkaev.github.io/repo-dive/examples/react/)
+- [vite](https://kachkaev.github.io/repo-dive/examples/vite/)
+- [zod](https://kachkaev.github.io/repo-dive/examples/zod/)
+
+Each one is a single self-contained HTML file exported with `repo-dive report` and redeployed weekly by [a scheduled workflow](.github/workflows/examples.yaml) — see [examples](examples/README.md) for how they are defined.
+
 ## Usage
 
 Run from inside the repository you want to analyze (or pass `--repo /path/to/repo`).

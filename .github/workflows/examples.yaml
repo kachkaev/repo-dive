@@ -1,0 +1,194 @@
+name: Examples
+
+# Rebuilds the public example dashboards (https://kachkaev.github.io/repo-dive/examples/…):
+# every example in examples/*/example.json is cloned, analyzed with the CLI built
+# from the current commit and exported as one self-contained HTML report, then
+# everything is deployed to GitHub Pages in a single pass.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - examples/**
+      - .github/workflows/examples.yaml
+  schedule:
+    # Weekly, Monday 05:13 UTC — keeps the dashboards "more or less up to date"
+    - cron: "13 5 * * 1"
+  workflow_dispatch:
+
+# One deploy at a time; a fresh run supersedes a queued (not running) one
+concurrency:
+  group: examples
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  prepare:
+    name: Build CLI and list examples
+    # Forks would fail at the deploy step and burn minutes before that
+    if: github.repository == 'kachkaev/repo-dive'
+    runs-on: ubuntu-24.04
+    outputs:
+      examples: ${{ steps.list.outputs.examples }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: Setup node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          cache: pnpm
+          node-version-file: .tool-versions
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run pnpm build
+        run: pnpm build
+
+      - name: Upload the built CLI
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cli
+          path: dist/
+          retention-days: 1
+
+      - name: List examples
+        id: list
+        run: |
+          examples=$(
+            for manifest in examples/*/example.json; do
+              jq --arg name "$(basename "$(dirname "$manifest")")" \
+                '{name: $name, repo: .repo}' "$manifest"
+            done | jq --slurp --compact-output .
+          )
+          echo "Examples: $examples"
+          echo "examples=$examples" >> "$GITHUB_OUTPUT"
+
+  analyze:
+    name: Analyze ${{ matrix.example.name }}
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        example: ${{ fromJSON(needs.prepare.outputs.examples) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .tool-versions
+
+      - name: Download the built CLI
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cli
+          path: dist/
+
+      - name: Clone ${{ matrix.example.repo }}
+        # Full history of the default branch — the whole point of the tool
+        run: git clone --single-branch "${{ matrix.example.repo }}" analyzed
+
+      - name: Copy example config if present
+        run: |
+          config="examples/${{ matrix.example.name }}/repo-dive.config.ts"
+          if [ -f "$config" ]; then
+            cp "$config" analyzed/
+          fi
+
+      - name: Run repo-dive scan
+        run: node dist/cli.js scan --repo analyzed
+
+      - name: Run repo-dive index
+        run: node dist/cli.js index --repo analyzed
+
+      - name: Run repo-dive report
+        run: |
+          mkdir -p report
+          node dist/cli.js report --repo analyzed --out report/index.html
+
+      - name: Add report size to the job summary
+        run: |
+          raw=$(du -h report/index.html | cut -f1)
+          gzipped=$(gzip -c report/index.html | wc -c)
+          {
+            echo "### ${{ matrix.example.name }}"
+            echo ""
+            echo "Report: $raw raw, $((gzipped / 1024)) kB gzipped."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: example--${{ matrix.example.name }}
+          path: report/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: analyze
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download all reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: example--*
+          path: _site/examples/
+
+      - name: Assemble the site
+        # Strip the artifact name prefix and add redirect stubs: the site root
+        # and /examples/ are not destinations, they point back at the repository
+        run: |
+          for dir in _site/examples/example--*; do
+            mv "$dir" "${dir/example--/}"
+          done
+
+          write_redirect() {
+            cat > "$1" << HTML
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8" />
+              <meta http-equiv="refresh" content="0; url=${{ github.server_url }}/${{ github.repository }}" />
+              <link rel="canonical" href="${{ github.server_url }}/${{ github.repository }}" />
+              <title>repo-dive</title>
+            </head>
+            <body>
+              <p><a href="${{ github.server_url }}/${{ github.repository }}">${{ github.repository }}</a></p>
+            </body>
+          </html>
+          HTML
+          }
+          write_redirect _site/index.html
+          write_redirect _site/examples/index.html
+
+          find _site -type f | sort
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        with:
+          enablement: true
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site/
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
