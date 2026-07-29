@@ -31,11 +31,11 @@ See [docs/specs](docs/specs/README.md) for the architecture and [docs/research/p
 
 Live dashboards for a few popular repositories, produced by running the tool on their full history:
 
-- [django](https://kachkaev.github.io/repo-dive/examples/django/) (Python, since 2005)
+- [curl](https://kachkaev.github.io/repo-dive/examples/curl/) (C, since 1999)
 - [ollama](https://kachkaev.github.io/repo-dive/examples/ollama/) (Go, since 2023)
 - [prettier](https://kachkaev.github.io/repo-dive/examples/prettier/) (JavaScript, since 2016)
 - [react](https://kachkaev.github.io/repo-dive/examples/react/) (JavaScript, since 2013)
-- [redis](https://kachkaev.github.io/repo-dive/examples/redis/) (C, since 2009)
+- [transformers](https://kachkaev.github.io/repo-dive/examples/transformers/) (Python, since 2018)
 - [vite](https://kachkaev.github.io/repo-dive/examples/vite/) (TypeScript, since 2020)
 
 Each one is a single self-contained HTML file exported with `repo-dive report` and redeployed weekly by [a scheduled workflow](.github/workflows/examples.yaml) — see [examples](examples/README.md) for how they are defined.
