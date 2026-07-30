@@ -74,7 +74,12 @@ jobs:
     name: Analyze ${{ matrix.example.name }}
     needs: prepare
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    # A hosted runner scans the heaviest histories at ~1 commit/s, so a fresh
+    # catalog can take longer than the 6-hour job ceiling (react: ~14 h).
+    # Scans are resumable: the catalog is cached across runs, every run banks
+    # up to ~5 h of progress even when the scan step times out, and once a
+    # catalog has caught up, the weekly increment takes minutes.
+    timeout-minutes: 350
     strategy:
       fail-fast: false
       matrix:
@@ -98,6 +103,25 @@ jobs:
         # Full history of the default branch — the whole point of the tool
         run: git clone --single-branch "${{ matrix.example.repo }}" analyzed
 
+      - name: Derive the catalog cache key
+        id: cache-key
+        # Keyed by the clone URL (not the example name), so the report workflow
+        # can share and pre-warm the same catalogs
+        env:
+          REPO_URL: ${{ matrix.example.repo }}
+        run: |
+          slug=$(basename "${REPO_URL%.git}" | tr -c 'a-zA-Z0-9._-' '-' | sed 's/-*$//')
+          hash=$(printf '%s' "$REPO_URL" | shasum | cut -c1-8)
+          echo "prefix=catalog-${slug:-repo}-$hash" >> "$GITHUB_OUTPUT"
+
+      - name: Load the catalog cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ steps.cache-key.outputs.prefix }}-${{ github.run_id }}
+          path: analyzed/.repo-dive
+          restore-keys: |
+            ${{ steps.cache-key.outputs.prefix }}-
+
       - name: Copy example config if present
         run: |
           config="examples/${{ matrix.example.name }}/repo-dive.config.ts"
@@ -106,7 +130,17 @@ jobs:
           fi
 
       - name: Run repo-dive scan
+        # The step (not job) times out, so the cache below is saved either way
+        timeout-minutes: 300
         run: node dist/cli.js scan --repo analyzed
+
+      - name: Save the catalog cache
+        # Saved before `index` adds the heavy metrics.sqlite to the catalog
+        if: ${{ always() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ steps.cache-key.outputs.prefix }}-${{ github.run_id }}
+          path: analyzed/.repo-dive
 
       - name: Run repo-dive index
         run: node dist/cli.js index --repo analyzed
@@ -139,6 +173,9 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: analyze
+    # Deploy whatever examples are ready: while heavy catalogs are still
+    # catching up across runs, the finished ones should not be held back
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     permissions:
       pages: write
@@ -157,6 +194,10 @@ jobs:
         # Strip the artifact name prefix and add redirect stubs: the site root
         # and /examples/ are not destinations, they point back at the repository
         run: |
+          if ! ls -d _site/examples/example--* > /dev/null 2>&1; then
+            echo "No example reports were produced — leaving the previous deployment in place."
+            exit 1
+          fi
           for dir in _site/examples/example--*; do
             mv "$dir" "${dir/example--/}"
           done

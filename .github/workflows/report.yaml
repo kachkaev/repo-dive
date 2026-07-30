@@ -20,7 +20,10 @@ jobs:
   report:
     name: Report on ${{ inputs.repo }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 300
+    # Heavy histories scan at ~1 commit/s here; the catalog cache below is
+    # shared with the examples workflow and makes re-runs resume where the
+    # previous one stopped
+    timeout-minutes: 350
     env:
       REPO_URL: ${{ inputs.repo }}
     steps:
@@ -45,8 +48,34 @@ jobs:
       - name: Clone the analyzed repository
         run: git clone --single-branch "$REPO_URL" analyzed
 
+      - name: Derive the artifact name and cache key
+        id: name
+        run: |
+          slug=$(basename "${REPO_URL%.git}" | tr -c 'a-zA-Z0-9._-' '-' | sed 's/-*$//')
+          hash=$(printf '%s' "$REPO_URL" | shasum | cut -c1-8)
+          echo "slug=${slug:-report}" >> "$GITHUB_OUTPUT"
+          echo "cache-prefix=catalog-${slug:-repo}-$hash" >> "$GITHUB_OUTPUT"
+
+      - name: Load the catalog cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ steps.name.outputs.cache-prefix }}-${{ github.run_id }}
+          path: analyzed/.repo-dive
+          restore-keys: |
+            ${{ steps.name.outputs.cache-prefix }}-
+
       - name: Run repo-dive scan
+        # The step (not job) times out, so the cache below is saved either way
+        timeout-minutes: 300
         run: node dist/cli.js scan --repo analyzed
+
+      - name: Save the catalog cache
+        # Saved before `index` adds the heavy metrics.sqlite to the catalog
+        if: ${{ always() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ steps.name.outputs.cache-prefix }}-${{ github.run_id }}
+          path: analyzed/.repo-dive
 
       - name: Run repo-dive index
         run: node dist/cli.js index --repo analyzed
@@ -55,12 +84,6 @@ jobs:
         run: |
           mkdir -p report
           node dist/cli.js report --repo analyzed --out report/index.html
-
-      - name: Derive the artifact name
-        id: name
-        run: |
-          slug=$(basename "${REPO_URL%.git}" | tr -c 'a-zA-Z0-9._-' '-' | sed 's/-*$//')
-          echo "slug=${slug:-report}" >> "$GITHUB_OUTPUT"
 
       - name: Upload the report
         # archive: false keeps index.html non-zipped, so the run page can
