@@ -81,26 +81,30 @@ jobs:
         run: node dist/cli.js index --repo analyzed
 
       - name: Run repo-dive report
+        # The file name doubles as the artifact name (see the upload step)
         run: |
           mkdir -p report
-          node dist/cli.js report --repo analyzed --out report/index.html
+          node dist/cli.js report --repo analyzed \
+            --out "report/report--${{ steps.name.outputs.slug }}.html"
 
       - name: Upload the report
-        # archive: false keeps index.html non-zipped, so the run page can
-        # render it in the browser without a download
+        # archive: false keeps the report non-zipped, so the run page can
+        # render it in the browser without a download. It also makes the file
+        # name the artifact name (a `name` input would be ignored), hence the
+        # slug in the report file name itself
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: report--${{ steps.name.outputs.slug }}
           path: report/
           archive: false
           retention-days: 30
 
       - name: Add the report to the job summary
         run: |
-          raw=$(du -h report/index.html | cut -f1)
-          gzipped=$(gzip -c report/index.html | wc -c)
+          report="report/report--${{ steps.name.outputs.slug }}.html"
+          raw=$(du -h "$report" | cut -f1)
+          gzipped=$(gzip -c "$report" | wc -c)
           {
             echo "Report for \`$REPO_URL\`: $raw raw, $((gzipped / 1024)) kB gzipped."
             echo ""
-            echo "Open **report--${{ steps.name.outputs.slug }}** under _Artifacts_ and click \`index.html\` to view it in the browser."
+            echo "Click **report--${{ steps.name.outputs.slug }}.html** under _Artifacts_ to view it in the browser."
           } >> "$GITHUB_STEP_SUMMARY"
