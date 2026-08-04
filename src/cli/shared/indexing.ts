@@ -369,7 +369,7 @@ const buildDashboardData = (
     const name = nameOf(resolved, observedName);
     const email = resolved.canonicalEmail.toLowerCase();
     const key =
-      resolved.kind === "human" ? email : `${name.toLowerCase()} ${email}`;
+      resolved.kind === "human" ? email : `${name.toLowerCase()}\u001F${email}`;
     const bucket = contributorMap.get(key) ?? {
       email: resolved.canonicalEmail,
       name,
