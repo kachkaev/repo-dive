@@ -177,8 +177,7 @@ CI runs the same report on every push and adds it to the job summary, comparing 
 
 ## Acknowledgements
 
-Thanks to [@WillJack20](https://github.com/WillJack20) for suggesting the name `repo-dive`.
-It was originally called [repo-insighter](https://www.npmjs.com/package/repo-insighter).
+Thanks to [@WillJack20](https://github.com/WillJack20) for suggesting the name `repo-dive`, formerly [repo-insighter](https://www.npmjs.com/package/repo-insighter).
 
 ## License
 
