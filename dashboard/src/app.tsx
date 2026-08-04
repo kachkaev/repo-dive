@@ -827,7 +827,7 @@ export function App({ data }: { data: DashboardData }) {
       {data.repo.firstCommitDate !== undefined && data.commits.length > 0 && (
         <Section
           title="Commit calendar"
-          subtitle="commits per day; days bucketed by the committer's local date, i.e. when each commit landed"
+          subtitle="commits per day; days bucketed by the author's local date"
           controls={
             <div className="mb-3 flex w-fit items-center gap-2">
               <Label
@@ -888,14 +888,14 @@ export function App({ data }: { data: DashboardData }) {
 
       <Section
         title="Commits per month"
-        subtitle="split by author kind; hatched = human commits with at least one AI co-author trailer"
+        subtitle="months bucketed by the author's date, split by author kind; hatched = human commits with at least one AI co-author trailer"
       >
         <TimeSeriesChart mode="bar" {...commitsChart} />
       </Section>
 
       <Section
         title="Churn per month"
-        subtitle="lines added and deleted; hatched = lines added by AI-assisted commits"
+        subtitle="lines added and deleted, months bucketed by the author's date so they line up with the survival cohorts; hatched = lines added by AI-assisted commits"
       >
         <DivergingBars
           points={monthlyRows.map(([month, bucket]) => ({

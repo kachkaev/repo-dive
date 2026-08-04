@@ -55,14 +55,16 @@ test("parseGitLog skips blank lines", () => {
   expect(parseGitLog("\n\n")).toStrictEqual([]);
 });
 
-test("summarizeCommits spans the committer dates, not the author ones", () => {
+test("summarizeCommits spans the outer edges of both clocks", () => {
   const summary = summarizeCommits(parseGitLog(sampleLog));
 
   expect(summary).toStrictEqual({
     commitCount: 2,
     authorCount: 2,
     firstCommitDate: "2026-01-01T00:00:00+00:00",
-    // Authored on 2026-02-03, landed a fortnight later
+    // The newest commit was authored on 2026-02-03 and landed a fortnight
+    // later; the range has to reach the later of the two, so the
+    // committer-dated timelines fit inside it.
     lastCommitDate: "2026-02-17T09:00:00+00:00",
   });
 });
@@ -73,6 +75,57 @@ test("summarizeCommits handles an empty history", () => {
     authorCount: 0,
     firstCommitDate: undefined,
     lastCommitDate: undefined,
+  });
+});
+
+test("summarizeCommits reaches back to the earliest author date", () => {
+  // An imported commit: written long before the history it was grafted into,
+  // so the author date is the outer edge at the start and the calendar has to
+  // reach it.
+  const imported = [
+    [
+      "ccc333",
+      "Carol",
+      "carol@example.com",
+      "2019-05-05T12:00:00+00:00",
+      "2026-01-05T12:00:00+00:00",
+      "Import",
+    ].join(separator),
+    "",
+  ].join("\n");
+
+  expect(summarizeCommits(parseGitLog(imported))).toMatchObject({
+    firstCommitDate: "2019-05-05T12:00:00+00:00",
+    lastCommitDate: "2026-01-05T12:00:00+00:00",
+  });
+});
+
+test("summarizeCommits compares instants, not strings", () => {
+  // Lexicographically "2026-01-01T01:00:00+05:00" sorts after
+  // "2026-01-01T00:00:00-05:00", but it is the earlier instant by nine hours.
+  const skewed = [
+    [
+      "d4d4d4",
+      "Dan",
+      "dan@example.com",
+      "2026-01-01T01:00:00+05:00",
+      "2026-01-01T01:00:00+05:00",
+      "East",
+    ].join(separator),
+    [
+      "e5e5e5",
+      "Erin",
+      "erin@example.com",
+      "2026-01-01T00:00:00-05:00",
+      "2026-01-01T00:00:00-05:00",
+      "West",
+    ].join(separator),
+    "",
+  ].join("\n");
+
+  expect(summarizeCommits(parseGitLog(skewed))).toMatchObject({
+    firstCommitDate: "2026-01-01T01:00:00+05:00",
+    lastCommitDate: "2026-01-01T00:00:00-05:00",
   });
 });
 

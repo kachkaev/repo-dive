@@ -58,20 +58,29 @@ Why a JSON `categories` column rather than an EAV side table or wide columns:
 
 ```sql
 -- Language breakdown over time (stacked area chart).
--- Every timeline goes by committed_at: that is when the repository looked like
--- this, and unlike authored_at it never runs backwards.
+-- A measurement of the tree, so it goes by committed_at: that is when the
+-- repository looked like this, and unlike authored_at it never runs backwards.
 SELECT c.committed_at, json_extract(f.categories, '$.language') AS language,
        f.value
 FROM facts f JOIN commits c ON c.sha = f.commit_sha
 WHERE f.metric = 'languages.lines'
 ORDER BY c.committed_at;
 
--- Lint debt trend by rule (top N rules)
+-- Lint debt trend by rule (top N rules) — also a measurement of the tree
 SELECT c.committed_at, json_extract(f.categories, '$.rule') AS rule,
        sum(f.value) AS errors
 FROM facts f JOIN commits c ON c.sha = f.commit_sha
 WHERE f.metric = 'lint.errors'
 GROUP BY 1, 2;
+
+-- Churn per month (bar chart).
+-- A count of work rather than a measurement of the tree, so it buckets by
+-- authored_at — the same clock survival's cohort category is on, which is what
+-- keeps "lines added in month M" and "lines in cohort M" the same lines.
+SELECT substr(c.authored_at, 1, 7) AS month, sum(f.value) AS added
+FROM facts f JOIN commits c ON c.sha = f.commit_sha
+WHERE f.metric = 'churn.added'
+GROUP BY 1 ORDER BY 1;
 ```
 
 The `report` and `query` commands, future chart generation and any AI/MCP integration all sit on top of this one SQL surface.
@@ -79,5 +88,5 @@ The `report` and `query` commands, future chart generation and any AI/MCP integr
 ## Notes
 
 - **Rebuildability** is the key invariant: `index` drops the DB and reruns every collector's `normalize` over the raw catalog on every invocation. The cube is a cache, never the source of truth — which is also why no `--rebuild` flag is needed.
-- **Dates as dimensions**: time bucketing (day/week/month) is derived at query time from `commits.committed_at` rather than materialized, until performance says otherwise. `authored_at` is recorded alongside it but nothing is plotted against it — see [collectors](04-collectors.md#one-clock-the-committer-date).
+- **Dates as dimensions**: time bucketing (day/week/month) is derived at query time rather than materialized, until performance says otherwise. Measurements of the tree over time order by `commits.committed_at`; counts of commits or lines of work bucket by `commits.authored_at` — see [collectors](04-collectors.md#author-date-vs-committer-date) for the rule.
 - **Future backends**: the cube interface should stay narrow enough that a DuckDB or Parquet export ("give me the facts table as Parquet") is an output format, not a rewrite. An `export` command is the likely shape.
