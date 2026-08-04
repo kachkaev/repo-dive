@@ -158,7 +158,15 @@ export const withIgnoreEntry = ({
       ? ["", `${style.commentMarker} repo-dive catalog`, entry]
       : [entry];
 
-  const lines = contents.split("\n");
+  // A last line left without a line ending gets the file's own one first, so
+  // that splicing happens between whole lines — appending afterwards would put
+  // a bare `\n` where the file uses `\r\n`, and a second `\r` after the entry.
+  const terminated =
+    contents === "" || contents.endsWith("\n")
+      ? contents
+      : `${contents}${style.eol}`;
+
+  const lines = terminated.split("\n");
   const carriageReturn = style.eol === "\r\n" ? "\r" : "";
   lines.splice(
     slotIn ? sortedPosition(lines, entry) : endOfContent(lines),
@@ -166,9 +174,5 @@ export const withIgnoreEntry = ({
     ...addition.map((line) => `${line}${carriageReturn}`),
   );
 
-  const updated = lines.join("\n");
-  return {
-    contents: updated.endsWith("\n") ? updated : `${updated}${style.eol}`,
-    entry,
-  };
+  return { contents: lines.join("\n"), entry };
 };

@@ -99,6 +99,10 @@ test("withIgnoreEntry keeps a CRLF file on CRLF", () => {
   ).toBe(
     "## Dependencies\r\n/node_modules/\r\n\r\n## Build\r\n/dist/\r\n\r\n## repo-dive catalog\r\n/.repo-dive/\r\n",
   );
+  // The line the file was missing is a \r\n too, not a bare \n and a stray \r.
+  expect(add("node_modules\r\ndist").contents).toBe(
+    "node_modules\r\ndist\r\n.repo-dive\r\n",
+  );
 });
 
 test("withIgnoreEntry writes something coversPath then recognizes", () => {
@@ -111,6 +115,7 @@ test("withIgnoreEntry writes something coversPath then recognizes", () => {
     "## Dependencies\n/node_modules/\n\n## Build\n/dist/\n",
     ".DS_Store\ncoverage/\ndist/\nnode_modules/\n",
     "node_modules\r\ndist\r\n",
+    "node_modules\r\ndist",
   ]) {
     const { contents } = add(before);
     expect(coversPath(contents, ".repo-dive"), before).toBe(true);
