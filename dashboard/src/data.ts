@@ -1,13 +1,18 @@
 /**
- * Every `date` below is the commit's **committer** date — when it became part
- * of the history, in the committer's own timezone. Nothing here is placed by
- * the author date: under a rebase workflow that says when the work was
- * written, which can be months earlier and does not run forwards, so one clock
- * for the whole dashboard means every chart answers the same question — when
- * did this repository's trunk change.
+ * Rows carry whichever of a commit's two dates their chart is shaped for.
+ *
+ * {@link CommitRow} is a **histogram** row — the calendar and the monthly bars
+ * count commits and lines of work, binning them by an attribute of the commit
+ * itself, so it carries the **author** date. Every other row here is a **state
+ * sample** — "at time T the tree held V" — positioned by the instant the
+ * measurement was valid, so those carry the **committer** date, the only one
+ * of the two that runs forwards along the history.
+ *
+ * See docs/specs/04-collectors.md for why the boundary sits there.
  */
 type CommitRow = {
   sha: string;
+  /** When the commit was authored, in the author's own timezone (git `%aI`). */
   date: string;
   author: string;
   /**
@@ -21,22 +26,25 @@ type CommitRow = {
   deleted: number;
 };
 
+/** When the snapshot's tree became part of the history (git `%cI`). */
+type SnapshotDate = string;
+
 type LanguagesRow = {
   sha: string;
-  date: string;
+  date: SnapshotDate;
   byLanguage: Record<string, number>;
 };
 
 type FileTypesRow = {
   sha: string;
-  date: string;
+  date: SnapshotDate;
   totalFiles: number;
   totalBytes: number;
 };
 
 type DirectivesRow = {
   sha: string;
-  date: string;
+  date: SnapshotDate;
   eslintNextLine: number;
   eslintLine: number;
   eslintBlocks: number;
@@ -49,7 +57,7 @@ type DirectivesRow = {
 
 type DependenciesRow = {
   sha: string;
-  date: string;
+  date: SnapshotDate;
   /** Total resolved packages across all lockfiles in the tree. */
   resolved: number;
   /**
@@ -67,7 +75,7 @@ type DependenciesRow = {
 
 type SurvivalRow = {
   sha: string;
-  date: string;
+  date: SnapshotDate;
   byCohort: Record<string, number>;
   byContributor: Record<string, number>;
   /**
@@ -147,9 +155,12 @@ export type DashboardData = {
     remoteUrl?: string;
     commitCount: number;
     contributorCount: number;
-    /** When the oldest commit landed — where the calendar and timelines start. */
+    /**
+     * The outer edges of both clocks — the earliest anything was authored and
+     * the latest anything landed — so this range covers the author-dated
+     * calendar and the committer-dated timelines alike.
+     */
     firstCommitDate?: string;
-    /** When the newest commit landed — where they end. */
     lastCommitDate?: string;
     /**
      * Short shas of the oldest and newest indexed commits. Absent in

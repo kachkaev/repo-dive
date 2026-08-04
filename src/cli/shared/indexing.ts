@@ -61,31 +61,35 @@ export const parseIdentity = (
   };
 };
 
+/**
+ * Which of a commit's two dates a series uses comes down to the series' shape,
+ * not its subject matter — see docs/specs/04-collectors.md.
+ *
+ * A **state sample** ("at time T the tree held V lines") is positioned by the
+ * instant the measurement was valid, so it takes {@link CommitFacts.committedAt}.
+ * A **histogram** ("how many commits fell in this day") bins objects by one of
+ * their own date attributes, so it takes the attribute it claims to show —
+ * {@link CommitFacts.authoredAt} for everything that counts work.
+ */
 type CommitFacts = {
   readonly sha: string;
   /**
-   * When the work was written. Recorded in the cube for queries that want it,
-   * but never used to place anything on a timeline — see {@link committedAt}.
+   * When the work was written — what every histogram over commits bins by, and
+   * the same clock `git blame` hands the survival collector for its cohorts, so
+   * "lines added in month M" and "lines belonging to cohort M" stay the same
+   * lines.
    */
   readonly authoredAt: string;
   /**
-   * When the commit became part of the history, and the single clock every
-   * chart is drawn against.
+   * When the commit became part of the history — the x coordinate of every
+   * state sample, because that is when the repository looked like that.
    *
-   * The author date can't serve as one. Under a rebase or squash-merge
-   * workflow it says when the work was written, which can be months before it
-   * landed, and it does not increase along the first-parent chain — ollama's
-   * mainline steps backwards by up to four months that way. Plotting a tree
-   * snapshot at its author date drags today's line counts back into the middle
-   * of a stretch the chart has already drawn, and every stacked area zigzags.
-   *
-   * Activity charts could have kept the author date, since bucketing by day or
-   * month makes them immune to that. They don't, deliberately: one clock for
-   * the whole dashboard is a rule worth stating in a sentence, and every chart
-   * then answers the same question — when did this repository's trunk change.
-   * The cost is real but small; measured across ollama's 5.6k commits, the
-   * calendar keeps 924 of its 947 active days and its weekend share moves from
-   * 9.9% to 9.6%.
+   * The author date can't serve there. Under a rebase or squash-merge workflow
+   * it says when the work was written, which can be months before it landed,
+   * and it does not increase along the first-parent chain — ollama's mainline
+   * steps backwards by up to four months that way. Plotting a tree snapshot at
+   * its author date drags today's line counts back into the middle of a stretch
+   * the chart has already drawn, and every stacked area zigzags.
    */
   readonly committedAt: string;
   readonly authorEmail: string;
@@ -148,6 +152,37 @@ const sumByKey = (
   return merged;
 };
 
+/**
+ * The instants the dashboard's time axes have to span.
+ *
+ * Both dates go in, because the two kinds of series are positioned by
+ * different ones: the calendar has to reach back to the earliest day anyone
+ * authored on, the timelines have to reach forward to the newest commit that
+ * landed, and either clock can be the outer one at either end. Parsed rather
+ * than compared as strings — ISO timestamps carry their own UTC offsets, so
+ * lexicographic order is not chronological order.
+ */
+const spanOf = (
+  commits: readonly CommitFacts[],
+): { first: string | undefined; last: string | undefined } => {
+  let first: string | undefined;
+  let last: string | undefined;
+  for (const commit of commits) {
+    for (const date of [commit.authoredAt, commit.committedAt]) {
+      if (!date) {
+        continue;
+      }
+      if (first === undefined || Date.parse(date) < Date.parse(first)) {
+        first = date;
+      }
+      if (last === undefined || Date.parse(date) > Date.parse(last)) {
+        last = date;
+      }
+    }
+  }
+  return { first, last };
+};
+
 const buildDashboardData = (
   repoRoot: string,
   commits: readonly CommitFacts[], // oldest first
@@ -175,9 +210,15 @@ const buildDashboardData = (
     };
   };
 
+  const span = spanOf(commits);
+
+  // A histogram over commits, so it bins by the author date: the calendar,
+  // the monthly bars and the churn bars all count work, and churn in
+  // particular has to line up with the survival cohorts below, which `git
+  // blame` reports on that same clock.
   const commitRows = commits.map((commit) => ({
     sha: commit.sha.slice(0, 10),
-    date: commit.committedAt,
+    date: commit.authoredAt,
     author: commit.authorEmail,
     kind: config.resolveContributor(commit.authorEmail, commit.authorName).kind,
     ai: coAuthorsOf(commit).some(
@@ -499,9 +540,9 @@ const buildDashboardData = (
       remoteUrl,
       commitCount: commits.length,
       contributorCount: contributorMap.size,
-      firstCommitDate: commits.at(0)?.committedAt,
+      firstCommitDate: span.first,
       firstCommitSha: commits.at(0)?.sha.slice(0, 10),
-      lastCommitDate: commits.at(-1)?.committedAt,
+      lastCommitDate: span.last,
       lastCommitSha: commits.at(-1)?.sha.slice(0, 10),
     },
     commits: commitRows,
