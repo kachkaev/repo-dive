@@ -39,7 +39,9 @@ Write every ordered-list marker as `1.` followed by **two spaces**, so item cont
 
 Two things markdownlint enforces here, so both are non-negotiable rather than stylistic:
 
-- **Every marker is `1.`, not `1.` / `2.` / `3.`** — `MD029` is set to `style: "one"`. The numbers render as `1. 2. 3.` regardless; using `1.` for each means inserting or reordering a step never changes the numbers on the lines below it, so the diff stays minimal. (Prettier keeps whatever you write, so it won't count them up into `1.` / `2.` / `3.`.)
+- **Every marker is `1.`, not `1.` / `2.` / `3.`** — `MD029` is set to `style: "one"`.
+  The numbers render as `1. 2. 3.` regardless; using `1.` for each means inserting or reordering a step never changes the numbers on the lines below it, so the diff stays minimal.
+  (Prettier keeps whatever you write, so it won't count them up into `1.` / `2.` / `3.`.)
 - **Two spaces after the dot** — `MD030` is set to `ol_single`/`ol_multi: 2`, landing item content at column 4.
 
 Everything that belongs to an item — continuation sentences, nested lists, fenced code blocks — indents by four spaces.

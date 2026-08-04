@@ -1,6 +1,7 @@
 # Metrics cube
 
-_Draft. The cube is the queryable index built from raw catalog outputs — the reduce half of the pipeline._
+_Draft.
+The cube is the queryable index built from raw catalog outputs — the reduce half of the pipeline._
 
 ## Model
 
@@ -88,5 +89,6 @@ The `report` and `query` commands, future chart generation and any AI/MCP integr
 ## Notes
 
 - **Rebuildability** is the key invariant: `index` drops the DB and reruns every collector's `normalize` over the raw catalog on every invocation. The cube is a cache, never the source of truth — which is also why no `--rebuild` flag is needed.
-- **Dates as dimensions**: time bucketing (day/week/month) is derived at query time rather than materialized, until performance says otherwise. Measurements of the tree over time order by `commits.committed_at`; counts of commits or lines of work bucket by `commits.authored_at` — see [collectors](04-collectors.md#author-date-vs-committer-date) for the rule.
+- **Dates as dimensions**: time bucketing (day/week/month) is derived at query time rather than materialized, until performance says otherwise.
+  Measurements of the tree over time order by `commits.committed_at`; counts of commits or lines of work bucket by `commits.authored_at` — see [collectors](04-collectors.md#author-date-vs-committer-date) for the rule.
 - **Future backends**: the cube interface should stay narrow enough that a DuckDB or Parquet export ("give me the facts table as Parquet") is an output format, not a rewrite. An `export` command is the likely shape.

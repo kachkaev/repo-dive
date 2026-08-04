@@ -24,12 +24,15 @@ Note this is an npm-specific rule — PyPI ([PEP 503](https://peps.python.org/pe
 
 - ~~Self-ignoring catalog vs appending to the repo's `.gitignore`~~ — answered: self-ignoring. Creating the catalog writes `.repo-dive/.gitignore` containing `*` and never touches the analyzed repo's own files.
 - When to introduce sha sharding and tree-level deduplication of catalog outputs (measure first). Blob-level deduplication is done — see the [blob cache](03-catalog.md#blob-cache).
-- Pruning the blob cache past dead fingerprints: `gc --stale` now drops namespaces whose collector fingerprint no longer matches any registered collector, which is the part that grows without bound. Entries under a _live_ fingerprint whose blob has left the repository still stay forever. Proving such a blob dead means a full `rev-list --objects` walk, and a wrong answer costs a long re-scan — so this is worth doing only if that residue turns out to matter in practice.
+- Pruning the blob cache past dead fingerprints: `gc --stale` now drops namespaces whose collector fingerprint no longer matches any registered collector, which is the part that grows without bound.
+  Entries under a _live_ fingerprint whose blob has left the repository still stay forever.
+  Proving such a blob dead means a full `rev-list --objects` walk, and a wrong answer costs a long re-scan — so this is worth doing only if that residue turns out to matter in practice.
 - Lock mechanism for concurrent runs.
 
 ## Collectors
 
-- ~~Embed a JS LOC counter vs shell out to tokei/scc if present (with graceful fallback)?~~ — answered: embedded. The `languages` collector counts lines in-process over the blob cache, which drops an external dependency and, more importantly, lets it scan the exact file set `survival` blames — the two halves of the "Lines by language" chart could not otherwise agree.
+- ~~Embed a JS LOC counter vs shell out to tokei/scc if present (with graceful fallback)?~~ — answered: embedded.
+  The `languages` collector counts lines in-process over the blob cache, which drops an external dependency and, more importantly, lets it scan the exact file set `survival` blames — the two halves of the "Lines by language" chart could not otherwise agree.
 - Default sampling policy for `worktree` collectors (`weekly`? `max:200`?).
 - Plugin distribution: npm packages (dynamic import, trusted code) vs command protocol (config-mapped shell commands) — or both, and in which order.
 - How collectors declare the category keys they emit (needed for dynamic index creation and for discoverability in `status`).
@@ -47,7 +50,8 @@ Note this is an npm-specific rule — PyPI ([PEP 503](https://peps.python.org/pe
 
 ## Scope
 
-- ~~Branch handling: first-parent history only vs everything reachable~~ — answered by strategy rather than globally: `log` collectors see every commit reachable from HEAD, while `tree` and `worktree` collectors are restricted to HEAD's first-parent chain, since only those trees are states the repository passed through (see [collectors](04-collectors.md#sampling)). Still open: whether anything should walk branches other than HEAD's.
+- ~~Branch handling: first-parent history only vs everything reachable~~ — answered by strategy rather than globally: `log` collectors see every commit reachable from HEAD, while `tree` and `worktree` collectors are restricted to HEAD's first-parent chain, since only those trees are states the repository passed through (see [collectors](04-collectors.md#sampling)).
+  Still open: whether anything should walk branches other than HEAD's.
 - Shallow clones and partial clones: detect and warn, or attempt to unshallow?
 - Monorepos: per-directory scoping (`--path`) as a first-class filter?
 - Other VCSs: git-only for now and for the foreseeable future, but a very distant Mercurial/Jujutsu/Pijul future shouldn't be structurally impossible — the catalog manifest records the VCS, and git-specific code stays behind the collector/runner seam rather than leaking into the cube model.

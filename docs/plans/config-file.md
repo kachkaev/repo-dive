@@ -1,6 +1,7 @@
 # Plan: `repo-dive.config.ts`
 
-_Implemented. See [docs/specs/07-config.md](../specs/07-config.md) for the shipped behavior; this file is kept as the original design note._
+_Implemented.
+See [docs/specs/07-config.md](../specs/07-config.md) for the shipped behavior; this file is kept as the original design note._
 
 Let users drop a `repo-dive.config.ts` at the root of the **analyzed** repository (knip-style) to alter how the tool works.
 Everything must keep working with zero config.
@@ -39,7 +40,9 @@ Note the categorical palette has 8 slots — beyond 8, series need the sequentia
 
 ## Implementation notes
 
-- **Loading**: the config lives in the analyzed repo, not in repo-dive. Node ≥ 22.18 strips types on `import()`, so a plain dynamic `import(pathToFileURL(configPath))` of the `.ts` file should work without a bundler — verify, and fall back to also accepting `.mjs`/`.js`. Check whether Effect v4 has file-config helpers worth using (`effect/config` is env-oriented; probably not a fit — confirm against the cloned Effect source, which is the API source of truth).
+- **Loading**: the config lives in the analyzed repo, not in repo-dive.
+  Node ≥ 22.18 strips types on `import()`, so a plain dynamic `import(pathToFileURL(configPath))` of the `.ts` file should work without a bundler — verify, and fall back to also accepting `.mjs`/`.js`.
+  Check whether Effect v4 has file-config helpers worth using (`effect/config` is env-oriented; probably not a fit — confirm against the cloned Effect source, which is the API source of truth).
 - **`defineConfig` export**: needs a `repo-dive/config` subpath export in package.json that ships types but almost no runtime (identity function). The CLI bundle currently has no secondary entry — add one to the vite config.
 - **Validation**: parse the imported object structurally (same no-assertions style as `src/shared/json.ts`) and fail with a friendly message on malformed config.
 - **Plumbing**: `runIndex` gets the config (resolved from `--repo` root); alias resolution is a `canonicalizeAuthor(email)` step applied wherever `prettifyAuthorEmail` is used today ([indexing.ts](../../src/cli/shared/indexing.ts)). Dashboard data shape doesn't change.
@@ -49,4 +52,5 @@ Note the categorical palette has 8 slots — beyond 8, series need the sequentia
 
 - Unit: alias resolution, config parsing, cap plumbing.
 - Fixture e2e: repo with two commits under different emails + a config file → one author in dashboard.json after `index`.
-- Real-world: the user has a locally scanned private repo for validation (ask them; **never name it in committed docs or commits**). Query the cube for candidate duplicate identities (same display name, different emails; noreply variants) and propose an alias config for that repo — the config file belongs to that repo and must not be committed here.
+- Real-world: the user has a locally scanned private repo for validation (ask them; **never name it in committed docs or commits**).
+  Query the cube for candidate duplicate identities (same display name, different emails; noreply variants) and propose an alias config for that repo — the config file belongs to that repo and must not be committed here.
