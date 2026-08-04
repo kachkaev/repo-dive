@@ -5,8 +5,12 @@
  * resolved in function bodies rather than destructured parameters (typed
  * destructured defaults silently bail React Compiler), the `cn-tooltip-*`
  * classes (which need a stylesheet this repo does not ship) are replaced by
- * plain utilities, and there is no `TooltipProvider` — the dashboard's tooltips
- * are scattered rather than grouped, so each trigger carries its own `delay`.
+ * plain utilities, there is no `TooltipProvider` — the dashboard's tooltips
+ * are scattered rather than grouped, so each trigger carries its own `delay` —
+ * the positioner's `anchor` is forwarded, so a controlled tooltip can follow
+ * something other than a trigger (a hovered SVG cell, say), and `arrow` can
+ * drop the arrow, for tooltips restyled as one of the dashboard's own cards
+ * (which never point at anything).
  */
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 
@@ -22,13 +26,15 @@ export function TooltipContent({
   sideOffset,
   align,
   alignOffset,
+  anchor,
+  arrow,
   children,
   ...props
 }: PropsWithPlainClassName<TooltipPrimitive.Popup.Props> &
   Pick<
     TooltipPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset"
-  >) {
+    "align" | "alignOffset" | "anchor" | "side" | "sideOffset"
+  > & { arrow?: boolean | undefined }) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner
@@ -36,6 +42,7 @@ export function TooltipContent({
         sideOffset={sideOffset ?? 6}
         align={align ?? "center"}
         alignOffset={alignOffset ?? 0}
+        anchor={anchor}
         className="isolate z-50"
       >
         <TooltipPrimitive.Popup
@@ -52,11 +59,13 @@ export function TooltipContent({
             `top` inline style); nudging it out of the popup, and turning it to
             face away, is the styling layer's job.
           */}
-          <TooltipPrimitive.Arrow className="data-[side=bottom]:-top-[5px] data-[side=bottom]:rotate-180 data-[side=left]:-right-[7.5px] data-[side=left]:-rotate-90 data-[side=right]:-left-[7.5px] data-[side=right]:rotate-90 data-[side=top]:-bottom-[5px]">
-            <svg width="10" height="5" viewBox="0 0 10 5" aria-hidden>
-              <path d="M0 0 L5 5 L10 0 Z" className="fill-foreground" />
-            </svg>
-          </TooltipPrimitive.Arrow>
+          {arrow !== false && (
+            <TooltipPrimitive.Arrow className="data-[side=bottom]:-top-[5px] data-[side=bottom]:rotate-180 data-[side=left]:-right-[7.5px] data-[side=left]:-rotate-90 data-[side=right]:-left-[7.5px] data-[side=right]:rotate-90 data-[side=top]:-bottom-[5px]">
+              <svg width="10" height="5" viewBox="0 0 10 5" aria-hidden>
+                <path d="M0 0 L5 5 L10 0 Z" className="fill-foreground" />
+              </svg>
+            </TooltipPrimitive.Arrow>
+          )}
         </TooltipPrimitive.Popup>
       </TooltipPrimitive.Positioner>
     </TooltipPrimitive.Portal>

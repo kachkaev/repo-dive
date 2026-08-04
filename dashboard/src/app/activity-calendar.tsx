@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 
 import type { ContributorKind } from "../data.ts";
 import { ScrollArea } from "./shared/@ui-primitive/scroll-area.tsx";
+import { Tooltip, TooltipContent } from "./shared/@ui-primitive/tooltip.tsx";
 import {
   kindColors,
   type KindFilter,
@@ -35,14 +36,15 @@ export type CalendarKindFilter = KindFilter;
 const dayMs = 86_400_000;
 const binSize = 12;
 const cellSize = 10;
-const marginLeft = 30;
+const marginLeft = 20;
 const marginTop = 16;
 /** Horizontal breathing room between months — makes month boundaries readable. */
 const gapColumns = 2;
 
+/** Two letters: the grid is 10px cells, so the gutter should not cost more. */
 const dayLabels: Record<WeekStart, string[]> = {
-  monday: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-  sunday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+  monday: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
+  sunday: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
 };
 
 /**
@@ -201,12 +203,13 @@ type Cell = {
   isoDate: string;
   column: number;
   row: number;
-  day: DayTotal;
+  /** Undefined outside the covered range — a day the calendar knows nothing about. */
+  day: DayTotal | undefined;
 };
 
 type StripLayout = {
   cells: Cell[];
-  /** Column of each month's first day, for label placement. */
+  /** Column each month's label is drawn at. */
   monthLabels: Array<{ isoMonth: string; column: number }>;
   columnCount: number;
 };
@@ -216,7 +219,9 @@ type StripLayout = {
  * {@link gapColumns} empty columns inserted at each month boundary (a week
  * spanning two months splits across the gap). Days outside
  * [`minIsoDate`, `maxIsoDate`] — before the first commit or after the data was
- * generated — get no cell at all, distinguishing "unknown" from "zero commits".
+ * generated — get a cell with no totals, drawn as an outline: "we have no data
+ * for this day" has to read differently from both "zero commits" and the void
+ * between months.
  */
 const layOutStrip = (
   months: string[],
@@ -247,18 +252,20 @@ const layOutStrip = (
     const isoMonth = isoDate.slice(0, 7);
     const week = Math.floor((ms - weekZeroMs) / (dayMs * 7));
     const column = week + (ordinalOfMonth.get(isoMonth) ?? 0) * gapColumns;
+    const row = rowOfMs(ms);
     columnCount = Math.max(columnCount, column + 1);
     if (isoDate.endsWith("-01")) {
-      monthLabels.push({ isoMonth, column });
+      // A month whose 1st is not on the week's first day only fills the bottom
+      // of its opening column, leaving the label hovering over the gap that
+      // precedes it. One column right, and it sits above the month's own days.
+      monthLabels.push({ isoMonth, column: row === 0 ? column : column + 1 });
     }
-    if (isoDate < minIsoDate || isoDate > maxIsoDate) {
-      continue;
-    }
+    const covered = isoDate >= minIsoDate && isoDate <= maxIsoDate;
     cells.push({
       isoDate,
       column,
-      row: rowOfMs(ms),
-      day: dayTotals.get(isoDate) ?? emptyDay,
+      row,
+      day: covered ? (dayTotals.get(isoDate) ?? emptyDay) : undefined,
     });
   }
   return { cells, monthLabels, columnCount };
@@ -271,7 +278,7 @@ const layOutStrip = (
  * building block as the monthly bars, normalized to cell height.
  */
 function CellStack({
-  cell,
+  day,
   x,
   y,
   level,
@@ -279,7 +286,7 @@ function CellStack({
   hatchId,
   clipId,
 }: {
-  cell: Cell;
+  day: DayTotal;
   x: number;
   y: number;
   level: number;
@@ -299,7 +306,7 @@ function CellStack({
       />
     );
   }
-  const parts = stackPartsOf(cell.day, filter);
+  const parts = stackPartsOf(day, filter);
   const heights = roundPartPx(
     parts.map((part) => part.value),
     cellSize,
@@ -348,13 +355,15 @@ function CalendarStrip({
   levelOf,
   filter,
   onHover,
+  onHoverEnd,
 }: {
   title: string;
   layout: StripLayout;
   weekStartsOn: WeekStart;
   levelOf: (value: number) => number;
   filter: CalendarKindFilter;
-  onHover: (cell: Cell | undefined) => void;
+  onHover: (cell: Cell, target: SVGRectElement) => void;
+  onHoverEnd: () => void;
 }) {
   const patternIdBase = useId();
   const hatchId = `${patternIdBase}-hatch`;
@@ -369,9 +378,7 @@ function CalendarStrip({
         height={height}
         role="img"
         aria-label={`Commit calendar, ${title}`}
-        onMouseLeave={() => {
-          onHover(undefined);
-        }}
+        onMouseLeave={onHoverEnd}
       >
         <defs>
           {/* AI-assist hatch: 1px lines at a 3px pitch — 2/3 author fill, 1/3 helper. */}
@@ -411,18 +418,34 @@ function CalendarStrip({
             {label}
           </text>
         ))}
-        {layout.cells.map((cell) => (
-          <CellStack
-            key={cell.isoDate}
-            cell={cell}
-            x={marginLeft + cell.column * binSize}
-            y={marginTop + cell.row * binSize}
-            level={levelOf(filterValueOf(cell.day, filter))}
-            filter={filter}
-            hatchId={hatchId}
-            clipId={clipId}
-          />
-        ))}
+        {layout.cells.map((cell) =>
+          cell.day === undefined ? (
+            /* An empty day's own fill, drawn as an outline: subtle enough to
+               stay background, with the ring the only thing that says "no
+               data". Half a pixel of inset keeps the stroke on the grid. */
+            <rect
+              key={cell.isoDate}
+              x={marginLeft + cell.column * binSize + 0.5}
+              y={marginTop + cell.row * binSize + 0.5}
+              width={cellSize - 1}
+              height={cellSize - 1}
+              rx={1.5}
+              fill="none"
+              stroke="var(--surface-2)"
+            />
+          ) : (
+            <CellStack
+              key={cell.isoDate}
+              day={cell.day}
+              x={marginLeft + cell.column * binSize}
+              y={marginTop + cell.row * binSize}
+              level={levelOf(filterValueOf(cell.day, filter))}
+              filter={filter}
+              hatchId={hatchId}
+              clipId={clipId}
+            />
+          ),
+        )}
         {/* Hover targets on top, so segment boundaries never break hovering. */}
         {layout.cells.map((cell) => (
           <rect
@@ -432,8 +455,8 @@ function CalendarStrip({
             width={cellSize}
             height={cellSize}
             fill="transparent"
-            onMouseEnter={() => {
-              onHover(cell);
+            onMouseEnter={(event) => {
+              onHover(cell, event.currentTarget);
             }}
           />
         ))}
@@ -461,7 +484,12 @@ export function CommitCalendar({
   kindFilter: CalendarKindFilter;
   onKindFilterChange: (filter: CalendarKindFilter) => void;
 }) {
-  const [hovered, setHovered] = useState<Cell | undefined>();
+  // The hovered cell outlives its hover so the tooltip has something to render
+  // while it animates out; `tooltipOpen` is what the pointer actually drives.
+  const [hovered, setHovered] = useState<
+    { cell: Cell; target: SVGRectElement } | undefined
+  >();
+  const [tooltipOpen, setTooltipOpen] = useState(false);
 
   // Committer-local day bucketing: the ISO timestamp carries the committer's
   // UTC offset, so its date part is the day the commit landed where it landed.
@@ -564,9 +592,12 @@ export function CommitCalendar({
   }));
 
   const rangeTotal: DayTotal = { ...emptyDay };
-  let busiest: Cell | undefined;
+  let busiest: { isoDate: string; day: DayTotal } | undefined;
   for (const { layout } of layouts) {
     for (const cell of layout.cells) {
+      if (cell.day === undefined) {
+        continue;
+      }
       rangeTotal.human += cell.day.human;
       rangeTotal.humanAi += cell.day.humanAi;
       rangeTotal.bot += cell.day.bot;
@@ -575,7 +606,7 @@ export function CommitCalendar({
         filterValueOf(cell.day, kindFilter) >
         filterValueOf(busiest?.day ?? emptyDay, kindFilter)
       ) {
-        busiest = cell;
+        busiest = { isoDate: cell.isoDate, day: cell.day };
       }
     }
   }
@@ -607,15 +638,21 @@ export function CommitCalendar({
       .join(" · ");
   };
 
-  const describe = (cell: Cell): string => {
-    const detail = detailOf(cell.day);
-    return `${cell.isoDate}: ${countPhrase(cell.day)}${detail ? ` — ${detail}` : ""}`;
+  const summarize = (day: DayTotal): string => {
+    const detail = detailOf(day);
+    return `${countPhrase(day)}${detail ? ` — ${detail}` : ""}`;
   };
+
+  /** Why a day has no totals — the calendar's own edges, in the reader's terms. */
+  const noDataReason = (isoDate: string): string =>
+    isoDate < minIsoDate
+      ? "Before the first commit"
+      : "After this report was generated";
 
   const rangeDetail = detailOf(rangeTotal);
   const rangeSummary = `${countPhrase(rangeTotal)} in this range${
     rangeDetail ? ` (${rangeDetail})` : ""
-  }${busiest ? ` · busiest day ${describe(busiest)}` : ""}`;
+  }${busiest ? ` · busiest day ${busiest.isoDate}: ${summarize(busiest.day)}` : ""}`;
 
   const legendColor =
     kindFilter === "all" ? kindColors.human : kindColors[kindFilter];
@@ -640,15 +677,49 @@ export function CommitCalendar({
               weekStartsOn={weekStartsOn}
               levelOf={levelOf}
               filter={kindFilter}
-              onHover={setHovered}
+              onHover={(cell, target) => {
+                setHovered({ cell, target });
+                setTooltipOpen(true);
+              }}
+              onHoverEnd={() => {
+                setTooltipOpen(false);
+              }}
             />
           ))}
         </div>
       </ScrollArea>
+      {/* A day's detail belongs in a tooltip rather than in the caption below:
+          the caption's height varies with the text, and the whole calendar
+          used to jump as the pointer moved from one day to the next.
+          `disableHoverablePopup` makes the popup inert, so the days it covers
+          keep receiving the pointer. */}
+      <Tooltip
+        open={tooltipOpen}
+        onOpenChange={setTooltipOpen}
+        disableHoverablePopup
+      >
+        {hovered && (
+          <TooltipContent
+            anchor={hovered.target}
+            arrow={false}
+            className="rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-(--text-primary) tabular-nums shadow-sm"
+          >
+            <div className="mb-1 font-medium text-(--text-secondary)">
+              {hovered.cell.isoDate} ·{" "}
+              {dayLabels[weekStartsOn][hovered.cell.row]}
+            </div>
+            {hovered.cell.day === undefined ? (
+              <div className="text-(--text-muted)">
+                {noDataReason(hovered.cell.isoDate)}
+              </div>
+            ) : (
+              <div>{summarize(hovered.cell.day)}</div>
+            )}
+          </TooltipContent>
+        )}
+      </Tooltip>
       <div className="mt-2 flex items-center justify-between gap-4 text-xs text-(--text-secondary)">
-        <span className="tabular-nums">
-          {hovered ? describe(hovered) : rangeSummary}
-        </span>
+        <span className="tabular-nums">{rangeSummary}</span>
         <span className="flex shrink-0 items-center gap-1 text-(--text-muted)">
           Less
           {levelOpacities.map((opacity, level) => (
