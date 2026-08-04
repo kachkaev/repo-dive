@@ -11,7 +11,7 @@ import { resolveRepoRoot } from "./scan.ts";
 const queryTool = Tool.make("query", {
   description:
     "Run a read-only SQL query (SELECT/WITH/EXPLAIN) against the repository's metrics cube. " +
-    "Tables: commits (sha, authored_at, author_email, author_name) and facts " +
+    "Tables: commits (sha, authored_at, committed_at, author_email, author_name) and facts " +
     "(commit_sha, collector, metric, value, categories as a JSON object usable via json_extract). " +
     "Returns { columns, rows, truncated }.",
   parameters: Schema.Struct({ sql: Schema.String }),
@@ -48,12 +48,18 @@ const buildSchemaDescription = (
     );
     const commitRange = yield* query(
       catalogPath,
-      "SELECT count(*) AS commits, min(authored_at) AS first, max(authored_at) AS last FROM commits",
+      "SELECT count(*) AS commits, min(committed_at) AS first, max(committed_at) AS last FROM commits",
     );
 
     return {
       tables: {
-        commits: ["sha", "authored_at", "author_email", "author_name"],
+        commits: [
+          "sha",
+          "authored_at",
+          "committed_at",
+          "author_email",
+          "author_name",
+        ],
         facts: [
           "id",
           "commit_sha",
@@ -68,6 +74,7 @@ const buildSchemaDescription = (
       categoryKeySamples: categorySamples.rows,
       hints: [
         "Join facts to commits via commit_sha to plot anything over time.",
+        "Use committed_at for anything over time — it is when the repository changed, and every chart in the tool is drawn against it. authored_at is recorded too, but it can run months behind and does not increase along the history, so ordering or bucketing by it produces nonsense on repos that rebase.",
         "categories is open-ended: keys differ per metric (language, extension, author, rule, cohort, …).",
         "Sampled collectors (languages.*, survival.*) only have facts at sampled commits.",
       ],

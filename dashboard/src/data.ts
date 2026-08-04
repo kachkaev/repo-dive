@@ -1,3 +1,11 @@
+/**
+ * Every `date` below is the commit's **committer** date — when it became part
+ * of the history, in the committer's own timezone. Nothing here is placed by
+ * the author date: under a rebase workflow that says when the work was
+ * written, which can be months earlier and does not run forwards, so one clock
+ * for the whole dashboard means every chart answers the same question — when
+ * did this repository's trunk change.
+ */
 type CommitRow = {
   sha: string;
   date: string;
@@ -139,7 +147,9 @@ export type DashboardData = {
     remoteUrl?: string;
     commitCount: number;
     contributorCount: number;
+    /** When the oldest commit landed — where the calendar and timelines start. */
     firstCommitDate?: string;
+    /** When the newest commit landed — where they end. */
     lastCommitDate?: string;
     /**
      * Short shas of the oldest and newest indexed commits. Absent in

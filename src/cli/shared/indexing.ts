@@ -63,7 +63,31 @@ export const parseIdentity = (
 
 type CommitFacts = {
   readonly sha: string;
-  readonly date: string;
+  /**
+   * When the work was written. Recorded in the cube for queries that want it,
+   * but never used to place anything on a timeline — see {@link committedAt}.
+   */
+  readonly authoredAt: string;
+  /**
+   * When the commit became part of the history, and the single clock every
+   * chart is drawn against.
+   *
+   * The author date can't serve as one. Under a rebase or squash-merge
+   * workflow it says when the work was written, which can be months before it
+   * landed, and it does not increase along the first-parent chain — ollama's
+   * mainline steps backwards by up to four months that way. Plotting a tree
+   * snapshot at its author date drags today's line counts back into the middle
+   * of a stretch the chart has already drawn, and every stacked area zigzags.
+   *
+   * Activity charts could have kept the author date, since bucketing by day or
+   * month makes them immune to that. They don't, deliberately: one clock for
+   * the whole dashboard is a rule worth stating in a sentence, and every chart
+   * then answers the same question — when did this repository's trunk change.
+   * The cost is real but small; measured across ollama's 5.6k commits, the
+   * calendar keeps 924 of its 947 active days and its weekend share moves from
+   * 9.9% to 9.6%.
+   */
+  readonly committedAt: string;
   readonly authorEmail: string;
   readonly authorName: string;
   /** collector name → facts from that collector's output */
@@ -153,7 +177,7 @@ const buildDashboardData = (
 
   const commitRows = commits.map((commit) => ({
     sha: commit.sha.slice(0, 10),
-    date: commit.date,
+    date: commit.committedAt,
     author: commit.authorEmail,
     kind: config.resolveContributor(commit.authorEmail, commit.authorName).kind,
     ai: coAuthorsOf(commit).some(
@@ -172,7 +196,7 @@ const buildDashboardData = (
     .filter((commit) => hasMetric(commit, "languages.lines"))
     .map((commit) => ({
       sha: commit.sha.slice(0, 10),
-      date: commit.date,
+      date: commit.committedAt,
       byLanguage: groupMetric(commit, "languages.lines", "language"),
     }));
 
@@ -180,7 +204,7 @@ const buildDashboardData = (
     .filter((commit) => hasMetric(commit, "files.count"))
     .map((commit) => ({
       sha: commit.sha.slice(0, 10),
-      date: commit.date,
+      date: commit.committedAt,
       totalFiles: sumMetric(commit, "files.count"),
       totalBytes: sumMetric(commit, "files.bytes"),
     }));
@@ -192,7 +216,7 @@ const buildDashboardData = (
       const ts = groupMetric(commit, "directives.ts", "type");
       return {
         sha: commit.sha.slice(0, 10),
-        date: commit.date,
+        date: commit.committedAt,
         eslintNextLine: byType["next-line"] ?? 0,
         eslintLine: byType["line"] ?? 0,
         eslintBlocks: byType["block"] ?? 0,
@@ -223,7 +247,7 @@ const buildDashboardData = (
       const byKind = groupMetric(commit, "dependencies.direct", "kind");
       return {
         sha: commit.sha.slice(0, 10),
-        date: commit.date,
+        date: commit.committedAt,
         resolved: sumMetric(commit, "dependencies.resolved"),
         manifestCount: sumMetric(commit, "dependencies.manifest"),
         directProd: byKind["prod"] ?? 0,
@@ -307,7 +331,7 @@ const buildDashboardData = (
       }
       return {
         sha: commit.sha.slice(0, 10),
-        date: commit.date,
+        date: commit.committedAt,
         byCohort: groupMetric(commit, "survival.lines", "cohort"),
         byContributor: sumByKey(
           groupMetric(commit, "survival.lines", "author"),
@@ -475,9 +499,9 @@ const buildDashboardData = (
       remoteUrl,
       commitCount: commits.length,
       contributorCount: contributorMap.size,
-      firstCommitDate: commits.at(0)?.date,
+      firstCommitDate: commits.at(0)?.committedAt,
       firstCommitSha: commits.at(0)?.sha.slice(0, 10),
-      lastCommitDate: commits.at(-1)?.date,
+      lastCommitDate: commits.at(-1)?.committedAt,
       lastCommitSha: commits.at(-1)?.sha.slice(0, 10),
     },
     commits: commitRows,
@@ -502,6 +526,7 @@ const writeSqlite = (
       CREATE TABLE commits (
         sha TEXT PRIMARY KEY,
         authored_at TEXT NOT NULL,
+        committed_at TEXT NOT NULL,
         author_email TEXT NOT NULL,
         author_name TEXT NOT NULL
       );
@@ -518,7 +543,7 @@ const writeSqlite = (
     `);
 
     const insertCommit = db.prepare(
-      "INSERT INTO commits (sha, authored_at, author_email, author_name) VALUES (?, ?, ?, ?)",
+      "INSERT INTO commits (sha, authored_at, committed_at, author_email, author_name) VALUES (?, ?, ?, ?, ?)",
     );
     const insertFact = db.prepare(
       "INSERT INTO facts (commit_sha, collector, metric, value, categories) VALUES (?, ?, ?, ?, ?)",
@@ -529,7 +554,8 @@ const writeSqlite = (
     for (const commit of commits) {
       insertCommit.run(
         commit.sha,
-        commit.date,
+        commit.authoredAt,
+        commit.committedAt,
         commit.authorEmail,
         commit.authorName,
       );
@@ -580,10 +606,19 @@ export const runIndex = ({
       }),
     );
 
-    // Oldest first so every derived series is naturally chronological.
+    // Oldest first so every derived series is naturally chronological, ordered
+    // by the very committer date snapshots are plotted against: `git log` order
+    // almost always agrees, but a skewed clock can put it out of step, and a
+    // timeline whose x coordinate moves backwards draws as a zigzag rather than
+    // a curve. Reversed before sorting, so commits sharing a committer date (a
+    // rebased batch lands with one) keep git's parent-before-child order.
     const orderedCommits = gitCommits
       .toReversed()
-      .filter((commit) => catalogShas.has(commit.hash));
+      .filter((commit) => catalogShas.has(commit.hash))
+      .toSorted(
+        (left, right) =>
+          Date.parse(left.committerDate) - Date.parse(right.committerDate),
+      );
 
     if (orderedCommits.length === 0) {
       return yield* new NoCollectedCommitsError({ commitsPath });
@@ -624,7 +659,8 @@ export const runIndex = ({
           }
           const facts: CommitFacts = {
             sha: commit.hash,
-            date: commit.authorDate,
+            authoredAt: commit.authorDate,
+            committedAt: commit.committerDate,
             authorEmail: commit.authorEmail,
             authorName: commit.authorName,
             factsByCollector,

@@ -66,13 +66,31 @@ Policies:
 - `every-nth:<n>` — a count-based budget, taken over the newest-first commit list
 - Tags/releases as natural sample points (future)
 
-Period buckets are computed from the author date in UTC (ISO weeks for `weekly`).
+Period buckets are computed from the committer date in UTC (ISO weeks for `weekly`), like every other timeline here — see [one clock](#one-clock-the-committer-date).
+A policy therefore asks for one snapshot per week or month of the repository's own history, and a rebased commit belongs to the period it landed in rather than the one it was written in.
 
 Which commits a collector was actually run on stays visible in the cube (facts carry the collector that produced them), so charts can interpolate honestly rather than pretending to be continuous.
 
 `tree` and `worktree` collectors sample the **first-parent chain only**.
 Their output describes the state of the tree, and only first-parent commits are states the repository actually passed through: a commit on a merged side branch — or one that arrived with a foreign history absorbed by an unrelated-histories merge — carries a tree that was never HEAD, so sampling it puts a cliff into the timeline.
 `log` collectors see every commit, since a commit's own authorship and diff are facts wherever it sits in the graph.
+
+## One clock: the committer date
+
+**Every** timeline in the tool — snapshot series, the commit calendar, commits and churn per month, the `scan` summary — places a commit at its **committer** date, i.e. when the commit became part of the history.
+So every chart answers one question: when did this repository's trunk change.
+
+The author date cannot serve as that clock.
+Under a rebase or squash-merge workflow it says when the work was written, which can be months before it landed, and it does not increase along the first-parent chain — ollama's mainline steps backwards 364 times, by up to four months.
+Plotting a tree snapshot at its author date drags the current line counts back into a stretch the chart has already drawn, and every stacked area zigzags.
+
+Activity charts could have kept the author date, since bucketing by day or month makes them immune to that, and doing so would preserve the contributor's own timezone and the delay between writing and landing.
+They don't, deliberately: a single clock is a rule that fits in a sentence, where "author date for people, committer date for repository state" needs a paragraph and a decision at every new chart.
+The cost is measurable and small — across ollama's 5.6k commits the calendar keeps 924 of its 947 active days, its median stays at 4 commits/day, and its weekend share moves from 9.9% to 9.6%.
+
+Both dates are still recorded (`commits.authored_at` and `commits.committed_at` in the [cube](05-metrics-cube.md)), so a query can ask about authoring time, and lead-time metrics — how long work sits before it lands — stay possible later.
+
+Attribution is unaffected and still keys off the **author**: see [config](07-config.md).
 
 ## Incrementality
 

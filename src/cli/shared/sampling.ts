@@ -58,9 +58,9 @@ const isoWeekOf = (date: Date): string => {
 
 const bucketOf = (
   policy: "weekly" | "monthly" | "quarterly",
-  authorDate: string,
+  committerDate: string,
 ): string => {
-  const date = new Date(authorDate);
+  const date = new Date(committerDate);
   if (policy === "weekly") {
     return isoWeekOf(date);
   }
@@ -74,6 +74,10 @@ const bucketOf = (
  * Picks the sampled subset of commits for a policy. `commits` must be ordered
  * newest first (as `git log` emits them); period policies keep the newest
  * commit of each period, so HEAD is always included.
+ *
+ * Periods are committer-date periods: a policy asks for one snapshot per week
+ * or month of the repository's own history, and a rebased commit belongs to
+ * the period it landed in, not the one it was written in.
  */
 export const sampleCommits = (
   commits: readonly CommitMeta[],
@@ -90,7 +94,7 @@ export const sampleCommits = (
   const seenBuckets = new Set<string>();
   const sampled: CommitMeta[] = [];
   for (const commit of commits) {
-    const bucket = bucketOf(policy, commit.authorDate);
+    const bucket = bucketOf(policy, commit.committerDate);
     if (!seenBuckets.has(bucket)) {
       seenBuckets.add(bucket);
       sampled.push(commit);
