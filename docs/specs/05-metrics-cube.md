@@ -26,7 +26,8 @@ Schema as built by `index` (v0):
 ```sql
 CREATE TABLE commits (
   sha TEXT PRIMARY KEY,
-  authored_at TEXT NOT NULL,     -- ISO 8601
+  authored_at TEXT NOT NULL,     -- ISO 8601; when the work was written
+  committed_at TEXT NOT NULL,    -- ISO 8601; when it landed in the history
   author_email TEXT NOT NULL,
   author_name TEXT NOT NULL
   -- … more metadata columns as needed
@@ -56,15 +57,17 @@ Why a JSON `categories` column rather than an EAV side table or wide columns:
 ## Query shapes to design for
 
 ```sql
--- Language breakdown over time (stacked area chart)
-SELECT c.authored_at, json_extract(f.categories, '$.language') AS language,
+-- Language breakdown over time (stacked area chart).
+-- Snapshot metrics go on the timeline by committed_at: that is when the tree
+-- looked like this, and unlike authored_at it never runs backwards.
+SELECT c.committed_at, json_extract(f.categories, '$.language') AS language,
        f.value
 FROM facts f JOIN commits c ON c.sha = f.commit_sha
 WHERE f.metric = 'languages.lines'
-ORDER BY c.authored_at;
+ORDER BY c.committed_at;
 
 -- Lint debt trend by rule (top N rules)
-SELECT c.authored_at, json_extract(f.categories, '$.rule') AS rule,
+SELECT c.committed_at, json_extract(f.categories, '$.rule') AS rule,
        sum(f.value) AS errors
 FROM facts f JOIN commits c ON c.sha = f.commit_sha
 WHERE f.metric = 'lint.errors'
@@ -76,5 +79,5 @@ The `report` and `query` commands, future chart generation and any AI/MCP integr
 ## Notes
 
 - **Rebuildability** is the key invariant: `index` drops the DB and reruns every collector's `normalize` over the raw catalog on every invocation. The cube is a cache, never the source of truth — which is also why no `--rebuild` flag is needed.
-- **Dates as dimensions**: time bucketing (day/week/month) is derived at query time from `commits.authored_at` rather than materialized, until performance says otherwise.
+- **Dates as dimensions**: time bucketing (day/week/month) is derived at query time rather than materialized, until performance says otherwise. Bucket snapshot metrics by `commits.committed_at` and authoring activity by `commits.authored_at` — see [collectors](04-collectors.md#sampling) for why the two differ.
 - **Future backends**: the cube interface should stay narrow enough that a DuckDB or Parquet export ("give me the facts table as Parquet") is an output format, not a rewrite. An `export` command is the likely shape.

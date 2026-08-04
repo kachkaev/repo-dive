@@ -22,12 +22,15 @@ const sampleLog = [
     "Alice",
     "alice@example.com",
     "2026-02-03T04:05:06+00:00",
+    // Rebased before landing, so it committed a fortnight after it was written
+    "2026-02-17T09:00:00+00:00",
     "Add feature",
   ].join(separator),
   [
     "bbb222",
     "Bob",
     "bob@example.com",
+    "2026-01-01T00:00:00+00:00",
     "2026-01-01T00:00:00+00:00",
     "Initial commit",
   ].join(separator),
@@ -43,6 +46,7 @@ test("parseGitLog extracts commit metadata", () => {
     authorName: "Alice",
     authorEmail: "alice@example.com",
     authorDate: "2026-02-03T04:05:06+00:00",
+    committerDate: "2026-02-17T09:00:00+00:00",
     subject: "Add feature",
   });
 });

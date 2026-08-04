@@ -7,12 +7,13 @@ import {
   samplingLabel,
 } from "./sampling.ts";
 
-function commit(hash: string, authorDate: string) {
+function commit(hash: string, committerDate: string, authorDate?: string) {
   return {
     hash,
     authorName: "A",
     authorEmail: "a@example.com",
-    authorDate,
+    authorDate: authorDate ?? committerDate,
+    committerDate,
     subject: "s",
   };
 }
@@ -39,6 +40,20 @@ test("sampleCommits keeps the newest commit per quarter", () => {
   expect(
     sampleCommits(commits, "quarterly").map((entry) => entry.hash),
   ).toStrictEqual(["e", "b"]);
+});
+
+test("sampleCommits buckets periods by the committer date", () => {
+  // Rebased onto the mainline in March, written in January: it belongs to
+  // March's bucket, and January is left to whatever actually landed then.
+  const rebased = [
+    commit("d", "2026-03-10T10:00:00Z", "2026-01-05T10:00:00Z"),
+    commit("c", "2026-03-01T10:00:00Z"),
+    commit("b", "2026-01-20T10:00:00Z"),
+  ];
+
+  expect(
+    sampleCommits(rebased, "monthly").map((entry) => entry.hash),
+  ).toStrictEqual(["d", "b"]);
 });
 
 test("sampleCommits supports every-nth", () => {

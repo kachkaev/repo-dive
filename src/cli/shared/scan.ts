@@ -36,7 +36,16 @@ export type CommitMeta = {
   readonly hash: string;
   readonly authorName: string;
   readonly authorEmail: string;
+  /** When the work was written — what authoring activity is measured against. */
   readonly authorDate: string;
+  /**
+   * When the commit took its current shape, i.e. when its tree became part of
+   * the history. Rebases and cherry-picks preserve the author date but reset
+   * this one, so only the committer date increases along the first-parent
+   * chain — which makes it the honest x coordinate for anything describing the
+   * state of the repository over time.
+   */
+  readonly committerDate: string;
   readonly subject: string;
 };
 
@@ -62,7 +71,7 @@ class CollectorRunError extends Data.TaggedError("CollectorRunError")<{
 
 const fieldSeparator = "\u001F";
 
-const gitLogFormat = ["%H", "%an", "%ae", "%aI", "%s"].join("%x1f");
+const gitLogFormat = ["%H", "%an", "%ae", "%aI", "%cI", "%s"].join("%x1f");
 
 export const parseGitLog = (stdout: string): CommitMeta[] => {
   const commits: CommitMeta[] = [];
@@ -73,6 +82,7 @@ export const parseGitLog = (stdout: string): CommitMeta[] => {
       authorName = "",
       authorEmail = "",
       authorDate = "",
+      committerDate = "",
       subject = "",
     ] = line.split(fieldSeparator);
 
@@ -80,7 +90,14 @@ export const parseGitLog = (stdout: string): CommitMeta[] => {
       continue;
     }
 
-    commits.push({ hash, authorName, authorEmail, authorDate, subject });
+    commits.push({
+      hash,
+      authorName,
+      authorEmail,
+      authorDate,
+      committerDate,
+      subject,
+    });
   }
 
   return commits;

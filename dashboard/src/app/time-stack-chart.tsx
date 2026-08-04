@@ -281,7 +281,16 @@ export function TimeSeriesChart({
   const supportsPercent = mode !== "line" && seriesKeys.length > 1;
   const showPercent = supportsPercent && percentMode;
 
-  const rows = points.map((point) => {
+  // Sorted here rather than trusted from the caller: everything downstream —
+  // the area paths, the bisector, the first/last row read as the data's span —
+  // assumes x increases, and a single point out of order draws as a zigzag
+  // instead of failing loudly. `index` writes chronological data, but a
+  // dashboard served against a catalog indexed by an older version may not.
+  const orderedPoints = points.toSorted(
+    (left, right) => left.dateMs - right.dateMs,
+  );
+
+  const rows = orderedPoints.map((point) => {
     const row: Record<string, number> = { dateMs: point.dateMs };
     for (const key of seriesKeys) {
       row[key] = point.values[key] ?? 0;

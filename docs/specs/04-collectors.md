@@ -66,13 +66,18 @@ Policies:
 - `every-nth:<n>` — a count-based budget, taken over the newest-first commit list
 - Tags/releases as natural sample points (future)
 
-Period buckets are computed from the author date in UTC (ISO weeks for `weekly`).
+Period buckets are computed from the **committer** date in UTC (ISO weeks for `weekly`): a policy asks for one snapshot per week or month of the repository's own history, and a rebased commit belongs to the period it landed in rather than the one it was written in.
 
 Which commits a collector was actually run on stays visible in the cube (facts carry the collector that produced them), so charts can interpolate honestly rather than pretending to be continuous.
 
 `tree` and `worktree` collectors sample the **first-parent chain only**.
 Their output describes the state of the tree, and only first-parent commits are states the repository actually passed through: a commit on a merged side branch — or one that arrived with a foreign history absorbed by an unrelated-histories merge — carries a tree that was never HEAD, so sampling it puts a cliff into the timeline.
 `log` collectors see every commit, since a commit's own authorship and diff are facts wherever it sits in the graph.
+
+Snapshots are also **placed on the timeline by their committer date**, not the author date.
+Under a rebase or squash-merge workflow the author date says when the work was written, which can be months before it landed, and it does not increase along the first-parent chain — ollama's mainline steps backwards by up to four months that way.
+Plotting a tree snapshot at its author date therefore drags the current line counts back into a stretch the chart has already drawn, and every stacked area zigzags.
+Authoring activity (the commit calendar, commits and churn per month) still measures the author date, since those answer when the work was done rather than when the repository looked like that.
 
 ## Incrementality
 

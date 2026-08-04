@@ -1,5 +1,13 @@
+/**
+ * Snapshot rows below carry the commit's *committer* date — when the
+ * repository actually looked like that. `CommitRow.date` is the odd one out
+ * and carries the *author* date, because the calendar and churn charts measure
+ * when work was done rather than when it landed; under a rebase workflow the
+ * two can be months apart.
+ */
 type CommitRow = {
   sha: string;
+  /** When the commit was authored, in the author's own timezone. */
   date: string;
   author: string;
   /**
@@ -13,22 +21,25 @@ type CommitRow = {
   deleted: number;
 };
 
+/** When the snapshot's tree became part of the history (the committer date). */
+type SnapshotDate = string;
+
 type LanguagesRow = {
   sha: string;
-  date: string;
+  date: SnapshotDate;
   byLanguage: Record<string, number>;
 };
 
 type FileTypesRow = {
   sha: string;
-  date: string;
+  date: SnapshotDate;
   totalFiles: number;
   totalBytes: number;
 };
 
 type DirectivesRow = {
   sha: string;
-  date: string;
+  date: SnapshotDate;
   eslintNextLine: number;
   eslintLine: number;
   eslintBlocks: number;
@@ -41,7 +52,7 @@ type DirectivesRow = {
 
 type DependenciesRow = {
   sha: string;
-  date: string;
+  date: SnapshotDate;
   /** Total resolved packages across all lockfiles in the tree. */
   resolved: number;
   /**
@@ -59,7 +70,7 @@ type DependenciesRow = {
 
 type SurvivalRow = {
   sha: string;
-  date: string;
+  date: SnapshotDate;
   byCohort: Record<string, number>;
   byContributor: Record<string, number>;
   /**
@@ -132,7 +143,9 @@ export type DashboardData = {
     name: string;
     commitCount: number;
     contributorCount: number;
+    /** When the first commit was authored — where the activity calendar starts. */
     firstCommitDate?: string;
+    /** When the newest commit landed — where every timeline ends. */
     lastCommitDate?: string;
   };
   commits: CommitRow[];

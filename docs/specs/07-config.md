@@ -41,7 +41,7 @@ export default defineConfig({
 `defineConfig` is an identity helper exported from the `repo-dive/config` entry point; it exists purely for type-checking and editor IntelliSense.
 A plain default-exported object works too.
 
-repo-dive derives its metrics from each commit's git **author** (not the committer).
+repo-dive attributes every metric to each commit's git **author** (not the committer); only the dates a snapshot is plotted at come from the committer, see [collectors](04-collectors.md#sampling).
 "Contributor" is the people-level concept this config describes: one person (or bot, or AI agent) who may commit under several author identities.
 
 ## Loading
