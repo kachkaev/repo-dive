@@ -3,7 +3,7 @@
 _Dive into a git repo's history: per-commit snapshots, an indexed metrics catalog and an interactive dashboard_ <!-- markdownlint-disable-line MD036 -- a tagline, not a heading -->
 
 [![npm version](https://img.shields.io/npm/v/repo-dive?logo=npm&color=3c7ef6&labelColor=333)](https://www.npmjs.com/package/repo-dive)
-[![npm downloads](https://img.shields.io/npm/dm/repo-dive?logo=npm&color=3c7ef6&labelColor=333)](https://www.npmjs.com/package/repo-dive)
+[![npm downloads](https://img.shields.io/npm/dt/repo-dive?logo=npm&color=3c7ef6&labelColor=333)](https://www.npmjs.com/package/repo-dive)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-3c7ef6?logo=opensourceinitiative&logoColor=white&labelColor=333)](LICENSE.md)
 [![Effect](https://img.shields.io/badge/Effect-v4-3c7ef6?logo=effect&logoColor=white&labelColor=333)](https://effect.website)
 [![MCP](https://img.shields.io/badge/MCP-ready-3c7ef6?logo=modelcontextprotocol&logoColor=white&labelColor=333)](#ai-agents-mcp)
@@ -68,7 +68,7 @@ Collectors so far:
 - **churn** — lines added/deleted per commit, by file extension
 - **file-types** — file count and bytes per extension at each commit's tree
 - **directives** — eslint-disable comments by rule (block disables tracked as gray areas) and `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck`
-- **dependencies** — resolved package totals from lockfiles, per package manager (pnpm, npm and yarn classic and berry), plus direct/dev/optional dependencies and manifest counts read straight from `package.json` files; version-aware, monorepo-aware and extensible to more managers
+- **dependencies** — resolved package totals from lockfiles, per package manager (pnpm, npm, yarn classic and yarn berry), plus direct/dev/optional dependencies and manifest counts read straight from `package.json` files; version-aware, monorepo-aware and extensible to more managers
 - **todo-comments** — TODO/FIXME/HACK/XXX counts
 - **languages** — lines and file count per language across a commit's source files (lockfiles, minified bundles and generated data excluded)
 - **survival** — `git blame` line survival by extension, author and age cohort (sampled monthly)
@@ -115,7 +115,8 @@ export default defineConfig({
 
 `charts.weekStartsOn` sets the first day of the week in calendar-shaped charts such as the commit calendar (`"monday"` by default, `"sunday"` also supported).
 `contributors.aliases` merges the multiple identities one person commits under (work + personal email, GitHub noreply, name variants) so attribution, the contributors table and code-survival-by-contributor count them once.
-A group can also carry a `displayName`, a profile `url` and a `kind` — `human`/`bot`/`ai`, otherwise auto-derived, with the dashboard badging bots and AI agents and listing them apart from humans.
+A group can also carry a `displayName`, a profile `url` and a `kind` (`human`/`bot`/`ai`, otherwise auto-derived).
+The dashboard badges bots and AI agents, listing them apart from humans.
 `catalog.dir` moves the catalog; point it outside the repository (e.g. `"../repo-dive-catalogs/my-repo"`) to leave the analyzed working tree untouched altogether, ignore files included.
 Apart from `catalog`, which every command needs, the config is read by `index`.
 See [docs/specs/07-config.md](docs/specs/07-config.md) for details.
@@ -176,8 +177,8 @@ CI runs the same report on every push and adds it to the job summary, comparing 
 
 ## Acknowledgements
 
-Thanks to [@WillJack20](https://github.com/WillJack20) for suggesting the name **repo-dive**.
-The project was published as [repo-insighter](https://www.npmjs.com/package/repo-insighter) before 0.4.0.
+Thanks to [@WillJack20](https://github.com/WillJack20) for suggesting the name `repo-dive`.
+It was originally called [repo-insighter](https://www.npmjs.com/package/repo-insighter).
 
 ## License
 
