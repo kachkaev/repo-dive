@@ -129,11 +129,24 @@ export type DashboardData = {
     };
   };
   repo: {
+    /** The `origin` repo's own name, falling back to the checkout directory. */
     name: string;
+    /**
+     * Browsable URL of the `origin` remote, credentials and ssh port stripped.
+     * Absent for a repo with no (or a purely local) origin, and in
+     * dashboard.json written before remotes were recorded.
+     */
+    remoteUrl?: string;
     commitCount: number;
     contributorCount: number;
     firstCommitDate?: string;
     lastCommitDate?: string;
+    /**
+     * Short shas of the oldest and newest indexed commits. Absent in
+     * dashboard.json written before they were recorded.
+     */
+    firstCommitSha?: string;
+    lastCommitSha?: string;
   };
   commits: CommitRow[];
   languages: LanguagesRow[];

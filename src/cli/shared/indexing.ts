@@ -18,6 +18,7 @@ import {
 } from "./config.ts";
 import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import { languageOfExtension } from "./languages.ts";
+import { readRemoteUrl } from "./remote.ts";
 import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
 class NoCollectedCommitsError extends Data.TaggedError(
@@ -127,6 +128,8 @@ const buildDashboardData = (
   repoRoot: string,
   commits: readonly CommitFacts[], // oldest first
   config: ResolvedConfig,
+  /** Browsable URL of `origin`, when the repo has one (see `remote.ts`). */
+  remoteUrl: string | undefined,
 ) => {
   /** The raw `"Name <email>"` trailers on a commit, in the order git listed them. */
   const coAuthorsOf = (commit: CommitFacts): string[] =>
@@ -466,11 +469,16 @@ const buildDashboardData = (
       charts: { weekStartsOn: config.weekStartsOn },
     },
     repo: {
-      name: path.basename(repoRoot),
+      // The remote is the name people know the repo by; the checkout directory
+      // is whatever the machine happened to clone into ("analyzed" on CI).
+      name: remoteUrl?.split("/").at(-1) ?? path.basename(repoRoot),
+      remoteUrl,
       commitCount: commits.length,
       contributorCount: contributorMap.size,
       firstCommitDate: commits.at(0)?.date,
+      firstCommitSha: commits.at(0)?.sha.slice(0, 10),
       lastCommitDate: commits.at(-1)?.date,
+      lastCommitSha: commits.at(-1)?.sha.slice(0, 10),
     },
     commits: commitRows,
     languages,
@@ -561,6 +569,7 @@ export const runIndex = ({
 
     const gitCommits = yield* listCommits(repoRoot);
     const firstParentShas = yield* listFirstParentShas(repoRoot);
+    const remoteUrl = yield* readRemoteUrl(repoRoot);
     const catalogShas = new Set(
       yield* Effect.tryPromise(async () => {
         try {
@@ -642,7 +651,12 @@ export const runIndex = ({
     yield* Effect.tryPromise(() => rm(dbPath, { force: true }));
     const factCount = yield* Effect.try(() => writeSqlite(dbPath, commitFacts));
 
-    const dashboardData = buildDashboardData(repoRoot, commitFacts, config);
+    const dashboardData = buildDashboardData(
+      repoRoot,
+      commitFacts,
+      config,
+      remoteUrl,
+    );
     const dashboardPath = path.join(indexDir, "dashboard.json");
     yield* Effect.tryPromise(() =>
       writeFile(dashboardPath, JSON.stringify(dashboardData), "utf8"),
