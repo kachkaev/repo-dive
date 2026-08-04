@@ -135,9 +135,12 @@ Everything these rules look at is best-effort: an unreadable or absent `package.
 #### How the entry is written
 
 An ignore file is something a person wrote and will read again, so `ignore` follows the hand the file is written in rather than always appending a stanza of its own.
-The path is spelled the way the file spells paths — anchored (`/.repo-dive/`) where most of its paths are anchored, with a trailing slash where it marks directories that way — and `\r\n` files stay on `\r\n`.
+The path is spelled the way the file spells paths — anchored (`/.repo-dive/`) where most of its paths are anchored, with a trailing slash where it marks directories that way — and a file written with `\r\n` gets a `\r\n` line (counted, so one stray `\r\n` in a `\n` file is not mistaken for a habit).
 Where the line goes depends on the file:
 
 - one flat list in alphabetical order — slotted in at its letter, keeping the order;
-- a file kept in blank-line-separated **commented** sections — one more section, headed by a `# repo-dive catalog` comment in the file's own comment style;
+- a file that keeps its patterns in **commented** groups — one more group, headed by a `# repo-dive catalog` comment in the file's own comment style, and set off with a blank line only where the file sets its own groups off that way;
 - anything else — appended as a bare line at the end.
+
+A group is anything a comment heads: blank-line-separated sections, and equally a run of headings with no blank lines between them.
+Comments sitting above every pattern head the whole file rather than a group, and leave it a flat list.

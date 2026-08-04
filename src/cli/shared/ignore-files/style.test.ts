@@ -24,17 +24,26 @@ test("withIgnoreEntry keeps the entry above trailing blank lines", () => {
   expect(add("node_modules\n\n").contents).toBe("node_modules\n.repo-dive\n\n");
 });
 
-test("withIgnoreEntry gives a file kept in commented sections one more", () => {
+test("withIgnoreEntry gives a file kept in commented groups one more", () => {
   expect(
     add("## Dependencies\n/node_modules/\n\n## Build\n/dist/\n").contents,
   ).toBe(
     "## Dependencies\n/node_modules/\n\n## Build\n/dist/\n\n## repo-dive catalog\n/.repo-dive/\n",
   );
+  // Headings alone divide this one, so the new group is set off the same way —
+  // a file that never spends a blank line does not start now.
+  expect(add("# Deps\nnode_modules\n# Build\ndist\n").contents).toBe(
+    "# Deps\nnode_modules\n# Build\ndist\n# repo-dive catalog\n.repo-dive\n",
+  );
+  // A comment left at the bottom would otherwise read as heading the entry.
+  expect(add("node_modules\ndist\n# TODO: coverage too\n").contents).toBe(
+    "node_modules\ndist\n# TODO: coverage too\n# repo-dive catalog\n.repo-dive\n",
+  );
 });
 
-test("withIgnoreEntry does not open a section in a file that has none", () => {
-  // Comments without sections, and sections without comments, both stay plain:
-  // a heading over a single pattern is more ceremony than the line deserves.
+test("withIgnoreEntry does not open a group in a file that has none", () => {
+  // Comments over the whole file, and blank lines without comments, both stay
+  // plain: a heading over a single pattern is more ceremony than it deserves.
   expect(add("# what CI skips\nnode_modules\ndist\n").contents).toBe(
     "# what CI skips\nnode_modules\ndist\n.repo-dive\n",
   );
@@ -102,6 +111,16 @@ test("withIgnoreEntry keeps a CRLF file on CRLF", () => {
   // The line the file was missing is a \r\n too, not a bare \n and a stray \r.
   expect(add("node_modules\r\ndist").contents).toBe(
     "node_modules\r\ndist\r\n.repo-dive\r\n",
+  );
+});
+
+test("withIgnoreEntry follows the line ending the file mostly uses", () => {
+  // One stray \r\n in a file otherwise written with \n is not a habit to copy.
+  expect(add("zebra\r\nyak\nyeti\n").contents).toBe(
+    "zebra\r\nyak\nyeti\n.repo-dive\n",
+  );
+  expect(add("zebra\r\nyak\r\nyeti\n").contents).toBe(
+    "zebra\r\nyak\r\nyeti\n.repo-dive\r\n",
   );
 });
 
