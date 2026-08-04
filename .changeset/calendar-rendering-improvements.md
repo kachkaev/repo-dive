@@ -2,7 +2,7 @@
 "repo-dive": minor
 ---
 
-Rework how the commit calendar draws days, month labels and hover detail.
+Sharpen the commit calendar's edges, labels and readouts.
 
 Days outside the report's coverage — before the first commit, or after the report was generated — are drawn as outlines instead of being left blank, so "we have no data" reads differently from "no commits".
 A month whose 1st does not land on the first day of the week now has its label shifted one column to the right, rather than hanging over the gap that precedes the month.
