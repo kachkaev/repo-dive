@@ -592,7 +592,9 @@ export function CommitCalendar({
   }));
 
   const rangeTotal: DayTotal = { ...emptyDay };
-  let busiest: { isoDate: string; day: DayTotal } | undefined;
+  // `row` rides along so the caption can name the weekday the way a cell's
+  // tooltip does — the strip's row order already is the weekday order.
+  let busiest: { isoDate: string; row: number; day: DayTotal } | undefined;
   for (const { layout } of layouts) {
     for (const cell of layout.cells) {
       if (cell.day === undefined) {
@@ -606,7 +608,7 @@ export function CommitCalendar({
         filterValueOf(cell.day, kindFilter) >
         filterValueOf(busiest?.day ?? emptyDay, kindFilter)
       ) {
-        busiest = { isoDate: cell.isoDate, day: cell.day };
+        busiest = { isoDate: cell.isoDate, row: cell.row, day: cell.day };
       }
     }
   }
@@ -649,10 +651,14 @@ export function CommitCalendar({
       ? "Before the first commit"
       : "After this report was generated";
 
+  /** How every day is stamped, in a cell's tooltip and in the caption alike. */
+  const stampOf = (isoDate: string, row: number): string =>
+    `${isoDate} · ${dayLabels[weekStartsOn][row]}`;
+
   const rangeDetail = detailOf(rangeTotal);
   const rangeSummary = `${countPhrase(rangeTotal)} in this range${
-    rangeDetail ? ` (${rangeDetail})` : ""
-  }${busiest ? ` · busiest day ${busiest.isoDate}: ${summarize(busiest.day)}` : ""}`;
+    rangeDetail ? ` — ${rangeDetail}` : ""
+  }`;
 
   const legendColor =
     kindFilter === "all" ? kindColors.human : kindColors[kindFilter];
@@ -666,9 +672,13 @@ export function CommitCalendar({
         presentKinds={presentKinds}
       />
       <ScrollArea>
-        {/* pb clears the overlay horizontal scrollbar (h-2.5) so it never
-            covers the last strip's bottom day row. */}
-        <div className="flex w-max min-w-full flex-col gap-3 pb-2.5">
+        {/* Strips are only as wide as the months they hold, so how much room
+            they need swings by a year's worth of week columns. `mx-auto`
+            spends whatever is left over evenly instead of pooling it on the
+            right — and collapses to nothing once a strip has to scroll. pb
+            clears the overlay horizontal scrollbar (h-2.5) so it never covers
+            the last strip's bottom day row. */}
+        <div className="mx-auto flex w-max flex-col gap-3 pb-2.5">
           {layouts.map(({ title, layout }) => (
             <CalendarStrip
               key={title}
@@ -705,8 +715,7 @@ export function CommitCalendar({
             className="rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-(--text-primary) tabular-nums shadow-sm"
           >
             <div className="mb-1 font-medium text-(--text-secondary)">
-              {hovered.cell.isoDate} ·{" "}
-              {dayLabels[weekStartsOn][hovered.cell.row]}
+              {stampOf(hovered.cell.isoDate, hovered.cell.row)}
             </div>
             {hovered.cell.day === undefined ? (
               <div className="text-(--text-muted)">
@@ -719,7 +728,17 @@ export function CommitCalendar({
         )}
       </Tooltip>
       <div className="mt-2 flex items-center justify-between gap-4 text-xs text-(--text-secondary)">
-        <span className="tabular-nums">{rangeSummary}</span>
+        {/* One claim per line: the range's own total, then the day that stands
+            out — the two used to run together behind nested parentheses. */}
+        <div className="tabular-nums">
+          <div>{rangeSummary}</div>
+          {busiest && (
+            <div>
+              Busiest day {stampOf(busiest.isoDate, busiest.row)}:{" "}
+              {summarize(busiest.day)}
+            </div>
+          )}
+        </div>
         <span className="flex shrink-0 items-center gap-1 text-(--text-muted)">
           Less
           {levelOpacities.map((opacity, level) => (
