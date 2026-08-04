@@ -1,4 +1,5 @@
 ASF
+browsable
 burndown
 CHAOSS
 Charta
@@ -61,6 +62,7 @@ repodiving
 repoinsights
 rollups
 scc
+scp
 scriptable
 sed
 shadcn
@@ -69,6 +71,7 @@ Sigstore
 simonw
 smol
 Sourcegraph
+tanuki
 tgz
 tokei
 toplevel
@@ -77,6 +80,7 @@ treemap
 tsc
 uncazzy
 undashed
+unparseable
 unscanned
 utf
 VCS

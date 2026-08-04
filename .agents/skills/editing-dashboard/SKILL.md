@@ -11,7 +11,7 @@ React-compiler rules live in [editing-react](../editing-react/SKILL.md); file pl
 
 ## What already exists
 
-- `@ui-primitive/`: `select` (Select/SelectTrigger/SelectValue/SelectContent/SelectItem), `checkbox`, `label`, `toggle-group` (ToggleGroup/ToggleGroupItem, with `toggleVariants` folded in), `scroll-area` (both scrollbars built in — never use raw `overflow-*-auto` for scrollable dashboard content), and `shared/cn.ts` (`cn`, `PropsWithPlainClassName`).
+- `@ui-primitive/`: `select` (Select/SelectTrigger/SelectValue/SelectContent/SelectItem), `checkbox`, `label`, `toggle-group` (ToggleGroup/ToggleGroupItem, with `toggleVariants` folded in), `scroll-area` (both scrollbars built in — never use raw `overflow-*-auto` for scrollable dashboard content), `tooltip` (Tooltip/TooltipTrigger/TooltipContent, no provider — each trigger sets its own `delay`), and `shared/cn.ts` (`cn`, `PropsWithPlainClassName`).
 - [`primitives.tsx`](../../../dashboard/src/app/shared/primitives.tsx): `Section`, `StatTile`, `Swatch`, `Legend`, `DataTable`.
 - Charts: `time-stack-chart` (area/bar/line + `#`/`%` toggle), `diverging-bars`, `bar-list`, `activity-calendar`.
 
@@ -37,7 +37,7 @@ Prefer these over raw `-(--var)` arbitrary values in new UI code; chart marks ke
 Fetch the canonical Base UI variant instead of writing from scratch:
 
 ```bash
-COMPONENT=tooltip # the shadcn component to port
+COMPONENT=popover # the shadcn component to port
 gh api "repos/shadcn-ui/ui/contents/apps/v4/registry/bases/base/ui/$COMPONENT.tsx" --jq '.content' | base64 -d
 ```
 
@@ -51,6 +51,7 @@ Then adapt — every deviation goes in the file's header comment:
 - Spell optional props `foo?: X | undefined` (`exactOptionalPropertyTypes` is on).
 - Export only the parts the dashboard uses (knip fails otherwise) and fold single-use helpers into the consumer file, e.g. `toggleVariants` lives in `toggle-group.tsx` until a standalone `Toggle` is needed.
 - Base UI is unstyled and positions nothing: absolutely position popups/scrollbars yourself and size scroll thumbs with `--scroll-area-thumb-width`/`-height` (see `scroll-area.tsx`).
+  A popup arrow only gets pinned along its edge (one inline `left`/`top`), so nudging it outside the popup and rotating it per `data-side` is on you (see `tooltip.tsx`).
 
 API notes that differ from Radix: `Select` takes `items` (value→label) so `SelectValue` renders labels; `onValueChange` may pass `null` (cleared); `ToggleGroup` deals in string arrays even single-select — ignore the empty array to keep one item always pressed; `Checkbox.onCheckedChange` passes a plain boolean.
 
