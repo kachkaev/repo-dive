@@ -652,7 +652,8 @@ test.concurrent(
       expect(applied.status, applied.stderr).toBe(0);
       expect(applied.stdout).toMatch(/Added \/\.repo-dive\/ to \.gitignore/);
       // Each file gets the entry spelled the way that file spells paths, and
-      // nothing else: no heading, no blank line, no untouched neighbour.
+      // nothing else: no heading, no blank line. The file that needs no entry
+      // is left exactly as it was.
       expect(readFileSync(path.join(repoPath, ".gitignore"), "utf8")).toBe(
         "/node_modules/\n/.repo-dive/\n",
       );
