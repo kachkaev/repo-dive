@@ -48,7 +48,7 @@ const buildSchemaDescription = (
     );
     const commitRange = yield* query(
       catalogPath,
-      "SELECT count(*) AS commits, min(authored_at) AS first, max(committed_at) AS last FROM commits",
+      "SELECT count(*) AS commits, min(committed_at) AS first, max(committed_at) AS last FROM commits",
     );
 
     return {
@@ -74,7 +74,7 @@ const buildSchemaDescription = (
       categoryKeySamples: categorySamples.rows,
       hints: [
         "Join facts to commits via commit_sha to plot anything over time.",
-        "Order snapshot metrics (languages.*, files.*, survival.*, …) by committed_at — that is when the tree looked like that; authored_at can run months behind it and does not increase along the history.",
+        "Use committed_at for anything over time — it is when the repository changed, and every chart in the tool is drawn against it. authored_at is recorded too, but it can run months behind and does not increase along the history, so ordering or bucketing by it produces nonsense on repos that rebase.",
         "categories is open-ended: keys differ per metric (language, extension, author, rule, cohort, …).",
         "Sampled collectors (languages.*, survival.*) only have facts at sampled commits.",
       ],

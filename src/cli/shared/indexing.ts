@@ -18,6 +18,7 @@ import {
 } from "./config.ts";
 import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import { languageOfExtension } from "./languages.ts";
+import { readRemoteUrl } from "./remote.ts";
 import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
 
 class NoCollectedCommitsError extends Data.TaggedError(
@@ -62,20 +63,29 @@ export const parseIdentity = (
 
 type CommitFacts = {
   readonly sha: string;
-  /** When the work was written — what authoring activity is measured against. */
+  /**
+   * When the work was written. Recorded in the cube for queries that want it,
+   * but never used to place anything on a timeline — see {@link committedAt}.
+   */
   readonly authoredAt: string;
   /**
-   * When the commit's tree became part of the history — the instant every
-   * snapshot series (languages, file types, directives, dependencies,
-   * survival) plots the commit at, because that is when the repository
-   * actually looked like that.
+   * When the commit became part of the history, and the single clock every
+   * chart is drawn against.
    *
-   * The author date cannot serve there. Under a rebase or squash-merge
+   * The author date can't serve as one. Under a rebase or squash-merge
    * workflow it says when the work was written, which can be months before it
    * landed, and it does not increase along the first-parent chain — ollama's
    * mainline steps backwards by up to four months that way. Plotting a tree
    * snapshot at its author date drags today's line counts back into the middle
    * of a stretch the chart has already drawn, and every stacked area zigzags.
+   *
+   * Activity charts could have kept the author date, since bucketing by day or
+   * month makes them immune to that. They don't, deliberately: one clock for
+   * the whole dashboard is a rule worth stating in a sentence, and every chart
+   * then answers the same question — when did this repository's trunk change.
+   * The cost is real but small; measured across ollama's 5.6k commits, the
+   * calendar keeps 924 of its 947 active days and its weekend share moves from
+   * 9.9% to 9.6%.
    */
   readonly committedAt: string;
   readonly authorEmail: string;
@@ -142,6 +152,8 @@ const buildDashboardData = (
   repoRoot: string,
   commits: readonly CommitFacts[], // oldest first
   config: ResolvedConfig,
+  /** Browsable URL of `origin`, when the repo has one (see `remote.ts`). */
+  remoteUrl: string | undefined,
 ) => {
   /** The raw `"Name <email>"` trailers on a commit, in the order git listed them. */
   const coAuthorsOf = (commit: CommitFacts): string[] =>
@@ -163,12 +175,9 @@ const buildDashboardData = (
     };
   };
 
-  // Authoring activity, so these rows keep the author date: the calendar and
-  // the churn bars answer "when was this work done", not "when did the
-  // repository look like this".
   const commitRows = commits.map((commit) => ({
     sha: commit.sha.slice(0, 10),
-    date: commit.authoredAt,
+    date: commit.committedAt,
     author: commit.authorEmail,
     kind: config.resolveContributor(commit.authorEmail, commit.authorName).kind,
     ai: coAuthorsOf(commit).some(
@@ -484,14 +493,16 @@ const buildDashboardData = (
       charts: { weekStartsOn: config.weekStartsOn },
     },
     repo: {
-      name: path.basename(repoRoot),
+      // The remote is the name people know the repo by; the checkout directory
+      // is whatever the machine happened to clone into ("analyzed" on CI).
+      name: remoteUrl?.split("/").at(-1) ?? path.basename(repoRoot),
+      remoteUrl,
       commitCount: commits.length,
       contributorCount: contributorMap.size,
-      // The span the dashboard has to cover, read from either end's own clock:
-      // the activity calendar starts on the day the first commit was authored,
-      // while every timeline ends where the newest one landed.
-      firstCommitDate: commits.at(0)?.authoredAt,
+      firstCommitDate: commits.at(0)?.committedAt,
+      firstCommitSha: commits.at(0)?.sha.slice(0, 10),
       lastCommitDate: commits.at(-1)?.committedAt,
+      lastCommitSha: commits.at(-1)?.sha.slice(0, 10),
     },
     commits: commitRows,
     languages,
@@ -584,6 +595,7 @@ export const runIndex = ({
 
     const gitCommits = yield* listCommits(repoRoot);
     const firstParentShas = yield* listFirstParentShas(repoRoot);
+    const remoteUrl = yield* readRemoteUrl(repoRoot);
     const catalogShas = new Set(
       yield* Effect.tryPromise(async () => {
         try {
@@ -675,7 +687,12 @@ export const runIndex = ({
     yield* Effect.tryPromise(() => rm(dbPath, { force: true }));
     const factCount = yield* Effect.try(() => writeSqlite(dbPath, commitFacts));
 
-    const dashboardData = buildDashboardData(repoRoot, commitFacts, config);
+    const dashboardData = buildDashboardData(
+      repoRoot,
+      commitFacts,
+      config,
+      remoteUrl,
+    );
     const dashboardPath = path.join(indexDir, "dashboard.json");
     yield* Effect.tryPromise(() =>
       writeFile(dashboardPath, JSON.stringify(dashboardData), "utf8"),

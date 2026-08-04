@@ -11,6 +11,7 @@ import {
   type ContributorBarsItem,
 } from "./app/contributor-bars.tsx";
 import { DivergingBars } from "./app/diverging-bars.tsx";
+import { ReportHeader } from "./app/report-header.tsx";
 import { Checkbox } from "./app/shared/@ui-primitive/checkbox.tsx";
 import { Label } from "./app/shared/@ui-primitive/label.tsx";
 import {
@@ -372,7 +373,6 @@ export function App({ data }: { data: DashboardData }) {
   const maxContributorsInCharts =
     data.config?.contributors.maxInCharts ?? defaultMaxContributorsInCharts;
   const latestLanguages = data.languages.at(-1);
-  const latestDirectives = data.directives.at(-1);
   const latestFileTypes = data.fileTypes.at(-1);
   const dependencies = data.dependencies;
   const latestDependencies = dependencies.at(-1);
@@ -676,20 +676,16 @@ export function App({ data }: { data: DashboardData }) {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold">{data.repo.name}</h1>
-        <p className="mt-1 text-sm text-(--text-secondary)">
-          {formatCount(data.repo.commitCount)} commits ·{" "}
-          {data.repo.contributorCount} contributors ·{" "}
-          {data.repo.firstCommitDate
-            ? `${formatDate(data.repo.firstCommitDate)} — ${formatDate(data.repo.lastCommitDate ?? "")}`
-            : "no history"}{" "}
-          · generated {formatDate(data.generatedAt)} by repo-dive
-        </p>
-      </header>
+      <ReportHeader repo={data.repo} generatedAt={data.generatedAt} />
 
       <div className="mb-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <StatTile label="Commits" value={formatCount(data.repo.commitCount)} />
+        <StatTile
+          label="Commits"
+          value={formatCount(data.repo.commitCount)}
+          hint={`by ${data.repo.contributorCount} ${
+            data.repo.contributorCount === 1 ? "contributor" : "contributors"
+          }`}
+        />
         <StatTile
           label="Lines"
           value={
@@ -738,22 +734,6 @@ export function App({ data }: { data: DashboardData }) {
             aiShareRecent === undefined ? "—" : formatPercent(aiShareRecent)
           }
           hint="last 90 days, by co-author"
-        />
-        <StatTile
-          label="Suppressions"
-          value={
-            latestDirectives
-              ? formatCount(
-                  latestDirectives.eslintNextLine +
-                    latestDirectives.eslintLine +
-                    latestDirectives.eslintBlocks +
-                    latestDirectives.tsIgnore +
-                    latestDirectives.tsExpectError +
-                    latestDirectives.tsNocheck,
-                )
-              : "—"
-          }
-          hint="eslint + ts directives now"
         />
       </div>
 
@@ -847,7 +827,7 @@ export function App({ data }: { data: DashboardData }) {
       {data.repo.firstCommitDate !== undefined && data.commits.length > 0 && (
         <Section
           title="Commit calendar"
-          subtitle="commits per day; days bucketed by the author's local date"
+          subtitle="commits per day; days bucketed by the committer's local date, i.e. when each commit landed"
           controls={
             <div className="mb-3 flex w-fit items-center gap-2">
               <Label

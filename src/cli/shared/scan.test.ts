@@ -55,14 +55,15 @@ test("parseGitLog skips blank lines", () => {
   expect(parseGitLog("\n\n")).toStrictEqual([]);
 });
 
-test("summarizeCommits aggregates counts and date range", () => {
+test("summarizeCommits spans the committer dates, not the author ones", () => {
   const summary = summarizeCommits(parseGitLog(sampleLog));
 
   expect(summary).toStrictEqual({
     commitCount: 2,
     authorCount: 2,
     firstCommitDate: "2026-01-01T00:00:00+00:00",
-    lastCommitDate: "2026-02-03T04:05:06+00:00",
+    // Authored on 2026-02-03, landed a fortnight later
+    lastCommitDate: "2026-02-17T09:00:00+00:00",
   });
 });
 

@@ -1,13 +1,13 @@
 /**
- * Snapshot rows below carry the commit's *committer* date — when the
- * repository actually looked like that. `CommitRow.date` is the odd one out
- * and carries the *author* date, because the calendar and churn charts measure
- * when work was done rather than when it landed; under a rebase workflow the
- * two can be months apart.
+ * Every `date` below is the commit's **committer** date — when it became part
+ * of the history, in the committer's own timezone. Nothing here is placed by
+ * the author date: under a rebase workflow that says when the work was
+ * written, which can be months earlier and does not run forwards, so one clock
+ * for the whole dashboard means every chart answers the same question — when
+ * did this repository's trunk change.
  */
 type CommitRow = {
   sha: string;
-  /** When the commit was authored, in the author's own timezone. */
   date: string;
   author: string;
   /**
@@ -21,25 +21,22 @@ type CommitRow = {
   deleted: number;
 };
 
-/** When the snapshot's tree became part of the history (the committer date). */
-type SnapshotDate = string;
-
 type LanguagesRow = {
   sha: string;
-  date: SnapshotDate;
+  date: string;
   byLanguage: Record<string, number>;
 };
 
 type FileTypesRow = {
   sha: string;
-  date: SnapshotDate;
+  date: string;
   totalFiles: number;
   totalBytes: number;
 };
 
 type DirectivesRow = {
   sha: string;
-  date: SnapshotDate;
+  date: string;
   eslintNextLine: number;
   eslintLine: number;
   eslintBlocks: number;
@@ -52,7 +49,7 @@ type DirectivesRow = {
 
 type DependenciesRow = {
   sha: string;
-  date: SnapshotDate;
+  date: string;
   /** Total resolved packages across all lockfiles in the tree. */
   resolved: number;
   /**
@@ -70,7 +67,7 @@ type DependenciesRow = {
 
 type SurvivalRow = {
   sha: string;
-  date: SnapshotDate;
+  date: string;
   byCohort: Record<string, number>;
   byContributor: Record<string, number>;
   /**
@@ -140,13 +137,26 @@ export type DashboardData = {
     };
   };
   repo: {
+    /** The `origin` repo's own name, falling back to the checkout directory. */
     name: string;
+    /**
+     * Browsable URL of the `origin` remote, credentials and ssh port stripped.
+     * Absent for a repo with no (or a purely local) origin, and in
+     * dashboard.json written before remotes were recorded.
+     */
+    remoteUrl?: string;
     commitCount: number;
     contributorCount: number;
-    /** When the first commit was authored — where the activity calendar starts. */
+    /** When the oldest commit landed — where the calendar and timelines start. */
     firstCommitDate?: string;
-    /** When the newest commit landed — where every timeline ends. */
+    /** When the newest commit landed — where they end. */
     lastCommitDate?: string;
+    /**
+     * Short shas of the oldest and newest indexed commits. Absent in
+     * dashboard.json written before they were recorded.
+     */
+    firstCommitSha?: string;
+    lastCommitSha?: string;
   };
   commits: CommitRow[];
   languages: LanguagesRow[];

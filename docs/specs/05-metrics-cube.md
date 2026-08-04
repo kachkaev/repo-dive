@@ -58,8 +58,8 @@ Why a JSON `categories` column rather than an EAV side table or wide columns:
 
 ```sql
 -- Language breakdown over time (stacked area chart).
--- Snapshot metrics go on the timeline by committed_at: that is when the tree
--- looked like this, and unlike authored_at it never runs backwards.
+-- Every timeline goes by committed_at: that is when the repository looked like
+-- this, and unlike authored_at it never runs backwards.
 SELECT c.committed_at, json_extract(f.categories, '$.language') AS language,
        f.value
 FROM facts f JOIN commits c ON c.sha = f.commit_sha
@@ -79,5 +79,5 @@ The `report` and `query` commands, future chart generation and any AI/MCP integr
 ## Notes
 
 - **Rebuildability** is the key invariant: `index` drops the DB and reruns every collector's `normalize` over the raw catalog on every invocation. The cube is a cache, never the source of truth — which is also why no `--rebuild` flag is needed.
-- **Dates as dimensions**: time bucketing (day/week/month) is derived at query time rather than materialized, until performance says otherwise. Bucket snapshot metrics by `commits.committed_at` and authoring activity by `commits.authored_at` — see [collectors](04-collectors.md#sampling) for why the two differ.
+- **Dates as dimensions**: time bucketing (day/week/month) is derived at query time from `commits.committed_at` rather than materialized, until performance says otherwise. `authored_at` is recorded alongside it but nothing is plotted against it — see [collectors](04-collectors.md#one-clock-the-committer-date).
 - **Future backends**: the cube interface should stay narrow enough that a DuckDB or Parquet export ("give me the facts table as Parquet") is an output format, not a rewrite. An `export` command is the likely shape.

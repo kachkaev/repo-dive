@@ -456,6 +456,15 @@ test.concurrent(
         "Alice's aliases collapse; the bot and the AI agent stay separate",
       ).toBe(3);
 
+      // A fixture repo has no origin, so the report has nothing to link to and
+      // falls back to naming the checkout. The bounding shas are what its
+      // header hangs the "coverage" dates off.
+      const repo = recordAt(dashboard, "repo");
+      expect(repo).not.toHaveProperty("remoteUrl");
+      expect(stringAt(repo, "name")).toBe(path.basename(repoPath));
+      expect(stringAt(repo, "firstCommitSha")).toMatch(/^[\da-f]{10}$/);
+      expect(stringAt(repo, "lastCommitSha")).toMatch(/^[\da-f]{10}$/);
+
       const contributors = arrayAt(dashboard, "contributors");
       const alice = contributors.find(
         (row) => stringAt(row, "email") === "alice@work.example",
