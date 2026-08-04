@@ -28,6 +28,7 @@ Gource
 greppable
 Grimoire
 hotspots
+hoverable
 incrementality
 insighter
 inspectable
