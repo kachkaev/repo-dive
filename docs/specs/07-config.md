@@ -112,10 +112,31 @@ The catalog hides itself from git by writing a nested `.gitignore` holding `*`.
 That trick is git's alone: prettier, markdownlint, cspell, eslint, `docker build` and `npm pack` each read a single ignore file at the **root** of the repository and know nothing about nested ones.
 Unless the catalog is listed there too, its thousands of small files quietly become their input.
 
-So `scan`, `index` and `status` check every root ignore file — anything matching `.*ignore` — and warn on stderr about the ones that do not cover the catalog, pointing at [`repo-dive ignore`](02-cli.md), which appends the entry.
+So `scan`, `index` and `status` check every root ignore file — anything matching `.*ignore` — and warn on stderr about the ones that still need the catalog, pointing at [`repo-dive ignore`](02-cli.md), which writes the entry.
 Set `checkIgnoreFiles` to `false` to silence the warning.
 The check is skipped entirely when the catalog sits outside the repository, where nothing walking the repo can reach it.
 
 Coverage is decided by reading the patterns, not by running each tool: the forms people write (`.repo-dive`, `/.repo-dive/`, `**/.repo-dive`, a bare name matching a path component at any depth, an ancestor directory, a catch-all `*`, a later `!` re-include) are recognized, and anything ambiguous — a wildcard pattern like `.repo-*` whose literal beginning points at the catalog — counts as covered.
 A warning that nags about an entry already sitting in the file is worse than one that never appears.
 Only the repository root is searched; ignore files deeper in the tree govern their own subtree.
+
+#### Files that need no entry
+
+Some tools are told about the catalog without a line of their own, and a line that changes nothing costs the next reader of the file a moment working out why it is there.
+Those files are reported as not needed and left untouched, both by the warning and by `repo-dive ignore`:
+
+- **`.prettierignore`**, when the repository has a root `.gitignore` — prettier's CLI has read both since v3, and `ignore` lists the catalog in `.gitignore` anyway. A `package.json` pinning prettier 2 or older opts back in, as does a script running prettier with `--ignore-path`, which replaces the files prettier would have read for itself.
+- **`.npmignore`**, when `package.json` has a `files` array — that array is an allow list, so it alone decides what `npm pack` includes.
+- **`.eslintignore`**, when eslint reads a flat config (an `eslint.config.*` at the root, or a declared eslint 9+) — flat config replaced the file with an `ignores` key and stopped reading it.
+
+Everything these rules look at is best-effort: an unreadable or absent `package.json` simply means no rule fires, and the file gets its entry.
+
+#### How the entry is written
+
+An ignore file is something a person wrote and will read again, so `ignore` follows the hand the file is written in rather than always appending a stanza of its own.
+The path is spelled the way the file spells paths — anchored (`/.repo-dive/`) where most of its paths are anchored, with a trailing slash where it marks directories that way — and `\r\n` files stay on `\r\n`.
+Where the line goes depends on the file:
+
+- one flat list in alphabetical order — slotted in at its letter, keeping the order;
+- a file kept in blank-line-separated **commented** sections — one more section, headed by a `# repo-dive catalog` comment in the file's own comment style;
+- anything else — appended as a bare line at the end.

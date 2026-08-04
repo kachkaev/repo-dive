@@ -620,7 +620,8 @@ test.concurrent(
 
     try {
       writeFileSync(path.join(repoPath, ".prettierignore"), "node_modules\n");
-      writeFileSync(path.join(repoPath, ".gitignore"), "node_modules\n");
+      writeFileSync(path.join(repoPath, ".gitignore"), "/node_modules/\n");
+      writeFileSync(path.join(repoPath, ".dockerignore"), "node_modules\n");
 
       const firstScan = await runCli(
         "scan",
@@ -630,26 +631,38 @@ test.concurrent(
         "commit-meta",
       );
       expect(firstScan.status, firstScan.stderr).toBe(0);
+      // Not .prettierignore: prettier reads .gitignore, which is about to list
+      // the catalog.
       expect(firstScan.stderr).toMatch(
-        /\.gitignore, \.prettierignore do not cover \.repo-dive\//,
+        /\.dockerignore, \.gitignore do not cover \.repo-dive\//,
       );
 
       const dryRun = await runCli("ignore", "--repo", repoPath, "--dry-run");
       expect(dryRun.status, dryRun.stderr).toBe(0);
-      expect(dryRun.stdout).toMatch(/Would add \.repo-dive\/ to:/);
+      expect(dryRun.stdout).toMatch(/Would add \/\.repo-dive\/ to \.gitignore/);
+      expect(dryRun.stdout).toMatch(
+        /Not needed: \.prettierignore \(prettier reads \.gitignore as well\)/,
+      );
       expect(
-        readFileSync(path.join(repoPath, ".prettierignore"), "utf8"),
+        readFileSync(path.join(repoPath, ".gitignore"), "utf8"),
         "--dry-run must not write",
-      ).toBe("node_modules\n");
+      ).toBe("/node_modules/\n");
 
       const applied = await runCli("ignore", "--repo", repoPath);
       expect(applied.status, applied.stderr).toBe(0);
-      expect(applied.stdout).toMatch(/Added \.repo-dive\/ to:/);
-      for (const name of [".gitignore", ".prettierignore"]) {
-        expect(readFileSync(path.join(repoPath, name), "utf8")).toMatch(
-          /# repo-dive catalog\n\.repo-dive\/\n$/,
-        );
-      }
+      expect(applied.stdout).toMatch(/Added \/\.repo-dive\/ to \.gitignore/);
+      // Each file gets the entry spelled the way that file spells paths, and
+      // nothing else: no heading, no blank line. The file that needs no entry
+      // is left exactly as it was.
+      expect(readFileSync(path.join(repoPath, ".gitignore"), "utf8")).toBe(
+        "/node_modules/\n/.repo-dive/\n",
+      );
+      expect(readFileSync(path.join(repoPath, ".dockerignore"), "utf8")).toBe(
+        "node_modules\n.repo-dive\n",
+      );
+      expect(readFileSync(path.join(repoPath, ".prettierignore"), "utf8")).toBe(
+        "node_modules\n",
+      );
 
       const secondScan = await runCli(
         "scan",

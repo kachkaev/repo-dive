@@ -4,6 +4,9 @@ import path from "node:path";
 import { Console, Effect } from "effect";
 
 import type { ResolvedConfig } from "./config.ts";
+import { coversPath } from "./ignore-files/coverage.ts";
+import { readRepoSetup, redundancyReason } from "./ignore-files/redundancy.ts";
+import { withIgnoreEntry } from "./ignore-files/style.ts";
 
 /**
  * The catalog hides itself from git with a nested `.gitignore` holding `*`, but
@@ -12,96 +15,40 @@ import type { ResolvedConfig } from "./config.ts";
  * and know nothing about nested ones. Left unlisted there, the catalog's
  * thousands of small files quietly become their input.
  *
- * This module finds those files, decides whether they already cover the
- * catalog, and appends the entry when asked to.
+ * This module finds those files and decides what each of them needs: nothing,
+ * because it already covers the catalog or because the tool reading it learns
+ * about the catalog elsewhere — or one line, written the way the rest of the
+ * file is written.
  */
 
 /** Dotfiles whose name ends in "ignore" — `.gitignore`, `.prettierignore`, … */
 const ignoreFileNamePattern = /^\..+ignore$/;
 
-/** Marks the line the `ignore` command appends. */
-const ignoreEntryComment = "# repo-dive catalog";
-
-/**
- * Ignore files sitting at the repository root, sorted by name. Only the root is
- * searched: ignore files further down govern their own subtree, and the tools
- * that matter read the root one anyway.
- */
-export const findIgnoreFileNames = (
+/** Names of the files (not directories) sitting at the repository root, sorted. */
+const readRootFileNames = (
   repoRoot: string,
 ): Effect.Effect<readonly string[], Error> =>
   Effect.tryPromise(async () => {
     const entries = await readdir(repoRoot, { withFileTypes: true });
     return entries
-      .filter(
-        (entry) => entry.isFile() && ignoreFileNamePattern.test(entry.name),
-      )
+      .filter((entry) => entry.isFile())
       .map((entry) => entry.name)
       .toSorted();
   });
 
-/** Strips the decoration that does not change which path a pattern points at. */
-const normalizePattern = (pattern: string): string =>
-  pattern
-    .trim()
-    .replace(/^\.?\//, "")
-    .replace(/\/$/, "")
-    .replace(/\/\*\*$/, "");
+export type IgnoreFileStatus = { readonly name: string } & (
+  | { readonly outcome: "listed" }
+  /** Nothing to add: the tool reading this file already learns to skip the catalog. */
+  | { readonly outcome: "redundant"; readonly reason: string }
+  /** Wants `entry` — the line to add, spelled the way this file spells patterns. */
+  | { readonly outcome: "missing"; readonly entry: string }
+);
 
 /**
- * Whether an ignore file's `contents` plainly cover `relativePath` (a
- * repository-root-relative POSIX path with no trailing slash).
- *
- * This is not a gitignore engine — it recognizes the handful of forms people
- * actually write, and leans towards answering "covered". A missed warning costs
- * a user nothing; one that nags about an entry already sitting in the file
- * would turn the whole check into something to switch off.
+ * What every ignore file at the repository root needs. Only the root is
+ * searched: ignore files further down govern their own subtree, and the tools
+ * that matter read the root one anyway.
  */
-export const coversPath = (contents: string, relativePath: string): boolean => {
-  const segments = relativePath.split("/");
-  const selfOrAncestors = new Set(
-    segments.map((_, index) => segments.slice(0, index + 1).join("/")),
-  );
-
-  // Later lines win: a re-including `!` after a broad `*` genuinely un-ignores.
-  let covered = false;
-  for (const line of contents.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed === "" || trimmed.startsWith("#")) {
-      continue;
-    }
-    const negated = trimmed.startsWith("!");
-    const pattern = normalizePattern(negated ? trimmed.slice(1) : trimmed);
-    const anchored = pattern.replace(/^\*\*\//, "");
-    const wildcardIndex = anchored.search(/[*?[]/);
-    const literalPrefix = anchored.slice(0, wildcardIndex);
-    if (
-      pattern === "*" ||
-      pattern === "**" ||
-      selfOrAncestors.has(pattern) ||
-      selfOrAncestors.has(anchored) ||
-      // A pattern with no slash matches a path component at any depth.
-      (!pattern.includes("/") && segments.includes(pattern)) ||
-      // A wildcard makes the pattern unreadable to this non-engine, so it is
-      // ambiguous; count it as covering when its literal beginning points at
-      // the path (`.repo-*` does, `*.log` claims nothing).
-      (wildcardIndex > 0 &&
-        (relativePath.startsWith(literalPrefix) ||
-          segments.some((segment) => segment.startsWith(literalPrefix))))
-    ) {
-      covered = !negated;
-    }
-  }
-
-  return covered;
-};
-
-export type IgnoreFileStatus = {
-  readonly name: string;
-  readonly covered: boolean;
-};
-
-/** Checks every root ignore file against the catalog's location. */
 export const checkIgnoreFiles = ({
   repoRoot,
   catalogRelativePath,
@@ -110,28 +57,41 @@ export const checkIgnoreFiles = ({
   readonly catalogRelativePath: string;
 }): Effect.Effect<readonly IgnoreFileStatus[], Error> =>
   Effect.gen(function* () {
-    const names = yield* findIgnoreFileNames(repoRoot);
+    const rootFileNames = yield* readRootFileNames(repoRoot);
+    const names = rootFileNames.filter((name) =>
+      ignoreFileNamePattern.test(name),
+    );
+    if (names.length === 0) {
+      return [];
+    }
+
+    const setup = yield* readRepoSetup({ repoRoot, rootFileNames });
     return yield* Effect.forEach(names, (name) =>
-      Effect.tryPromise(async (): Promise<IgnoreFileStatus> => ({
-        name,
-        covered: coversPath(
-          await readFile(path.join(repoRoot, name), "utf8"),
-          catalogRelativePath,
-        ),
-      })),
+      Effect.tryPromise(async (): Promise<IgnoreFileStatus> => {
+        const contents = await readFile(path.join(repoRoot, name), "utf8");
+        if (coversPath(contents, catalogRelativePath)) {
+          return { name, outcome: "listed" };
+        }
+        const reason = redundancyReason({ name, setup });
+        if (reason !== undefined) {
+          return { name, outcome: "redundant", reason };
+        }
+        const { entry } = withIgnoreEntry({ contents, catalogRelativePath });
+        return { name, outcome: "missing", entry };
+      }),
     );
   });
 
-/** The line to add to an ignore file — a directory pattern, so tools skip the whole tree. */
+/** How the catalog is referred to in messages, whatever a given file spells. */
 export const ignoreEntryFor = (catalogRelativePath: string): string =>
   `${catalogRelativePath}/`;
 
 /**
- * Appends the catalog entry to an existing ignore file, separated by a blank
- * line and introduced by a comment saying where it came from. Never creates a
- * file: an ignore file the repository does not have is one no tool reads.
+ * Lists the catalog in an existing ignore file, in the shape the file is
+ * already written in. Never creates a file: an ignore file the repository does
+ * not have is one no tool reads.
  */
-export const appendIgnoreEntry = ({
+export const addIgnoreEntry = ({
   filePath,
   catalogRelativePath,
 }: {
@@ -139,24 +99,17 @@ export const appendIgnoreEntry = ({
   readonly catalogRelativePath: string;
 }): Effect.Effect<void, Error> =>
   Effect.tryPromise(async () => {
-    const contents = await readFile(filePath, "utf8");
-    const separator =
-      contents === "" || contents.endsWith("\n\n")
-        ? ""
-        : contents.endsWith("\n")
-          ? "\n"
-          : "\n\n";
-    await writeFile(
-      filePath,
-      `${contents}${separator}${ignoreEntryComment}\n${ignoreEntryFor(catalogRelativePath)}\n`,
-      "utf8",
-    );
+    const { contents } = withIgnoreEntry({
+      contents: await readFile(filePath, "utf8"),
+      catalogRelativePath,
+    });
+    await writeFile(filePath, contents, "utf8");
   });
 
 /**
- * Names of the root ignore files that do not cover the catalog. Empty whenever
- * the question does not apply: the catalog lives outside the repository, the
- * check is switched off, or every file already lists it.
+ * Names of the root ignore files that will send their tool into the catalog.
+ * Empty whenever the question does not apply: the catalog lives outside the
+ * repository, the check is switched off, or nothing is left to add.
  */
 const missingIgnoreFiles = ({
   repoRoot,
@@ -172,7 +125,7 @@ const missingIgnoreFiles = ({
     }
     const statuses = yield* checkIgnoreFiles({ repoRoot, catalogRelativePath });
     return statuses
-      .filter((status) => !status.covered)
+      .filter((status) => status.outcome === "missing")
       .map((status) => status.name);
   });
 
