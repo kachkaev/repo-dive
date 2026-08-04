@@ -2,11 +2,11 @@
  * An ignore file is something a person wrote and will read again, so a line
  * added by a tool should look like they typed it themselves.
  *
- * This module reads how a file is written — comments, sections, ordering, how
+ * This module reads how a file is written — comments, grouping, ordering, how
  * paths are spelled — and returns it with the catalog listed in the same hand:
  * slotted into place in an alphabetical list, appended as a bare line to a
- * plain one, and introduced by a comment of its own only where the file is
- * already organized into commented sections.
+ * plain one, and introduced by a comment of its own only where the file already
+ * keeps its patterns in commented groups.
  */
 
 const isBlank = (line: string): boolean => line.trim() === "";
@@ -26,13 +26,19 @@ const sortKey = (line: string): string =>
     .replace(/\/+$/, "")
     .toLowerCase();
 
+/**
+ * What holds one group of patterns apart from the next, in a file that keeps
+ * its patterns in groups at all. Undefined in one undivided list.
+ */
+type Grouping = "blank-line" | "comment";
+
 type IgnoreFileStyle = {
   /** The line ending the file already uses. */
   readonly eol: "\n" | "\r\n";
   /** The `#` run that introduces comments (`#`, `##`, …); absent in a file with none. */
   readonly commentMarker: string | undefined;
-  /** Blank lines split the patterns into groups. */
-  readonly sectioned: boolean;
+  /** What the file divides its patterns with, if it divides them. */
+  readonly grouping: Grouping | undefined;
   /** The patterns run in alphabetical order, so a new one belongs in the middle. */
   readonly sorted: boolean;
   /** Paths are anchored to the repository root with a leading slash. */
@@ -41,23 +47,41 @@ type IgnoreFileStyle = {
   readonly directorySlash: boolean;
 };
 
-/** Whether a blank line ever separates one pattern from a later one. */
-const hasSections = (lines: readonly string[]): boolean => {
+/**
+ * How the file divides its patterns: a blank line between two of them, or —
+ * failing that — a comment somewhere below the first, which is a heading over
+ * what follows. Comments above every pattern head the whole file and divide
+ * nothing.
+ */
+const readGrouping = (lines: readonly string[]): Grouping | undefined => {
   let seenPattern = false;
   let blankSincePattern = false;
+  let commentBelowFirstPattern = false;
   for (const line of lines) {
     if (isPattern(line)) {
       if (seenPattern && blankSincePattern) {
-        return true;
+        return "blank-line";
       }
       seenPattern = true;
       blankSincePattern = false;
-    } else if (isBlank(line) && seenPattern) {
+    } else if (seenPattern && isBlank(line)) {
       blankSincePattern = true;
+    } else if (seenPattern && isComment(line)) {
+      commentBelowFirstPattern = true;
     }
   }
-  return false;
+  return commentBelowFirstPattern ? "comment" : undefined;
 };
+
+/**
+ * The line ending the file mostly uses. Counted rather than merely spotted: one
+ * stray `\r\n` in a file otherwise written with `\n` is not a habit to copy.
+ */
+const readEol = (contents: string): "\n" | "\r\n" =>
+  (contents.match(/\r\n/g)?.length ?? 0) * 2 >
+  (contents.match(/\n/g)?.length ?? 0)
+    ? "\r\n"
+    : "\n";
 
 const readIgnoreFileStyle = (contents: string): IgnoreFileStyle => {
   const lines = contents.split("\n");
@@ -68,9 +92,9 @@ const readIgnoreFileStyle = (contents: string): IgnoreFileStyle => {
   const spelling = plain.length > 0 ? plain : patterns;
 
   return {
-    eol: contents.includes("\r\n") ? "\r\n" : "\n",
+    eol: readEol(contents),
     commentMarker: /^#+/.exec(lines.find(isComment)?.trim() ?? "")?.[0],
-    sectioned: hasSections(lines),
+    grouping: readGrouping(lines),
     sorted:
       patterns.length >= 2 &&
       patterns.every(
@@ -147,16 +171,26 @@ export const withIgnoreEntry = ({
 
   // One flat alphabetical block: the entry belongs at its letter. Sorting is
   // only followed here — in a file cut into sections the same reasoning would
-  // drop the line into a section it has nothing to do with.
-  const slotIn = style.sorted && !style.sectioned;
+  // drop the line into a section it has nothing to do with. Comments alone do
+  // not cut it into sections: `sortedPosition` keeps each one with its pattern.
+  const slotIn = style.sorted && style.grouping !== "blank-line";
 
-  // A file kept in commented sections gets one more section; anywhere else a
-  // blank line and a comment around a single pattern are more ceremony than the
-  // line deserves.
+  // A file that keeps its patterns in groups gets one more, headed by a comment
+  // in the file's own marker. Anywhere else a heading over a single pattern is
+  // more ceremony than the line deserves.
+  const heading =
+    !slotIn && style.grouping !== undefined && style.commentMarker !== undefined
+      ? `${style.commentMarker} repo-dive catalog`
+      : undefined;
+
   const addition =
-    !slotIn && style.sectioned && style.commentMarker !== undefined
-      ? ["", `${style.commentMarker} repo-dive catalog`, entry]
-      : [entry];
+    heading === undefined
+      ? [entry]
+      : // The group is set off the way the file sets its groups off: a file
+        // that never spends a blank line does not start now.
+        style.grouping === "blank-line"
+        ? ["", heading, entry]
+        : [heading, entry];
 
   // A last line left without a line ending gets the file's own one first, so
   // that splicing happens between whole lines — appending afterwards would put

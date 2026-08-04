@@ -5,8 +5,8 @@
 Make `repo-dive ignore` write in each file's own style, and leave alone the files no tool needs it in.
 
 The command used to end every ignore file with the same three lines — a blank line, a `# repo-dive catalog` comment and the entry — which is a lot of ceremony for one pattern in a file that is otherwise a plain list.
-Now it reads how the file is written and follows it: the entry is slotted in at its letter in an alphabetically ordered list, appended as a bare line to a plain one, and given a comment of its own only in a file already kept in commented sections.
-The path itself is spelled the way the file spells paths — anchored (`/.repo-dive/`) where its paths are anchored, with a trailing slash where it marks directories that way — and `\r\n` files stay on `\r\n`.
+Now it reads how the file is written and follows it: the entry is slotted in at its letter in an alphabetically ordered list, appended as a bare line to a plain one, and given a comment of its own only in a file that already keeps its patterns in commented groups — with a blank line before it only where the file sets its own groups off that way.
+The path itself is spelled the way the file spells paths — anchored (`/.repo-dive/`) where its paths are anchored, with a trailing slash where it marks directories that way — and a file written with `\r\n` gets a `\r\n` line.
 
 Some ignore files also get nothing at all now, because the tool reading them already learns to skip the catalog:
 
