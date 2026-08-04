@@ -36,14 +36,14 @@ export type CommitMeta = {
   readonly hash: string;
   readonly authorName: string;
   readonly authorEmail: string;
-  /** When the work was written. Kept for the cube; nothing is plotted against it. */
+  /** When the work was written — what charts that count work bin by. */
   readonly authorDate: string;
   /**
    * When the commit took its current shape, i.e. when it became part of the
    * history. Rebases and cherry-picks preserve the author date but reset this
    * one, so only the committer date increases along the first-parent chain —
-   * which is why it, and it alone, is the timeline every chart is drawn
-   * against.
+   * which is why anything measuring the state of the tree over time is
+   * positioned by it. See docs/specs/04-collectors.md for the boundary.
    */
   readonly committerDate: string;
   readonly subject: string;
@@ -162,7 +162,11 @@ export const listFirstParentShas = (
 export type RepoSummary = {
   readonly commitCount: number;
   readonly authorCount: number;
-  /** Committer dates, like every other timeline in the tool. */
+  /**
+   * The outer edges of both clocks — the earliest anything was authored and
+   * the latest anything landed — so the range covers every commit however it
+   * is dated.
+   */
   readonly firstCommitDate: string | undefined;
   readonly lastCommitDate: string | undefined;
 };
@@ -171,10 +175,12 @@ export const summarizeCommits = (
   commits: readonly CommitMeta[],
 ): RepoSummary => {
   const authorEmails = new Set(commits.map((commit) => commit.authorEmail));
+  // Parsed rather than compared as strings: ISO timestamps carry their own UTC
+  // offsets, so lexicographic order is not chronological order.
   const dates = commits
-    .map((commit) => commit.committerDate)
-    .filter(Boolean)
-    .toSorted();
+    .flatMap((commit) => [commit.authorDate, commit.committerDate])
+    .filter((date) => !Number.isNaN(Date.parse(date)))
+    .toSorted((left, right) => Date.parse(left) - Date.parse(right));
 
   return {
     commitCount: commits.length,

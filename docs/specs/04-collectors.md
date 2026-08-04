@@ -66,7 +66,7 @@ Policies:
 - `every-nth:<n>` — a count-based budget, taken over the newest-first commit list
 - Tags/releases as natural sample points (future)
 
-Period buckets are computed from the committer date in UTC (ISO weeks for `weekly`), like every other timeline here — see [one clock](#one-clock-the-committer-date).
+Period buckets are computed from the committer date in UTC (ISO weeks for `weekly`) — sampling picks the snapshots that state-over-time charts are drawn from, so it shares their clock (see [author date vs committer date](#author-date-vs-committer-date)).
 A policy therefore asks for one snapshot per week or month of the repository's own history, and a rebased commit belongs to the period it landed in rather than the one it was written in.
 
 Which commits a collector was actually run on stays visible in the cube (facts carry the collector that produced them), so charts can interpolate honestly rather than pretending to be continuous.
@@ -75,20 +75,33 @@ Which commits a collector was actually run on stays visible in the cube (facts c
 Their output describes the state of the tree, and only first-parent commits are states the repository actually passed through: a commit on a merged side branch — or one that arrived with a foreign history absorbed by an unrelated-histories merge — carries a tree that was never HEAD, so sampling it puts a cliff into the timeline.
 `log` collectors see every commit, since a commit's own authorship and diff are facts wherever it sits in the graph.
 
-## One clock: the committer date
+## Author date vs committer date
 
-**Every** timeline in the tool — snapshot series, the commit calendar, commits and churn per month, the `scan` summary — places a commit at its **committer** date, i.e. when the commit became part of the history.
-So every chart answers one question: when did this repository's trunk change.
+Git gives every commit two timestamps, and under a rebase or squash-merge workflow they are genuinely different facts: the **author** date is when the work was written, the **committer** date is when it became part of the history.
+On ollama's mainline the two differ for 24% of commits, by a median of 13 hours and a maximum of 113 days.
 
-The author date cannot serve as that clock.
-Under a rebase or squash-merge workflow it says when the work was written, which can be months before it landed, and it does not increase along the first-parent chain — ollama's mainline steps backwards 364 times, by up to four months.
-Plotting a tree snapshot at its author date drags the current line counts back into a stretch the chart has already drawn, and every stacked area zigzags.
+Which one a series uses is decided by the **shape of the series**, not by its subject matter.
+Asking "is this chart about people or about the repository?" sounds like the right question and isn't — a commit is honestly both. Ask instead what the x axis _is_:
 
-Activity charts could have kept the author date, since bucketing by day or month makes them immune to that, and doing so would preserve the contributor's own timezone and the delay between writing and landing.
-They don't, deliberately: a single clock is a rule that fits in a sentence, where "author date for people, committer date for repository state" needs a paragraph and a decision at every new chart.
-The cost is measurable and small — across ollama's 5.6k commits the calendar keeps 924 of its 947 active days, its median stays at 4 commits/day, and its weekend share moves from 9.9% to 9.6%.
+1.  **A sampled state variable** — "at time _T_ the tree held _V_ lines". The x coordinate is the instant the measurement was valid.
+    Use the **committer date**. This is not a preference: the author date does not increase along the first-parent chain (ollama's steps backwards 364 times), so a chart drawn against it doubles back on itself and every stacked area zigzags. The committer date is monotonic there by construction, because rebasing rewrites it.
+    Covers: lines by language, file types, suppression directives, dependencies, code-survival totals, and the period buckets [sampling](#sampling) picks snapshots for.
+1.  **A histogram of objects binned by one of their own date attributes** — "how many commits fell in this day", "how many living lines were written in this year". The x coordinate is a property of the things being counted, so bin order is irrelevant and monotonicity buys nothing.
+    Use **the attribute the chart claims to show**, which for anything counting work is the **author date**.
+    Covers: the commit calendar, commits per month, churn per month, the "AI commits in the last 90 days" stat, and code-survival cohorts.
 
-Both dates are still recorded (`commits.authored_at` and `commits.committed_at` in the [cube](05-metrics-cube.md)), so a query can ask about authoring time, and lead-time metrics — how long work sits before it lands — stay possible later.
+The second rule is load-bearing rather than cosmetic, because two charts on the same page have to agree.
+Survival cohorts come from `git blame`, which reports `author-time` — a line written in June and merged in July belongs to the June cohort, and the label says so ("the year each line was written").
+If churn were binned by the committer date, that same line would be counted as added in July, and "lines added in month M" would stop matching "lines in cohort M".
+Only the author date keeps them the same lines.
+
+Two consequences worth knowing:
+
+- **Only the author date is at risk from bad data.** Nothing validates it — settable via `GIT_AUTHOR_DATE`, taken from the author's machine clock, preserved through imports and grafts — so an imported or clock-skewed history corrupts the histograms. It can never corrupt the timelines, which is a real argument for the committer date that the shape rule overrides rather than answers.
+- **The dashboard's axis range spans both.** `repo.firstCommitDate` / `lastCommitDate` are the outer edges of the two clocks — earliest authored, latest landed — so the author-dated calendar and the committer-dated timelines both fit inside them.
+
+Both dates are recorded in the [cube](05-metrics-cube.md) as `commits.authored_at` and `commits.committed_at`, so queries can pick either, and lead-time metrics — how long work sits before it lands — stay possible later.
+Attribution is a separate axis and always keys off the author: see [config](07-config.md).
 
 Attribution is unaffected and still keys off the **author**: see [config](07-config.md).
 
