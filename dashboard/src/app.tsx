@@ -827,7 +827,7 @@ export function App({ data }: { data: DashboardData }) {
       {data.repo.firstCommitDate !== undefined && data.commits.length > 0 && (
         <Section
           title="Commit calendar"
-          subtitle="commits per day; days bucketed by the author's local date"
+          subtitle="commits per day; days bucketed by the committer's local date, i.e. when each commit landed"
           controls={
             <div className="mb-3 flex w-fit items-center gap-2">
               <Label

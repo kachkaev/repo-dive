@@ -14,7 +14,7 @@ export type WeekStart = "monday" | "sunday";
 
 /** The commits a calendar aggregates — a filtered subset enables per-contributor calendars later. */
 export type CalendarCommit = {
-  /** ISO timestamp with the author's UTC offset (git `%aI`). */
+  /** ISO timestamp with the committer's UTC offset (git `%cI`). */
   date: string;
   /** Author kind; missing in dashboard.json written before per-commit kinds. */
   kind?: ContributorKind;
@@ -463,8 +463,8 @@ export function CommitCalendar({
 }) {
   const [hovered, setHovered] = useState<Cell | undefined>();
 
-  // Author-local day bucketing: the ISO timestamp carries the author's UTC
-  // offset, so its date part is the day the author actually committed on.
+  // Committer-local day bucketing: the ISO timestamp carries the committer's
+  // UTC offset, so its date part is the day the commit landed where it landed.
   const dayTotals = new Map<string, DayTotal>();
   for (const commit of commits) {
     const isoDate = commit.date.slice(0, 10);
