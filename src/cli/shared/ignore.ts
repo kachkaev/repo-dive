@@ -5,15 +5,15 @@ import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import { loadConfig } from "./config.ts";
 import {
-  appendIgnoreEntry,
+  addIgnoreEntry,
   checkIgnoreFiles,
   ignoreEntryFor,
 } from "./ignore-files.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
 /**
- * Lists the catalog in every ignore file at the repository root that does not
- * cover it yet, so the tools reading them stop walking the cache.
+ * Lists the catalog in every ignore file at the repository root that needs it,
+ * so the tools reading them stop walking the cache.
  */
 export const runIgnore = ({
   repoPath,
@@ -45,14 +45,13 @@ export const runIgnore = ({
     }
 
     const entry = ignoreEntryFor(catalogRelativePath);
-    const missing = statuses.filter((status) => !status.covered);
-    const covered = statuses.filter((status) => status.covered);
+    const missing = statuses.filter((status) => status.outcome === "missing");
 
     if (!dryRun) {
       yield* Effect.forEach(
         missing,
         (status) =>
-          appendIgnoreEntry({
+          addIgnoreEntry({
             filePath: path.join(repoRoot, status.name),
             catalogRelativePath,
           }),
@@ -60,19 +59,25 @@ export const runIgnore = ({
       );
     }
 
+    const listed = statuses.filter((status) => status.outcome === "listed");
     yield* Console.log(
       [
         ...(missing.length === 0
-          ? [`Every ignore file already covers ${entry}.`]
-          : [
-              `${dryRun ? "Would add" : "Added"} ${entry} to:`,
-              ...missing.map((status) => `  ${status.name}`),
-            ]),
-        ...(covered.length === 0
+          ? [`No ignore file needs ${entry}.`]
+          : missing.map(
+              (status) =>
+                // The line each file gets follows how that file is written, so
+                // it is worth showing rather than summarizing.
+                `${dryRun ? "Would add" : "Added"} ${status.entry} to ${status.name}`,
+            )),
+        ...(listed.length === 0
           ? []
           : [
-              `Already covered: ${covered.map((status) => status.name).join(", ")}`,
+              `Already listed: ${listed.map((status) => status.name).join(", ")}`,
             ]),
+        ...statuses
+          .filter((status) => status.outcome === "redundant")
+          .map((status) => `Not needed: ${status.name} (${status.reason})`),
       ].join("\n"),
     );
   });
