@@ -6,13 +6,17 @@
  * handful of forms people actually write.
  */
 
-/** Strips the decoration that does not change which path a pattern points at. */
+/**
+ * Strips the decoration that does not change which path a pattern points at.
+ * A trailing `/*` or `/**` goes with it: to git those leave the directory
+ * itself unignored, but everything a tool would walk into is gone either way.
+ */
 const normalizePattern = (pattern: string): string =>
   pattern
     .trim()
     .replace(/^\.?\//, "")
     .replace(/\/$/, "")
-    .replace(/\/\*\*$/, "");
+    .replace(/\/\*+$/, "");
 
 /**
  * Whether an ignore file's `contents` plainly cover `relativePath` (a

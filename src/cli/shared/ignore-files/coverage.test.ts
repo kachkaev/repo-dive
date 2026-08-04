@@ -12,6 +12,7 @@ test("coversPath recognizes the forms people actually write", () => {
     "**/.repo-dive",
     ".repo-dive/**",
     ".repo-dive/**/",
+    ".repo-dive/*",
     "  .repo-dive/  ",
     "node_modules\n.repo-dive/\ndist",
   ]) {
@@ -22,7 +23,9 @@ test("coversPath recognizes the forms people actually write", () => {
 test("coversPath treats a catch-all and an ancestor directory as covering", () => {
   expect(coversPath("*", ".repo-dive")).toBe(true);
   expect(coversPath("**", ".repo-dive")).toBe(true);
+  expect(coversPath("**/*", ".repo-dive")).toBe(true);
   expect(coversPath("tmp/", "tmp/dive-cache")).toBe(true);
+  expect(coversPath("tmp/*", "tmp")).toBe(true);
 });
 
 test("coversPath matches a bare name at any depth, like gitignore", () => {
