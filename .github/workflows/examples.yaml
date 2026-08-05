@@ -11,7 +11,10 @@ on:
       - main
     paths:
       - examples/**
-      - .github/workflows/examples.yaml
+  release:
+    # Cutting a release refreshes the dashboards with the version just published
+    types:
+      - published
   schedule:
     # Weekly, Monday 05:13 UTC — keeps the dashboards "more or less up to date"
     - cron: "13 5 * * 1"
