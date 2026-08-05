@@ -12,7 +12,6 @@ on:
     paths:
       - examples/**
   release:
-    # Cutting a release refreshes the dashboards with the version just published
     types:
       - published
   schedule:
