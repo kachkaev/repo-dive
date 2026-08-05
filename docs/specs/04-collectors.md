@@ -1,6 +1,7 @@
 # Collectors
 
-_Draft. Collectors are the pluggable "tools" of the map phase: each one knows how to extract one kind of raw snapshot from a commit._
+_Draft.
+Collectors are the pluggable "tools" of the map phase: each one knows how to extract one kind of raw snapshot from a commit._
 
 ## Interface sketch
 
@@ -51,9 +52,15 @@ Because `normalize` re-runs on every `index`, config that only affects normaliza
 
 Ordered by cost; the strategy tells the runner what context a collector needs:
 
-1.  **`log`** — derived from commit metadata / `git log --numstat` only. Near-free, runs on every commit. (Examples: commit metadata, churn, author stats.)
-1.  **`tree`** — reads the commit's tree and file contents from the object database (`git ls-tree`, `git cat-file`) without touching the filesystem. Cheap, and cacheable per blob when the result depends on content alone (see [content caching](#content-caching)). (Examples: file size distributions, suppression-comment counts, line survival.)
-1.  **`worktree`** — needs a real checkout: the runner materializes the commit via `git worktree add` in a temporary directory and hands the collector a path. Expensive; sampled by default. (Examples: ESLint, type-checking, building, test counting — anything that needs `node_modules` or real files.)
+1.  **`log`** — derived from commit metadata / `git log --numstat` only.
+    Near-free, runs on every commit.
+    (Examples: commit metadata, churn, author stats.)
+1.  **`tree`** — reads the commit's tree and file contents from the object database (`git ls-tree`, `git cat-file`) without touching the filesystem.
+    Cheap, and cacheable per blob when the result depends on content alone (see [content caching](#content-caching)).
+    (Examples: file size distributions, suppression-comment counts, line survival.)
+1.  **`worktree`** — needs a real checkout: the runner materializes the commit via `git worktree add` in a temporary directory and hands the collector a path.
+    Expensive; sampled by default.
+    (Examples: ESLint, type-checking, building, test counting — anything that needs `node_modules` or real files.)
 
 ## Sampling
 
@@ -81,10 +88,13 @@ Git gives every commit two timestamps, and under a rebase or squash-merge workfl
 On ollama's mainline the two differ for 24% of commits, by a median of 13 hours and a maximum of 113 days.
 
 Which one a series uses is decided by the **shape of the series**, not by its subject matter.
-Asking "is this chart about people or about the repository?" sounds like the right question and isn't — a commit is honestly both. Ask instead what the x axis _is_:
+Asking "is this chart about people or about the repository?" sounds like the right question and isn't — a commit is honestly both.
+Ask instead what the x axis _is_:
 
 1.  **A sampled state variable** — "at time _T_ the tree held _V_ lines". The x coordinate is the instant the measurement was valid.
-    Use the **committer date**. This is not a preference: the author date does not increase along the first-parent chain (ollama's steps backwards 364 times), so a chart drawn against it doubles back on itself and every stacked area zigzags. The committer date is monotonic there by construction, because rebasing rewrites it.
+    Use the **committer date**.
+    This is not a preference: the author date does not increase along the first-parent chain (ollama's steps backwards 364 times), so a chart drawn against it doubles back on itself and every stacked area zigzags.
+    The committer date is monotonic there by construction, because rebasing rewrites it.
     Covers: lines by language, file types, suppression directives, dependencies, code-survival totals, and the period buckets [sampling](#sampling) picks snapshots for.
 1.  **A histogram of objects binned by one of their own date attributes** — "how many commits fell in this day", "how many living lines were written in this year". The x coordinate is a property of the things being counted, so bin order is irrelevant and monotonicity buys nothing.
     Use **the attribute the chart claims to show**, which for anything counting work is the **author date**.
@@ -97,7 +107,8 @@ Only the author date keeps them the same lines.
 
 Two consequences worth knowing:
 
-- **Only the author date is at risk from bad data.** Nothing validates it — settable via `GIT_AUTHOR_DATE`, taken from the author's machine clock, preserved through imports and grafts — so an imported or clock-skewed history corrupts the histograms. It can never corrupt the timelines, which is a real argument for the committer date that the shape rule overrides rather than answers.
+- **Only the author date is at risk from bad data.** Nothing validates it — settable via `GIT_AUTHOR_DATE`, taken from the author's machine clock, preserved through imports and grafts — so an imported or clock-skewed history corrupts the histograms.
+  It can never corrupt the timelines, which is a real argument for the committer date that the shape rule overrides rather than answers.
 - **The dashboard's axis range spans both.** `repo.firstCommitDate` / `lastCommitDate` are the outer edges of the two clocks — earliest authored, latest landed — so the author-dated calendar and the committer-dated timelines both fit inside them.
 
 Both dates are recorded in the [cube](05-metrics-cube.md) as `commits.authored_at` and `commits.committed_at`, so queries can pick either, and lead-time metrics — how long work sits before it lands — stay possible later.
@@ -152,9 +163,13 @@ Implemented, in `src/cli/shared/collectors/` (strategy, then default sampling wh
 1.  **churn** (`log`) — lines added/deleted per commit vs first parent, by file extension. Batched.
 1.  **file-types** (`tree`) — file count and bytes per extension at the commit's tree, straight from `git ls-tree -l`.
 1.  **directives** (`tree`) — ESLint suppression comments by rule (block disables counted as gray areas) and `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck` counts. Blob-cached.
-1.  **dependencies** (`tree`) — total resolved packages from package-manager lockfiles, per package manager (pnpm, npm, yarn; parser registry keyed by lockfile name generalizes to bun/cargo/…), plus direct/dev/optional dependencies and manifest counts read from `package.json` files (the authoritative source for what a project declares, so accurate even where a lockfile omits it). Blob-cached. Emits `dependencies.resolved`, `dependencies.direct` and `dependencies.manifest`.
+1.  **dependencies** (`tree`) — total resolved packages from package-manager lockfiles, per package manager (pnpm, npm, yarn; parser registry keyed by lockfile name generalizes to bun/cargo/…), plus direct/dev/optional dependencies and manifest counts read from `package.json` files (the authoritative source for what a project declares, so accurate even where a lockfile omits it).
+    Blob-cached.
+    Emits `dependencies.resolved`, `dependencies.direct` and `dependencies.manifest`.
 1.  **todo-comments** (`tree`) — TODO/FIXME/HACK/XXX counts in source files. Blob-cached.
-1.  **languages** (`tree`) — lines and file count per language, counted in-process over the source files of the commit's tree and labelled from the shared extension → language map. Blob-cached. It scans exactly the file set `survival` blames, so the dashboard's "Lines by language" chart shows the same totals with age shading on and off; an earlier version shelled out to `tokei`, which counted lockfiles and generated data the blame view could never account for.
+1.  **languages** (`tree`) — lines and file count per language, counted in-process over the source files of the commit's tree and labelled from the shared extension → language map.
+    Blob-cached.
+    It scans exactly the file set `survival` blames, so the dashboard's "Lines by language" chart shows the same totals with age shading on and off; an earlier version shelled out to `tokei`, which counted lockfiles and generated data the blame view could never account for.
 1.  **survival** (`tree`, `monthly`) — living lines by extension, author and authoring-month cohort, via `git blame --line-porcelain` per file. The expensive one.
 
 Planned next:

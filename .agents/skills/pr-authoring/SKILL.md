@@ -7,7 +7,8 @@ description: Conventions for authoring PRs in this repo — changesets (includin
 
 ## Every user-facing change needs a changeset
 
-If a PR changes what users see or run — the CLI, collectors, indexing, the dashboard, config, the report — it must include a changeset in the same PR. Internal-only changes (tests, CI, lint setup, docs) don't get one.
+If a PR changes what users see or run — the CLI, collectors, indexing, the dashboard, config, the report — it must include a changeset in the same PR.
+Internal-only changes (tests, CI, lint setup, docs) don't get one.
 
 Create `.changeset/<kebab-slug>.md` (pick a descriptive slug, not the generator's random name):
 
@@ -16,11 +17,12 @@ Create `.changeset/<kebab-slug>.md` (pick a descriptive slug, not the generator'
 "repo-dive": patch
 ---
 
-Imperative first sentence matching the PR title. Then paragraphs (and bullets
-where they help) written for CHANGELOG readers: what changed, why, and what —
-if anything — users must do. Mention when existing catalogs heal without a
-re-scan, or when they don't.
+Imperative first sentence matching the PR title.
+Then paragraphs (and bullets where they help) written for CHANGELOG readers: what changed, why, and what — if anything — users must do.
+Mention when existing catalogs heal without a re-scan, or when they don't.
 ```
+
+Changesets are Markdown, so they follow [editing-markdown](../editing-markdown/SKILL.md) — one sentence per line, no hard-wrapping.
 
 Bump levels while the package is 0.x:
 
@@ -29,7 +31,8 @@ Bump levels while the package is 0.x:
 
 ## Backfilling a missed changeset
 
-When a changeset lands in a _different_ PR than the change it describes, the changelog would attribute it to the wrong PR/commit. `@changesets/changelog-github` supports overrides: put these lines at the top of the changeset body (they are parsed out and never rendered):
+When a changeset lands in a _different_ PR than the change it describes, the changelog would attribute it to the wrong PR/commit.
+`@changesets/changelog-github` supports overrides: put these lines at the top of the changeset body (they are parsed out and never rendered):
 
 ```md
 ---
@@ -42,7 +45,8 @@ commit: cfc01d3239cd95ea917f4f1409d668c595c7619b
 Actual summary starts here…
 ```
 
-Use the full SHA of the squash-merge commit on `main` and the merged PR's number. `author: @login` is also supported but unused here (`disableThanks` is on).
+Use the full SHA of the squash-merge commit on `main` and the merged PR's number.
+`author: @login` is also supported but unused here (`disableThanks` is on).
 
 ## PR conventions
 

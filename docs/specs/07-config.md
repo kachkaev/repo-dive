@@ -125,7 +125,8 @@ Only the repository root is searched; ignore files deeper in the tree govern the
 Some tools are told about the catalog without a line of their own, and a line that changes nothing costs the next reader of the file a moment working out why it is there.
 Those files are reported as not needed and left untouched, both by the warning and by `repo-dive ignore`:
 
-- **`.prettierignore`**, when the repository has a root `.gitignore` — prettier's CLI has read both since v3, and `ignore` lists the catalog in `.gitignore` anyway. A `package.json` pinning prettier 2 or older opts back in, as does a script running prettier with `--ignore-path`, which replaces the files prettier would have read for itself.
+- **`.prettierignore`**, when the repository has a root `.gitignore` — prettier's CLI has read both since v3, and `ignore` lists the catalog in `.gitignore` anyway.
+  A `package.json` pinning prettier 2 or older opts back in, as does a script running prettier with `--ignore-path`, which replaces the files prettier would have read for itself.
 - **`.npmignore`**, when `package.json` has a `files` array — that array is an allow list, so it alone decides what `npm pack` includes.
 - **`.eslintignore`**, when eslint reads a flat config (an `eslint.config.*` at the root, or a declared eslint 9+) — flat config replaced the file with an `ignores` key and stopped reading it.
 

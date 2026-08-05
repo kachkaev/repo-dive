@@ -21,7 +21,7 @@ One command runs the whole pipeline — scan, index, dashboard — and opens the
 
 - **Map**: walk the repo's commits (all or sampled) and let pluggable collectors capture raw snapshots per commit — language/LOC breakdowns, author stats, lint diagnostics and more.
 - **Reduce**: index those snapshots into a local metrics store shaped like a data cube — numbers at intersections of open-ended categories (author, language, date, lint rule, …).
-- **Explore**: query the cube to draw charts, build presentations and ask AI questions about how the codebase evolved.
+- **Explore**: query the cube to draw charts, export shareable reports and ask AI questions about how the codebase evolved.
 
 Everything is local-first, incremental and resumable: results live in a catalog folder inside the repo being analyzed and are refined over multiple runs.
 

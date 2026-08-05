@@ -1,6 +1,7 @@
 # Prior art: git-history analytics tools
 
-_Research date: 2026-07-19. All GitHub/npm dates were verified against the registries and the GitHub API on that day._
+_Research date: 2026-07-19.
+All GitHub/npm dates were verified against the registries and the GitHub API on that day._
 
 This document surveys existing tools that analyze git repository history and assesses how closely each matches the repo-dive vision: an npx-runnable TypeScript CLI that walks history map-reduce style, runs pluggable collectors per commit, stores raw snapshots in a local catalog, indexes them into a queryable metrics cube and feeds visualizations and AI exploration.
 
@@ -57,7 +58,8 @@ See [open questions](../specs/06-open-questions.md).
 ## Ideas to borrow
 
 - **Engines to embed as collectors**: `tokei` or `scc` (active; scc adds complexity/COCOMO, clean JSON) for language/LOC; `cloc --git --diff`; ESLint `--format json`; code-maat-style analyses reimplemented from `git log --numstat`.
-- **Performance** (hercules, git-loc): avoid full worktree checkouts when a tool can run on blobs/trees read from the object database; cache per-blob results so identical blobs across commits are counted once. Reserve real checkouts (`git worktree` in a temp dir) for filesystem-dependent tools like ESLint.
+- **Performance** (hercules, git-loc): avoid full worktree checkouts when a tool can run on blobs/trees read from the object database; cache per-blob results so identical blobs across commits are counted once.
+  Reserve real checkouts (`git worktree` in a temp dir) for filesystem-dependent tools like ESLint.
 - **Sampling** (git-of-theseus, Sourcegraph): sample commits by time interval and interpolate rather than analyzing every commit.
 - **Storage patterns**: mergestat-lite's SQLite schema for git entities; simonw/git-history's per-commit-versioned rows; DevLake's normalized dimension schema.
 - **UX** (git-truck): `npx -y` instant start, cache on first run; labours' "analyze once, plot many" split; CodeCharta's merge-many-tools-into-one-model file format.
@@ -66,5 +68,7 @@ See [open questions](../specs/06-open-questions.md).
 ## Stack notes (verified 2026-07-19)
 
 - `effect@beta` = **4.0.0-beta.99** (2026-07-17, near-weekly releases; effect-smol repo merged into Effect-TS/effect, main branch is now v4). No stable date announced.
-- **`@effect/cli` is v3-only.** In v4 the CLI is merged into core as `effect/unstable/cli` (`Command`, `Flag`, `Argument`, `Prompt`, wizard mode, completions). Everything under `unstable/` may break between betas — pin exact versions, keep `effect` and `@effect/platform-node` on the same beta N.
-- **SQLite**: `@effect/sql-sqlite-node@beta` is built on Node's built-in `node:sqlite` (no native/node-gyp dependency — good for npx) and plugs into the driver-agnostic `effect/unstable/sql` interfaces. Requires a Node version with `node:sqlite` available; `@effect/sql-libsql` exists as an alternative.
+- **`@effect/cli` is v3-only.** In v4 the CLI is merged into core as `effect/unstable/cli` (`Command`, `Flag`, `Argument`, `Prompt`, wizard mode, completions).
+  Everything under `unstable/` may break between betas — pin exact versions, keep `effect` and `@effect/platform-node` on the same beta N.
+- **SQLite**: `@effect/sql-sqlite-node@beta` is built on Node's built-in `node:sqlite` (no native/node-gyp dependency — good for npx) and plugs into the driver-agnostic `effect/unstable/sql` interfaces.
+  Requires a Node version with `node:sqlite` available; `@effect/sql-libsql` exists as an alternative.
