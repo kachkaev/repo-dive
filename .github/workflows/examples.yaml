@@ -11,7 +11,9 @@ on:
       - main
     paths:
       - examples/**
-      - .github/workflows/examples.yaml
+  release:
+    types:
+      - published
   schedule:
     # Weekly, Monday 05:13 UTC — keeps the dashboards "more or less up to date"
     - cron: "13 5 * * 1"
