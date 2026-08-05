@@ -32,6 +32,7 @@ See [docs/specs](docs/specs/README.md) for the architecture and [docs/research/p
 Live dashboards for a few popular repositories, produced by running the tool on their full history:
 
 - [curl](https://kachkaev.github.io/repo-dive/examples/curl/) (C, since 1999)
+- [effect](https://kachkaev.github.io/repo-dive/examples/effect/) (TypeScript, since 2020)
 - [ollama](https://kachkaev.github.io/repo-dive/examples/ollama/) (Go, since 2023)
 - [prettier](https://kachkaev.github.io/repo-dive/examples/prettier/) (JavaScript, since 2016)
 - [react](https://kachkaev.github.io/repo-dive/examples/react/) (JavaScript, since 2013)
