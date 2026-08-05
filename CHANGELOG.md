@@ -1,5 +1,71 @@
 # repo-dive
 
+## 0.9.0
+
+### Minor Changes
+
+- [#106](https://github.com/kachkaev/repo-dive/pull/106) [`0b97bf9`](https://github.com/kachkaev/repo-dive/commit/0b97bf91f74ad449168da64f764a7ee8a28b6d73) - Sharpen the commit calendar's edges, labels and readouts.
+
+  Days outside the report's coverage — before the first commit, or after the report was generated — are drawn as outlines instead of being left blank, so "we have no data" reads differently from "no commits".
+  A month whose 1st does not land on the first day of the week now has its label shifted one column to the right, rather than hanging over the gap that precedes the month.
+  Day-of-week labels are down to two letters ("Mo", "Tu"), which also buys back enough width for the widest possible year to fit: the calendar no longer scrolls horizontally on a wide screen.
+  What width a strip does not need is now spent evenly on both sides instead of pooling to its right.
+
+  A day's detail moved out of the caption below the calendar and into a tooltip styled like the other charts' hover cards, so the calendar no longer changes height as the pointer travels across it.
+  The tooltip names the weekday alongside the date, and days outside the coverage get one too, saying which edge of the report they fall off.
+
+  The caption itself now gives the range's total and the busiest day a line each, names the busiest day's weekday, and drops the nested parentheses the two used to share.
+
+- [#103](https://github.com/kachkaev/repo-dive/pull/103) [`9fe9206`](https://github.com/kachkaev/repo-dive/commit/9fe920617ed26b4b19f5a443c46865298dc50f13) - Rework the report header around the repository's own identity.
+
+  The heading is now a breadcrumb of the `origin` remote — `kachkaev / repo-dive` under the GitHub or GitLab mark, or the host followed by the path on any other forge — linking to the repository itself; a repo with no (or a purely local) remote keeps its checkout name, unlinked.
+  That also fixes the name shown for a clone whose directory says nothing about it: the published examples used to be titled "analyzed".
+
+  The line below reads `Analyzed by repo-dive at <date> · coverage: <first> — <last>`.
+  Each date carries a tooltip with its full timestamp, the two coverage dates name the commit each one comes from, and on GitHub and GitLab they link straight to that commit.
+  `dashboard.json` gains `repo.remoteUrl`, `repo.firstCommitSha` and `repo.lastCommitSha`, and `repo.name` now prefers the remote's name — run `index` to rebuild it (older files still render, minus the new links).
+
+  The stat tiles lose "Suppressions" — the directives chart covers it in more depth — and "Commits" now spells out how many contributors produced them, which is where the header's own commit and contributor counts went.
+
+### Patch Changes
+
+- [#88](https://github.com/kachkaev/repo-dive/pull/88) [`aefe65b`](https://github.com/kachkaev/repo-dive/commit/aefe65b87385c926385051f0b062ba52aedb4b87) - Build the dashboard with a relative base (`./`), so the bundle works from any directory of any static host — not only a domain root.
+  `repo-dive dashboard` and `repo-dive report` behave exactly as before; the change matters when copying `dist/dashboard` together with a `dashboard.json` onto static hosting (e.g. GitHub Pages), where the absolute `/assets/…` URLs used to 404.
+
+- [#107](https://github.com/kachkaev/repo-dive/pull/107) [`e9a8f86`](https://github.com/kachkaev/repo-dive/commit/e9a8f86d7db99b83377ea61cb0eb86d9d10040b8) - Make `repo-dive ignore` write in each file's own style, and leave alone the files no tool needs it in.
+
+  The command used to end every ignore file with the same three lines — a blank line, a `# repo-dive catalog` comment and the entry — which is a lot of ceremony for one pattern in a file that is otherwise a plain list.
+  Now it reads how the file is written and follows it: the entry is slotted in at its letter in an alphabetically ordered list, appended as a bare line to a plain one, and given a comment of its own only in a file that already keeps its patterns in commented groups — with a blank line before it only where the file sets its own groups off that way.
+  The path itself is spelled the way the file spells paths — anchored (`/.repo-dive/`) where its paths are anchored, with a trailing slash where it marks directories that way — and a file written with `\r\n` gets a `\r\n` line.
+
+  Some ignore files also get nothing at all now, because the tool reading them already learns to skip the catalog:
+
+  - `.prettierignore`, when the repository has a root `.gitignore` — prettier reads both since v3, and the catalog is listed in `.gitignore` anyway (pinning prettier 2 or running it with `--ignore-path` opts back in);
+  - `.npmignore`, when `package.json` has a `files` array, which alone decides what `npm pack` includes;
+  - `.eslintignore`, when eslint reads a flat config, which never looks at that file.
+
+  Both `repo-dive ignore` and the warning from `scan`, `index` and `status` go by these rules, so a repository where the entry is already taken care of stays quiet.
+  The command now reports what each file got, or why it needed nothing.
+  Entries written by earlier versions are still recognized — nothing is rewritten, and re-running adds nothing.
+
+- [#102](https://github.com/kachkaev/repo-dive/pull/102) [`ae17729`](https://github.com/kachkaev/repo-dive/commit/ae177298112af2a50ee7844fa11836b1ad493bb2) - Plot measurements of the tree against the committer date so rebased history stops zigzagging.
+
+  Every chart placed each commit at its **author** date.
+  Under a rebase or squash-merge workflow that is when the work was written, not when it landed, so it can sit months earlier and does not increase along the first-parent chain: on ollama's mainline it steps backwards 364 times, by up to four months.
+  Each of those commits dragged the current line counts back into a stretch the chart had already drawn, which is what produced the dense vertical stripes across the stacked areas.
+
+  Which date a series uses now follows the shape of the series:
+
+  - **Measurements of the tree at points in time** — lines by language, file types, suppressions, dependencies, code-survival totals, and the snapshots `weekly` / `monthly` / `quarterly` sampling picks — are positioned by the **committer** date, the instant the repository actually looked like that.
+    It is the only one of the two that runs forwards along the history, so it is the only one a time axis can use.
+  - **Counts of work** — the commit calendar, commits and churn per month, the AI-commit stat — keep binning by the **author** date.
+    Bucketing by day or month makes them immune to the zigzag, and the author date is the clock `git blame` reports for code-survival cohorts, so "lines added in month M" and "lines belonging to cohort M" stay the same lines.
+
+  Attribution is unchanged — who a commit belongs to is still its git author.
+  The cube's `commits` table gains a `committed_at` column next to `authored_at` so queries can pick either, and the MCP `schema` tool explains which to reach for.
+
+  Existing catalogs heal on the next `repo-dive index` — no re-scan needed, since the dates come from git rather than from collected output.
+
 ## 0.8.0
 
 ### Minor Changes
