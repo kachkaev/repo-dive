@@ -210,6 +210,7 @@ export function TimeSeriesChart({
   colors,
   seriesHatch,
   mode,
+  percentMode,
   valueFormat,
   legendItems,
   tooltipGroups,
@@ -228,6 +229,12 @@ export function TimeSeriesChart({
    */
   seriesHatch?: Record<string, string>;
   mode: "area" | "bar" | "line";
+  /**
+   * Draw per-row shares instead of raw values. Owned by the section's controls
+   * (above the frame); ignored when the chart can't show shares — lines aren't
+   * parts of a whole, and a single series is always 100%.
+   */
+  percentMode?: boolean | undefined;
   valueFormat?: (value: number) => string;
   /** Overrides the per-series legend — e.g. one swatch per contributor. */
   legendItems?: LegendItem[];
@@ -260,7 +267,6 @@ export function TimeSeriesChart({
   // The instant under the cursor (continuous), not a data index — so the
   // crosshair reaches the whole domain, including stretches with no data point.
   const [hoverMs, setHoverMs] = useState<number | undefined>();
-  const [percentMode, setPercentMode] = useState(false);
   const patternIdBase = useId();
 
   // One <pattern> per distinct hatch color; series map to them by color.
@@ -279,7 +285,7 @@ export function TimeSeriesChart({
 
   // Lines aren't parts of a whole, and a single series is always 100%.
   const supportsPercent = mode !== "line" && seriesKeys.length > 1;
-  const showPercent = supportsPercent && percentMode;
+  const showPercent = supportsPercent && (percentMode ?? false);
 
   // Sorted here rather than trusted from the caller: everything downstream —
   // the area paths, the bisector, the first/last row read as the data's span —
@@ -418,6 +424,16 @@ export function TimeSeriesChart({
     return index === -1 ? Number.MAX_SAFE_INTEGER : index;
   };
 
+  // An empty `legendItems` hides the legend — a one-entry legend for a chart
+  // like the all-lines total explains nothing.
+  const resolvedLegendItems =
+    legendItems ??
+    seriesKeys.map((key, index) => ({
+      label: key,
+      color: colors[index] ?? "var(--series-1)",
+      hatch: seriesHatch?.[key],
+    }));
+
   if (points.length === 0) {
     return (
       <p className="text-sm text-(--text-muted)">No data collected yet.</p>
@@ -426,49 +442,7 @@ export function TimeSeriesChart({
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-4">
-        <Legend
-          items={
-            legendItems ??
-            seriesKeys.map((key, index) => ({
-              label: key,
-              color: colors[index] ?? "var(--series-1)",
-              hatch: seriesHatch?.[key],
-            }))
-          }
-        />
-        {supportsPercent && (
-          <div
-            role="group"
-            aria-label="Value display"
-            className="flex shrink-0 overflow-hidden rounded-md border border-(--grid-line) text-xs"
-          >
-            {(
-              [
-                { percent: false, label: "#", title: "Absolute values" },
-                { percent: true, label: "%", title: "Share of total" },
-              ] as const
-            ).map((option) => (
-              <button
-                key={option.label}
-                type="button"
-                title={option.title}
-                aria-pressed={percentMode === option.percent}
-                onClick={() => {
-                  setPercentMode(option.percent);
-                }}
-                className={`px-2 py-0.5 ${
-                  percentMode === option.percent
-                    ? "bg-(--surface-2) font-medium"
-                    : "text-(--text-muted) hover:text-(--text-secondary)"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {resolvedLegendItems.length > 0 && <Legend items={resolvedLegendItems} />}
       <div ref={containerRef} className="relative">
         <svg width={width} height={height} role="img">
           {hatchColors.length > 0 && (

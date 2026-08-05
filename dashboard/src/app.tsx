@@ -11,8 +11,8 @@ import {
   type ContributorBarsItem,
 } from "./app/contributor-bars.tsx";
 import { DivergingBars } from "./app/diverging-bars.tsx";
+import { LinesTimeline } from "./app/lines-timeline.tsx";
 import { ReportHeader } from "./app/report-header.tsx";
-import { Checkbox } from "./app/shared/@ui-primitive/checkbox.tsx";
 import { Label } from "./app/shared/@ui-primitive/label.tsx";
 import {
   Select,
@@ -34,174 +34,10 @@ import {
   formatPercent,
 } from "./app/shared/format.ts";
 import { DataTable, Section, StatTile } from "./app/shared/primitives.tsx";
-import { type TimePoint, TimeSeriesChart } from "./app/time-stack-chart.tsx";
+import { PercentControl } from "./app/shared/segmented-control.tsx";
+import { shapeStacked } from "./app/shared/stacked-series.ts";
+import { TimeSeriesChart } from "./app/time-stack-chart.tsx";
 import type { ContributorKind, DashboardData } from "./data.ts";
-
-const categoricalColors = Array.from(
-  { length: 20 },
-  (_, index) => `var(--series-${index + 1})`,
-);
-const otherColor = "var(--text-muted)";
-
-/**
- * How many age bands the survival charts distinguish before folding the oldest
- * years together. The actual count is the repo's age in years capped at this,
- * kept constant across every survival chart so a given year reads the same
- * shade everywhere. (Intended to become a config option.)
- */
-const maxYearShades = 10;
-
-/** How far the oldest band fades toward the surface; newest stays full color. */
-const maxYearFade = 70;
-
-/**
- * A per-year lightness band of a category's base color: the newest year keeps
- * the full color, older years mix progressively toward the surface so they
- * recede. Theme-aware — "paler" means closer to the background in either theme.
- */
-function yearBandColor(
-  baseColor: string,
-  ageFromNewest: number,
-  shadeCount: number,
-): string {
-  if (shadeCount <= 1 || ageFromNewest <= 0) {
-    return baseColor;
-  }
-  const fade = Math.round((ageFromNewest / (shadeCount - 1)) * maxYearFade);
-  return `color-mix(in oklab, ${baseColor} ${100 - fade}%, var(--surface-1))`;
-}
-
-type YearScale = {
-  /** Age buckets, oldest first; the oldest may be a folded `≤YYYY` label. */
-  buckets: string[];
-  /** Maps a cohort year to its bucket (folding years past the window). */
-  bucketOf: (year: string) => string;
-  /** The shade of `baseColor` for a bucket — full for newest, palest for oldest. */
-  colorOf: (baseColor: string, bucket: string) => string;
-};
-
-/**
- * Builds a repo-wide age scale from the years present in the survival data.
- * The number of shades stays constant across charts so colors stay comparable;
- * years older than the window fold into a single `≤YYYY` bucket.
- */
-function makeYearScale(years: Iterable<string>): YearScale {
-  const sorted = [...new Set(years)].filter((year) => /^\d{4}$/.test(year));
-  sorted.sort();
-
-  let buckets: string[];
-  let foldBelow: number | undefined;
-  let foldLabel: string | undefined;
-  if (sorted.length <= maxYearShades) {
-    buckets = sorted;
-  } else {
-    const keptNewest = sorted.slice(-(maxYearShades - 1));
-    const oldestKept = Number(keptNewest[0]);
-    foldBelow = oldestKept;
-    foldLabel = `≤${oldestKept - 1}`;
-    buckets = [foldLabel, ...keptNewest];
-  }
-
-  const shadeCount = Math.max(1, buckets.length);
-  const bucketOf = (year: string) =>
-    foldLabel !== undefined && Number(year) < (foldBelow ?? 0)
-      ? foldLabel
-      : year;
-  const colorOf = (baseColor: string, bucket: string) => {
-    const index = buckets.indexOf(bucket);
-    const ageFromNewest =
-      index === -1 ? shadeCount - 1 : shadeCount - 1 - index;
-    return yearBandColor(baseColor, ageFromNewest, shadeCount);
-  };
-
-  return { buckets, bucketOf, colorOf };
-}
-
-type StackedChart = {
-  points: TimePoint[];
-  seriesKeys: string[];
-  colors: string[];
-  legendItems?: Array<{ label: string; color: string }>;
-  tooltipGroups?: Array<{ label: string; color: string; keys: string[] }>;
-  separateGroups?: boolean;
-};
-
-/** Separates a group (contributor, language) from its year in a stack key. */
-const yearBandSeparator = "";
-
-/** Sum of a group's living lines across all its year bands. */
-function sumYears(byYear: Record<string, number>): number {
-  return Object.values(byYear).reduce((total, lines) => total + lines, 0);
-}
-
-/**
- * Shapes a survival cross-tab into year-banded stacks: each group (contributor,
- * language, …) is a contiguous run of sub-series (oldest→newest), colored as
- * lightness bands of the group's base color. Top groups are kept; the rest fold
- * into "Other". The legend and tooltip collapse the bands back to one row each.
- */
-function shapeYearBands(
-  rows: ReadonlyArray<{
-    date: string;
-    byGroupYear: Record<string, Record<string, number>>;
-  }>,
-  maxSeries: number,
-  yearScale: YearScale,
-  /** Base color per kept group given its rank; defaults to the palette order. */
-  baseColorOf: (label: string, rank: number) => string = (_, rank) =>
-    categoricalColors[rank % categoricalColors.length] ?? otherColor,
-): StackedChart {
-  const latest = rows.at(-1)?.byGroupYear ?? {};
-  const ranked = Object.entries(latest)
-    .toSorted(([, left], [, right]) => sumYears(right) - sumYears(left))
-    .map(([name]) => name);
-  const kept = ranked.slice(0, maxSeries);
-  const hasOther =
-    ranked.length > maxSeries ||
-    rows.some((row) =>
-      Object.keys(row.byGroupYear).some((name) => !kept.includes(name)),
-    );
-  const groups = hasOther ? [...kept, "Other"] : kept;
-
-  const seriesKeys: string[] = [];
-  const colors: string[] = [];
-  const legendItems: Array<{ label: string; color: string }> = [];
-  const tooltipGroups: Array<{ label: string; color: string; keys: string[] }> =
-    [];
-  for (const [index, name] of groups.entries()) {
-    const baseColor = name === "Other" ? otherColor : baseColorOf(name, index);
-    const keys: string[] = [];
-    for (const bucket of yearScale.buckets) {
-      const key = `${name}${yearBandSeparator}${bucket}`;
-      keys.push(key);
-      seriesKeys.push(key);
-      colors.push(yearScale.colorOf(baseColor, bucket));
-    }
-    legendItems.push({ label: name, color: baseColor });
-    tooltipGroups.push({ label: name, color: baseColor, keys });
-  }
-
-  const points = rows.map((row) => {
-    const values: Record<string, number> = {};
-    for (const [name, byYear] of Object.entries(row.byGroupYear)) {
-      const group = kept.includes(name) ? name : "Other";
-      for (const [year, lines] of Object.entries(byYear)) {
-        const key = `${group}${yearBandSeparator}${yearScale.bucketOf(year)}`;
-        values[key] = (values[key] ?? 0) + lines;
-      }
-    }
-    return { dateMs: new Date(row.date).getTime(), values };
-  });
-
-  return {
-    points,
-    seriesKeys,
-    colors,
-    legendItems,
-    tooltipGroups,
-    separateGroups: true,
-  };
-}
 
 /** Keeps every nth row so dense per-commit series stay light to render. */
 function decimate<T>(rows: readonly T[], maxPoints: number): T[] {
@@ -223,117 +59,8 @@ function decimate<T>(rows: readonly T[], maxPoints: number): T[] {
   return result;
 }
 
-/**
- * Top n keys by importance; the rest fold into "Other". Importance is the
- * latest snapshot's value by default — fine when today's series are the ones
- * worth naming. Pass `rankBy: "peak"` when a series can matter historically yet
- * be absent now (e.g. a package manager used before a migration): ranking by
- * each key's peak keeps it a named series across the whole timeline instead of
- * dropping it into "Other" the moment it disappears from the latest snapshot.
- */
-function shapeStacked(
-  rows: ReadonlyArray<{ date: string; values: Record<string, number> }>,
-  maxSeries: number,
-  rankBy: "latest" | "peak" = "latest",
-): { points: TimePoint[]; seriesKeys: string[]; colors: string[] } {
-  const weights: Record<string, number> = {};
-  if (rankBy === "peak") {
-    for (const row of rows) {
-      for (const [key, value] of Object.entries(row.values)) {
-        weights[key] = Math.max(weights[key] ?? 0, value);
-      }
-    }
-  } else {
-    for (const [key, value] of Object.entries(rows.at(-1)?.values ?? {})) {
-      weights[key] = value;
-    }
-  }
-  const ranked = Object.keys(weights).toSorted(
-    (left, right) => (weights[right] ?? 0) - (weights[left] ?? 0),
-  );
-  const kept = ranked.slice(0, maxSeries);
-  const hasOther =
-    ranked.length > maxSeries ||
-    rows.some((row) =>
-      Object.keys(row.values).some((key) => !kept.includes(key)),
-    );
-
-  const points = rows.map((row) => {
-    const values: Record<string, number> = {};
-    let other = 0;
-    for (const [key, value] of Object.entries(row.values)) {
-      if (kept.includes(key)) {
-        values[key] = value;
-      } else {
-        other += value;
-      }
-    }
-    if (hasOther) {
-      values["Other"] = other;
-    }
-    return { dateMs: new Date(row.date).getTime(), values };
-  });
-
-  const seriesKeys = hasOther ? [...kept, "Other"] : kept;
-  const colors = seriesKeys.map((key, index) =>
-    key === "Other"
-      ? otherColor
-      : (categoricalColors[index % categoricalColors.length] ?? otherColor),
-  );
-  return { points, seriesKeys, colors };
-}
-
-function YearShadeToggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  const id = useId();
-  return (
-    <div className="mb-3 flex w-fit items-center gap-2">
-      <Checkbox
-        id={id}
-        checked={checked}
-        onCheckedChange={(value) => {
-          onChange(value);
-        }}
-        className="size-3.5"
-      />
-      <Label
-        htmlFor={id}
-        className="text-xs font-normal text-(--text-secondary)"
-      >
-        Shade by year written
-      </Label>
-    </div>
-  );
-}
-
 /** Falls back when serving a dashboard.json written before configurable caps. */
 const defaultMaxContributorsInCharts = 10;
-
-/**
- * Survival series that indexing folds non-human contributors into (must match
- * `kindGroupLabels` in src/cli/shared/indexing.ts), colored with the reserved
- * kind colors instead of palette slots.
- */
-const kindGroupSeriesColors: Record<string, string> = {
-  Bots: kindColors.bot,
-  "AI agents": kindColors.ai,
-};
-
-/**
- * Palette slots a person may take in a chart that also draws the folded Bots /
- * AI agents bands. `--series-3` is skipped because `--kind-bot` aliases it (see
- * styles.css) — otherwise a human and the Bots band render in the very same
- * amber within one stack, which is exactly what the reserved colors exist to
- * prevent. `--series-1` stays in: it *is* `--kind-human`.
- */
-const humanCategoricalColors = categoricalColors.filter(
-  (color) => color !== "var(--series-3)",
-);
 
 /** The commits-per-month series: author kind, with humans split by AI assistance. */
 const commitKindSeries = {
@@ -361,14 +88,6 @@ type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
   aiAdded: number;
 };
 
-// Bots and AI agents arrive pre-folded into one series per kind (indexing
-// groups them), colored with the reserved kind colors; humans take palette
-// slots by rank as before.
-const survivalBaseColorOf = (label: string, rank: number): string =>
-  kindGroupSeriesColors[label] ??
-  humanCategoricalColors[rank % humanCategoricalColors.length] ??
-  otherColor;
-
 export function App({ data }: { data: DashboardData }) {
   const maxContributorsInCharts =
     data.config?.contributors.maxInCharts ?? defaultMaxContributorsInCharts;
@@ -376,8 +95,10 @@ export function App({ data }: { data: DashboardData }) {
   const latestFileTypes = data.fileTypes.at(-1);
   const dependencies = data.dependencies;
   const latestDependencies = dependencies.at(-1);
-  const [shadeContributorsByYear, setShadeContributorsByYear] = useState(false);
-  const [shadeLanguagesByYear, setShadeLanguagesByYear] = useState(false);
+  const [directDependenciesPercent, setDirectDependenciesPercent] =
+    useState(false);
+  const [dependenciesPercent, setDependenciesPercent] = useState(false);
+  const [commitsPercent, setCommitsPercent] = useState(false);
   const [calendarRange, setCalendarRange] =
     useState<CalendarRange>("last-12-months");
   // Lifted out of CommitCalendar so it survives the remount on range change.
@@ -450,14 +171,6 @@ export function App({ data }: { data: DashboardData }) {
       ? undefined
       : recentCommits.filter((commit) => commit.ai).length /
         Math.max(1, recentCommits.length);
-
-  const languagesChart = shapeStacked(
-    data.languages.map((row) => ({
-      date: row.date,
-      values: row.byLanguage,
-    })),
-    7,
-  );
 
   // One pass over the per-commit rows feeds both monthly charts. dashboard.json
   // carries no monthly rollup of its own: every field of one is a group-by-month
@@ -576,104 +289,6 @@ export function App({ data }: { data: DashboardData }) {
   const hasManifestCounts = dependencies.some(
     (row) => row.manifestCount !== undefined,
   );
-
-  // One age scale shared by every survival chart, so a given year reads the
-  // same lightness band whether it's split by cohort or by contributor.
-  const survivalYearScale = makeYearScale(
-    data.survival.flatMap((row) =>
-      Object.keys(row.byCohort).map((cohortMonth) => cohortMonth.slice(0, 4)),
-    ),
-  );
-
-  // Newest year at full color, oldest palest — matching the contributor chart.
-  const cohortBaseColor = "var(--series-1)";
-  const survivalCohortChart =
-    data.survival.length === 0
-      ? undefined
-      : {
-          points: data.survival.map((row) => {
-            const values: Record<string, number> = {};
-            for (const [cohortMonth, lines] of Object.entries(row.byCohort)) {
-              const bucket = survivalYearScale.bucketOf(
-                cohortMonth.slice(0, 4),
-              );
-              values[bucket] = (values[bucket] ?? 0) + lines;
-            }
-            return { dateMs: new Date(row.date).getTime(), values };
-          }),
-          seriesKeys: survivalYearScale.buckets,
-          colors: survivalYearScale.buckets.map((bucket) =>
-            survivalYearScale.colorOf(cohortBaseColor, bucket),
-          ),
-        };
-
-  const languagesHasYearData = data.survival.some(
-    (row) => row.byLanguageYear !== undefined,
-  );
-
-  // Blame-based counterpart to the per-commit chart: the same lines over the
-  // same files, shaded by the year each was written. Languages the flat chart
-  // also shows keep its colors so toggling doesn't recolor the stack; the two
-  // top-7 lists can still differ, since survival samples fewer commits, so an
-  // extra takes a palette slot past the flat chart's.
-  const languagesYearChart: StackedChart | undefined = languagesHasYearData
-    ? shapeYearBands(
-        data.survival.map((row) => ({
-          date: row.date,
-          byGroupYear: row.byLanguageYear ?? {},
-        })),
-        7,
-        survivalYearScale,
-        (label, rank) => {
-          const flatKeys = languagesChart.seriesKeys;
-          const matched = flatKeys.indexOf(label);
-          const slot = matched === -1 ? flatKeys.length + rank : matched;
-          return (
-            categoricalColors[slot % categoricalColors.length] ?? otherColor
-          );
-        },
-      )
-    : undefined;
-
-  const survivalHasYearData = data.survival.some(
-    (row) => row.byContributorYear !== undefined,
-  );
-
-  // Flat one-color-per-contributor stack when age shading is off, or when a
-  // pre-per-year dashboard.json has no byContributorYear to shade with.
-  let survivalAuthorChart: StackedChart | undefined;
-  if (data.survival.length > 0) {
-    if (!shadeContributorsByYear || !survivalHasYearData) {
-      const flat = shapeStacked(
-        data.survival.map((row) => ({
-          date: row.date,
-          values: row.byContributor,
-        })),
-        maxContributorsInCharts,
-      );
-      survivalAuthorChart = {
-        ...flat,
-        colors: flat.seriesKeys.map((key, index) =>
-          key === "Other"
-            ? otherColor
-            : (kindGroupSeriesColors[key] ??
-              humanCategoricalColors[index % humanCategoricalColors.length] ??
-              otherColor),
-        ),
-      };
-    } else {
-      survivalAuthorChart = shapeYearBands(
-        data.survival.map((row) => ({
-          date: row.date,
-          byGroupYear: row.byContributorYear ?? {},
-        })),
-        maxContributorsInCharts,
-        survivalYearScale,
-        survivalBaseColorOf,
-      );
-    }
-  }
-
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
       <ReportHeader repo={data.repo} generatedAt={data.generatedAt} />
@@ -737,47 +352,29 @@ export function App({ data }: { data: DashboardData }) {
         />
       </div>
 
-      {languagesChart.points.length > 0 && (
-        <Section
-          title="Lines by language"
-          subtitle={
-            shadeLanguagesByYear && languagesYearChart
-              ? "the same lines, attributed via git blame at sampled commits and shaded by the year each one was written"
-              : "lines in source files at each commit, grouped by language (from file extensions); lockfiles, minified bundles and generated data are not counted"
-          }
-          controls={
-            languagesYearChart ? (
-              <YearShadeToggle
-                checked={shadeLanguagesByYear}
-                onChange={setShadeLanguagesByYear}
-              />
-            ) : undefined
-          }
-        >
-          <TimeSeriesChart
-            mode="area"
-            {...(shadeLanguagesByYear && languagesYearChart
-              ? languagesYearChart
-              : languagesChart)}
-          />
-          <DataTable
-            caption="View data"
-            header={["date", ...languagesChart.seriesKeys]}
-            rows={languagesChart.points.map((point) => [
-              formatDate(new Date(point.dateMs).toISOString()),
-              ...languagesChart.seriesKeys.map((key) => point.values[key] ?? 0),
-            ])}
-          />
-        </Section>
+      {(data.languages.length > 0 || data.survival.length > 0) && (
+        <LinesTimeline
+          data={data}
+          maxContributorsInCharts={maxContributorsInCharts}
+        />
       )}
 
       {hasManifestData && (
         <Section
           title="Direct dependencies over time"
           subtitle="dependencies, devDependencies and optionalDependencies declared across all package.json files at each commit"
+          controls={
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <PercentControl
+                value={directDependenciesPercent}
+                onChange={setDirectDependenciesPercent}
+              />
+            </div>
+          }
         >
           <TimeSeriesChart
             mode="area"
+            percentMode={directDependenciesPercent}
             {...directDependenciesChart}
             domainStartMs={repoStartMs}
             zeroLabel="No package.json"
@@ -806,9 +403,20 @@ export function App({ data }: { data: DashboardData }) {
         <Section
           title="Dependencies over time"
           subtitle="resolved packages in the lockfile at each commit, split by package manager"
+          controls={
+            dependenciesChart.seriesKeys.length > 1 ? (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <PercentControl
+                  value={dependenciesPercent}
+                  onChange={setDependenciesPercent}
+                />
+              </div>
+            ) : undefined
+          }
         >
           <TimeSeriesChart
             mode="area"
+            percentMode={dependenciesPercent}
             {...dependenciesChart}
             domainStartMs={repoStartMs}
             zeroLabel="No lockfile"
@@ -889,8 +497,22 @@ export function App({ data }: { data: DashboardData }) {
       <Section
         title="Commits per month"
         subtitle="months bucketed by the author's date, split by author kind; hatched = human commits with at least one AI co-author trailer"
+        controls={
+          commitsChart.seriesKeys.length > 1 ? (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <PercentControl
+                value={commitsPercent}
+                onChange={setCommitsPercent}
+              />
+            </div>
+          ) : undefined
+        }
       >
-        <TimeSeriesChart mode="bar" {...commitsChart} />
+        <TimeSeriesChart
+          mode="bar"
+          percentMode={commitsPercent}
+          {...commitsChart}
+        />
       </Section>
 
       <Section
@@ -933,32 +555,6 @@ export function App({ data }: { data: DashboardData }) {
             }))}
             color="var(--series-6)"
           />
-        </Section>
-      )}
-
-      {survivalCohortChart && (
-        <Section
-          title="Code survival by cohort"
-          subtitle="living lines at sampled commits, grouped by the year each line was written"
-        >
-          <TimeSeriesChart mode="area" {...survivalCohortChart} />
-        </Section>
-      )}
-
-      {survivalAuthorChart && (
-        <Section
-          title="Code survival by contributor"
-          subtitle="who wrote the lines that are still alive"
-          controls={
-            survivalHasYearData ? (
-              <YearShadeToggle
-                checked={shadeContributorsByYear}
-                onChange={setShadeContributorsByYear}
-              />
-            ) : undefined
-          }
-        >
-          <TimeSeriesChart mode="area" {...survivalAuthorChart} />
         </Section>
       )}
 
