@@ -366,6 +366,19 @@ export function LinesTimeline({
 
   const supportsPercent = chart.seriesKeys.length > 1;
 
+  // One x-domain across every variant: language rows cover each commit while
+  // survival rows are sampled, so their extents differ slightly — without the
+  // shared union, toggling the dimension would nudge the axis.
+  let domainStartMs: number | undefined;
+  let domainEndMs: number | undefined;
+  for (const row of [...data.languages, ...data.survival]) {
+    const dateMs = new Date(row.date).getTime();
+    domainStartMs =
+      domainStartMs === undefined ? dateMs : Math.min(domainStartMs, dateMs);
+    domainEndMs =
+      domainEndMs === undefined ? dateMs : Math.max(domainEndMs, dateMs);
+  }
+
   // The data table follows the selection, collapsing year bands back into one
   // column per group (language, contributor) — same as the legend and tooltip.
   const tableColumns = chart.tooltipGroups
@@ -428,7 +441,13 @@ export function LinesTimeline({
         </>
       }
     >
-      <TimeSeriesChart mode="area" percentMode={percentMode} {...chart} />
+      <TimeSeriesChart
+        mode="area"
+        percentMode={percentMode}
+        domainStartMs={domainStartMs}
+        domainEndMs={domainEndMs}
+        {...chart}
+      />
       <DataTable
         caption="View data"
         header={["date", ...tableColumns.map((column) => column.label)]}
