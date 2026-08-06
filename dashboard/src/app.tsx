@@ -442,8 +442,14 @@ export function App({ data }: { data: DashboardData }) {
     ? new Date(data.repo.firstCommitDate).getTime()
     : undefined;
 
+  // "Recent" is anchored to when the catalog was written, not to wall-clock
+  // now: the same dashboard.json always renders the same share, and a report
+  // opened more than 90 days later still shows its own final window instead of
+  // an empty one.
+  const recentWindowStartMs =
+    new Date(data.generatedAt).getTime() - 90 * 86_400_000;
   const recentCommits = data.commits.filter(
-    (commit) => new Date(commit.date).getTime() >= Date.now() - 90 * 86_400_000,
+    (commit) => new Date(commit.date).getTime() >= recentWindowStartMs,
   );
   const aiShareRecent =
     recentCommits.length === 0
