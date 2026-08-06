@@ -1,6 +1,6 @@
 import { NodeStdio } from "@effect/platform-node";
 import { Effect, Layer, Logger, Schema } from "effect";
-import { McpServer, Tool, Toolkit } from "effect/unstable/ai";
+import { McpProtocol, McpServer, Tool, Toolkit } from "effect/unstable/ai";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import packageJson from "../../../package.json" with { type: "json" };
@@ -121,6 +121,7 @@ export const buildMcpLayer = (
         McpServer.layerStdio({
           name: "repo-dive",
           version: packageJson.version,
+          protocols: [McpProtocol.v2025_06_18],
         }),
       ),
       Layer.provide(NodeStdio.layer),
