@@ -25,7 +25,7 @@ import {
   kindBadge,
   kindColors,
   type KindFilter,
-  KindFilterChips,
+  KindFilterControl,
 } from "./app/shared/contributor-kinds.tsx";
 import {
   formatBytes,
@@ -127,6 +127,11 @@ export function App({ data }: { data: DashboardData }) {
   );
   const contributorKinds = new Set<ContributorKind>(
     contributorItems.map((item) => item.kind),
+  );
+  // Kinds that ever committed — drives the calendar's filter; the contributor
+  // list can differ (it is capped per kind at index time).
+  const commitKinds = new Set<ContributorKind>(
+    data.commits.map((commit) => commit.kind ?? "human"),
   );
   const filteredContributorItems = contributorItems
     .filter(
@@ -471,6 +476,12 @@ export function App({ data }: { data: DashboardData }) {
                   ))}
                 </SelectContent>
               </Select>
+              <KindFilterControl
+                label="Filter calendar by contributor kind"
+                value={calendarKindFilter}
+                onChange={setCalendarKindFilter}
+                presentKinds={commitKinds}
+              />
             </>
           }
         >
@@ -485,7 +496,6 @@ export function App({ data }: { data: DashboardData }) {
             weekStartsOn={data.config?.charts?.weekStartsOn ?? "monday"}
             range={calendarRange}
             kindFilter={calendarKindFilter}
-            onKindFilterChange={setCalendarKindFilter}
           />
         </Section>
       )}
@@ -556,7 +566,7 @@ export function App({ data }: { data: DashboardData }) {
         title="Contributors"
         subtitle="whole history; per contributor: commits authored above, commits co-authored for others below — hatching marks cross-kind collaboration"
         controls={
-          <KindFilterChips
+          <KindFilterControl
             label="Filter contributors by kind"
             value={contributorKindFilter}
             onChange={setContributorKindFilter}

@@ -6,7 +6,6 @@ import { Tooltip, TooltipContent } from "./shared/@ui-primitive/tooltip.tsx";
 import {
   kindColors,
   type KindFilter,
-  KindFilterChips,
   kindNouns,
 } from "./shared/contributor-kinds.tsx";
 import { formatMonth, monthShortNames } from "./shared/format.ts";
@@ -472,7 +471,6 @@ export function CommitCalendar({
   weekStartsOn,
   range,
   kindFilter,
-  onKindFilterChange,
 }: {
   commits: readonly CalendarCommit[];
   /** ISO timestamp the data was generated at — the calendar's "today". */
@@ -482,7 +480,6 @@ export function CommitCalendar({
   weekStartsOn: WeekStart;
   range: CalendarRange;
   kindFilter: CalendarKindFilter;
-  onKindFilterChange: (filter: CalendarKindFilter) => void;
 }) {
   // The hovered cell outlives its hover so the tooltip has something to render
   // while it animates out; `tooltipOpen` is what the pointer actually drives.
@@ -509,19 +506,6 @@ export function CommitCalendar({
       total.agent += 1;
     }
     dayTotals.set(isoDate, total);
-  }
-
-  const presentKinds = new Set<ContributorKind>();
-  for (const total of dayTotals.values()) {
-    if (total.human > 0) {
-      presentKinds.add("human");
-    }
-    if (total.bot > 0) {
-      presentKinds.add("bot");
-    }
-    if (total.agent > 0) {
-      presentKinds.add("ai");
-    }
   }
 
   // Intensity thresholds are quartiles of nonzero daily counts over the WHOLE
@@ -665,12 +649,6 @@ export function CommitCalendar({
 
   return (
     <div>
-      <KindFilterChips
-        label="Filter calendar by contributor kind"
-        value={kindFilter}
-        onChange={onKindFilterChange}
-        presentKinds={presentKinds}
-      />
       <ScrollArea>
         {/* Strips are only as wide as the months they hold, so how much room
             they need swings by a year's worth of week columns. `mx-auto`

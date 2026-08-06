@@ -1,5 +1,5 @@
 import type { ContributorKind } from "../../data.ts";
-import { ToggleGroup, ToggleGroupItem } from "./@ui-primitive/toggle-group.tsx";
+import { SegmentedControl } from "./segmented-control.tsx";
 
 /** The reserved contributor-kind colors (see styles.css). */
 export const kindColors: Record<ContributorKind, string> = {
@@ -42,11 +42,21 @@ export type KindFilter = "all" | ContributorKind;
 /** Mirrors a calendar cell's stacking order, top-down. */
 const allKindsGradient = `linear-gradient(to bottom, ${kindColors.human} 0 34%, ${kindColors.ai} 34% 67%, ${kindColors.bot} 67% 100%)`;
 
+/** Control-option casing: lowercase like every other segmented control, except the AI initialism. */
+const filterLabels: Record<KindFilter, string> = {
+  all: "all",
+  human: "humans",
+  ai: "AI agents",
+  bot: "bots",
+};
+
 /**
- * The `all | humans | ai agents | bots` chip row. Renders nothing when the repo
- * only ever had one kind of contributor — there is nothing to filter then.
+ * The `all | humans | ai agents | bots` filter — a SegmentedControl with a
+ * color swatch per option, so it looks like every other chart control. Renders
+ * nothing when the repo only ever had one kind of contributor — there is
+ * nothing to filter then.
  */
-export function KindFilterChips({
+export function KindFilterControl({
   label,
   value,
   onChange,
@@ -68,38 +78,25 @@ export function KindFilterChips({
   ];
 
   return (
-    <ToggleGroup
-      value={[value]}
-      onValueChange={(groupValue) => {
-        // Single-select semantics on an array-valued group: re-clicking the
-        // pressed chip yields [] — keep the current filter (one is always
-        // active) rather than allowing an empty selection.
-        const next = groupValue.at(-1);
-        if (typeof next === "string") {
-          onChange(next as KindFilter);
-        }
-      }}
-      aria-label={label}
-      variant="outline"
-      size="sm"
-      className="mb-3 flex-wrap gap-1.5"
-    >
-      {options.map((option) => (
-        <ToggleGroupItem
-          key={option}
-          value={option}
-          className="h-auto gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-normal text-(--text-secondary) shadow-none hover:bg-transparent hover:text-(--text-primary) data-pressed:border-(--text-muted) data-pressed:text-(--text-primary)"
-        >
-          <span
-            className="inline-block size-2.5 rounded-xs"
-            style={{
-              background:
-                option === "all" ? allKindsGradient : kindColors[option],
-            }}
-          />
-          {option === "all" ? "All" : kindLabels[option]}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+    <SegmentedControl
+      label={label}
+      value={value}
+      onChange={onChange}
+      options={options.map((option) => ({
+        value: option,
+        label: (
+          <>
+            <span
+              className="inline-block size-2.5 rounded-xs"
+              style={{
+                background:
+                  option === "all" ? allKindsGradient : kindColors[option],
+              }}
+            />
+            {filterLabels[option]}
+          </>
+        ),
+      }))}
+    />
   );
 }

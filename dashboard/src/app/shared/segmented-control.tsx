@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { ToggleGroup, ToggleGroupItem } from "./@ui-primitive/toggle-group.tsx";
 
 /**
@@ -18,7 +20,7 @@ export function SegmentedControl<Value extends string>({
   onChange: (value: Value) => void;
   options: Array<{
     value: Value;
-    label: string;
+    label: ReactNode;
     /** Tooltip; on a disabled option, say why it is unavailable. */
     title?: string | undefined;
     disabled?: boolean | undefined;

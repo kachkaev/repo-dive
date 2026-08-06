@@ -265,44 +265,39 @@ export function LinesTimeline({
   );
 
   let chart: StackedChart;
-  let subtitle: string;
   if (dimension === "all") {
-    if (shaded) {
-      chart = {
-        points: data.survival.map((row) => {
-          const values: Record<string, number> = {};
-          for (const [cohortMonth, lines] of Object.entries(row.byCohort)) {
-            const bucket = survivalYearScale.bucketOf(cohortMonth.slice(0, 4));
-            values[bucket] = (values[bucket] ?? 0) + lines;
-          }
-          return { dateMs: new Date(row.date).getTime(), values };
-        }),
-        seriesKeys: survivalYearScale.buckets,
-        colors: survivalYearScale.buckets.map((bucket) =>
-          survivalYearScale.colorOf(cohortBaseColor, bucket),
-        ),
-      };
-      subtitle =
-        "living lines at sampled commits, grouped by the year each line was written";
-    } else {
-      chart = {
-        points: data.languages.map((row) => ({
-          dateMs: new Date(row.date).getTime(),
-          values: {
-            Lines: Object.values(row.byLanguage).reduce(
-              (sum, lines) => sum + lines,
-              0,
-            ),
-          },
-        })),
-        seriesKeys: ["Lines"],
-        colors: [cohortBaseColor],
-        // A one-entry legend explains nothing — hide it.
-        legendItems: [],
-      };
-      subtitle =
-        "lines in source files at each commit; lockfiles, minified bundles and generated data are not counted";
-    }
+    chart = shaded
+      ? {
+          points: data.survival.map((row) => {
+            const values: Record<string, number> = {};
+            for (const [cohortMonth, lines] of Object.entries(row.byCohort)) {
+              const bucket = survivalYearScale.bucketOf(
+                cohortMonth.slice(0, 4),
+              );
+              values[bucket] = (values[bucket] ?? 0) + lines;
+            }
+            return { dateMs: new Date(row.date).getTime(), values };
+          }),
+          seriesKeys: survivalYearScale.buckets,
+          colors: survivalYearScale.buckets.map((bucket) =>
+            survivalYearScale.colorOf(cohortBaseColor, bucket),
+          ),
+        }
+      : {
+          points: data.languages.map((row) => ({
+            dateMs: new Date(row.date).getTime(),
+            values: {
+              Lines: Object.values(row.byLanguage).reduce(
+                (sum, lines) => sum + lines,
+                0,
+              ),
+            },
+          })),
+          seriesKeys: ["Lines"],
+          colors: [cohortBaseColor],
+          // A one-entry legend explains nothing — hide it.
+          legendItems: [],
+        };
   } else if (dimension === "language") {
     if (shaded) {
       // Blame-based counterpart to the per-commit stack: the same lines over
@@ -332,8 +327,6 @@ export function LinesTimeline({
           );
         },
       );
-      subtitle =
-        "the same lines, attributed via git blame at sampled commits and shaded by the year each one was written";
     } else {
       chart = shapeStacked(
         data.languages.map((row) => ({
@@ -342,8 +335,6 @@ export function LinesTimeline({
         })),
         7,
       );
-      subtitle =
-        "lines in source files at each commit, grouped by language (from file extensions); lockfiles, minified bundles and generated data are not counted";
     }
   } else {
     if (shaded) {
@@ -356,8 +347,6 @@ export function LinesTimeline({
         survivalYearScale,
         contributorBaseColorOf,
       );
-      subtitle =
-        "who wrote the lines that are still alive, via git blame at sampled commits; shaded by the year each one was written";
     } else {
       const flat = shapeStacked(
         data.survival.map((row) => ({
@@ -372,8 +361,6 @@ export function LinesTimeline({
           key === "Other" ? otherColor : contributorBaseColorOf(key, index),
         ),
       };
-      subtitle =
-        "who wrote the lines that are still alive, via git blame at sampled commits";
     }
   }
 
@@ -391,7 +378,10 @@ export function LinesTimeline({
   return (
     <Section
       title="Lines of code"
-      subtitle={subtitle}
+      // Constant across every toggle combination (see Section): language
+      // splits count source files at each commit, while contributor splits
+      // and age shading are attributed via git blame at sampled commits.
+      subtitle="lines in source files over the whole history; contributor split and age shading come from git blame at sampled commits; lockfiles, minified bundles and generated data are not counted"
       controls={
         <>
           <SegmentedControl
