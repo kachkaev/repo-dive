@@ -88,9 +88,14 @@ export function Swatch({
   );
 }
 
+/**
+ * Rendered below its chart, centered like a figure caption: legends change
+ * with the controls, and above the marks a height change would shift them
+ * mid-read.
+ */
 export function Legend({ items }: { items: LegendEntry[] }) {
   return (
-    <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-(--text-secondary)">
+    <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-(--text-secondary)">
       {items.map((item) => (
         <span key={item.label} className="inline-flex items-center gap-1.5">
           <Swatch color={item.color} hatch={item.hatch} />

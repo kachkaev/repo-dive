@@ -442,7 +442,6 @@ export function TimeSeriesChart({
 
   return (
     <div>
-      {resolvedLegendItems.length > 0 && <Legend items={resolvedLegendItems} />}
       <div ref={containerRef} className="relative">
         <svg width={width} height={height} role="img">
           {hatchColors.length > 0 && (
@@ -610,6 +609,7 @@ export function TimeSeriesChart({
           </div>
         )}
       </div>
+      {resolvedLegendItems.length > 0 && <Legend items={resolvedLegendItems} />}
     </div>
   );
 }

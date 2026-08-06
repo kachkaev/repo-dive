@@ -705,19 +705,11 @@ export function CommitCalendar({
           </TooltipContent>
         )}
       </Tooltip>
-      <div className="mt-2 flex items-center justify-between gap-4 text-xs text-(--text-secondary)">
-        {/* One claim per line: the range's own total, then the day that stands
-            out — the two used to run together behind nested parentheses. */}
-        <div className="tabular-nums">
-          <div>{rangeSummary}</div>
-          {busiest && (
-            <div>
-              Busiest day {stampOf(busiest.isoDate, busiest.row)}:{" "}
-              {summarize(busiest.day)}
-            </div>
-          )}
-        </div>
-        <span className="flex shrink-0 items-center gap-1 text-(--text-muted)">
+      {/* Centered under the strips like a figure caption (see Legend): the
+          intensity scale first, then one claim per line — the range's own
+          total and the day that stands out. */}
+      <div className="mt-2 flex flex-col items-center gap-1 text-center text-xs text-(--text-secondary)">
+        <span className="flex items-center gap-1 text-(--text-muted)">
           Less
           {levelOpacities.map((opacity, level) => (
             <span
@@ -732,6 +724,15 @@ export function CommitCalendar({
           ))}
           More
         </span>
+        <div className="tabular-nums">
+          <div>{rangeSummary}</div>
+          {busiest && (
+            <div>
+              Busiest day {stampOf(busiest.isoDate, busiest.row)}:{" "}
+              {summarize(busiest.day)}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
