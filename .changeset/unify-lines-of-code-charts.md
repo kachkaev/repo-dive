@@ -9,4 +9,5 @@ Chart controls now follow one universal pattern: they sit between the section he
 Legends render centered below their chart like a figure caption — subtitles keep constant wording and legends no longer sit above the marks, so toggling never shifts the chart or the controls.
 The calendar's intensity scale and range summary are centered the same way.
 The calendar's range select drops its visible "Range" label, matches the toggle height, and opens as a plain dropdown, so the selected value no longer nudges when it expands.
+Controls render flat — no shadows — and the select keeps the toggles' transparent background in dark mode too.
 Existing catalogs render without a re-scan; per-year shading options light up only where the catalog already carries per-year survival data.

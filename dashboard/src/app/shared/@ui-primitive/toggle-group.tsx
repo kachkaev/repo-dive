@@ -25,7 +25,7 @@ const toggleVariants = cva(
       variant: {
         default: "bg-transparent",
         outline:
-          "border border-input bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground",
+          "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground",
       },
       size: {
         default: "h-9 min-w-9 px-2",
@@ -60,7 +60,7 @@ export function ToggleGroup({
       data-variant={variant}
       data-size={size}
       className={cn(
-        "flex w-fit items-center gap-2 data-[variant=outline]:gap-0 data-[variant=outline]:rounded-md data-[variant=outline]:shadow-xs",
+        "flex w-fit items-center gap-2 data-[variant=outline]:gap-0 data-[variant=outline]:rounded-md",
         className,
       )}
       {...props}
@@ -91,7 +91,7 @@ export function ToggleGroupItem({
           variant: context.variant ?? variant,
           size: context.size ?? size,
         }),
-        "shrink-0 focus:z-10 focus-visible:z-10 data-[variant=outline]:rounded-none data-[variant=outline]:border-l-0 data-[variant=outline]:shadow-none data-[variant=outline]:first:rounded-l-md data-[variant=outline]:first:border-l data-[variant=outline]:last:rounded-r-md",
+        "shrink-0 focus:z-10 focus-visible:z-10 data-[variant=outline]:rounded-none data-[variant=outline]:border-l-0 data-[variant=outline]:first:rounded-l-md data-[variant=outline]:first:border-l data-[variant=outline]:last:rounded-r-md",
         className,
       )}
       {...props}
