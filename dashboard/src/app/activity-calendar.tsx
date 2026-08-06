@@ -708,7 +708,7 @@ export function CommitCalendar({
       {/* Centered under the strips like a figure caption (see Legend): the
           intensity scale first, then one claim per line — the range's own
           total and the day that stands out. */}
-      <div className="mt-2 flex flex-col items-center gap-1 text-center text-xs text-(--text-secondary)">
+      <div className="mt-3 flex flex-col items-center gap-2.5 text-center text-xs text-(--text-secondary)">
         <span className="flex items-center gap-1 text-(--text-muted)">
           Less
           {levelOpacities.map((opacity, level) => (
