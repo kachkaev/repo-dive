@@ -364,12 +364,10 @@ export function App({ data }: { data: DashboardData }) {
           title="Direct dependencies over time"
           subtitle="dependencies, devDependencies and optionalDependencies declared across all package.json files at each commit"
           controls={
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <PercentControl
-                value={directDependenciesPercent}
-                onChange={setDirectDependenciesPercent}
-              />
-            </div>
+            <PercentControl
+              value={directDependenciesPercent}
+              onChange={setDirectDependenciesPercent}
+            />
           }
         >
           <TimeSeriesChart
@@ -405,12 +403,10 @@ export function App({ data }: { data: DashboardData }) {
           subtitle="resolved packages in the lockfile at each commit, split by package manager"
           controls={
             dependenciesChart.seriesKeys.length > 1 ? (
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <PercentControl
-                  value={dependenciesPercent}
-                  onChange={setDependenciesPercent}
-                />
-              </div>
+              <PercentControl
+                value={dependenciesPercent}
+                onChange={setDependenciesPercent}
+              />
             ) : undefined
           }
         >
@@ -437,7 +433,7 @@ export function App({ data }: { data: DashboardData }) {
           title="Commit calendar"
           subtitle="commits per day; days bucketed by the committer's local date, i.e. when each commit landed"
           controls={
-            <div className="mb-3 flex w-fit items-center gap-2">
+            <>
               <Label
                 htmlFor={calendarRangeSelectId}
                 className="text-xs font-normal text-(--text-secondary)"
@@ -475,7 +471,7 @@ export function App({ data }: { data: DashboardData }) {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </>
           }
         >
           <CommitCalendar
@@ -499,12 +495,10 @@ export function App({ data }: { data: DashboardData }) {
         subtitle="months bucketed by the author's date, split by author kind; hatched = human commits with at least one AI co-author trailer"
         controls={
           commitsChart.seriesKeys.length > 1 ? (
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <PercentControl
-                value={commitsPercent}
-                onChange={setCommitsPercent}
-              />
-            </div>
+            <PercentControl
+              value={commitsPercent}
+              onChange={setCommitsPercent}
+            />
           ) : undefined
         }
       >

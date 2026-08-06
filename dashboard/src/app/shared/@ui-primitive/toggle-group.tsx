@@ -6,8 +6,10 @@
  * when one appears. Base UI marks a pressed item with `data-pressed`, and the
  * group's `value`/`onValueChange` deal in arrays even in single-select mode.
  * Deviations from the canonical file: no spacing/orientation machinery (the
- * dashboard only needs a horizontal gap group), and variant defaults resolve in
- * function bodies (typed destructured defaults silently bail React Compiler).
+ * dashboard only needs a horizontal group), an extra `xs` size, and variant
+ * defaults resolve in function bodies (typed destructured defaults silently
+ * bail React Compiler). The outline variant keeps the canonical segmented
+ * look: items join into one bordered pill, rounded only at the group's ends.
  */
 import { Toggle as TogglePrimitive } from "@base-ui/react/toggle";
 import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group";
@@ -29,6 +31,7 @@ const toggleVariants = cva(
         default: "h-9 min-w-9 px-2",
         sm: "h-8 min-w-8 px-1.5",
         lg: "h-10 min-w-10 px-2.5",
+        xs: "px-2 py-0.5 text-xs",
       },
     },
     defaultVariants: {
@@ -55,7 +58,10 @@ export function ToggleGroup({
       data-slot="toggle-group"
       data-variant={variant}
       data-size={size}
-      className={cn("flex w-fit items-center gap-2", className)}
+      className={cn(
+        "flex w-fit items-center gap-2 data-[variant=outline]:gap-0 data-[variant=outline]:rounded-md data-[variant=outline]:shadow-xs",
+        className,
+      )}
       {...props}
     >
       <ToggleGroupContext.Provider value={{ variant, size }}>
@@ -84,7 +90,7 @@ export function ToggleGroupItem({
           variant: context.variant ?? variant,
           size: context.size ?? size,
         }),
-        "shrink-0 focus:z-10 focus-visible:z-10",
+        "shrink-0 focus:z-10 focus-visible:z-10 data-[variant=outline]:rounded-none data-[variant=outline]:border-l-0 data-[variant=outline]:shadow-none data-[variant=outline]:first:rounded-l-md data-[variant=outline]:first:border-l data-[variant=outline]:last:rounded-r-md",
         className,
       )}
       {...props}

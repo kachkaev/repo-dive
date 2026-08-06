@@ -393,7 +393,7 @@ export function LinesTimeline({
       title="Lines of code"
       subtitle={subtitle}
       controls={
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <>
           <SegmentedControl
             label="Split lines"
             value={dimension}
@@ -435,7 +435,7 @@ export function LinesTimeline({
             disabled={!supportsPercent}
             disabledTitle="A single series is always 100%"
           />
-        </div>
+        </>
       }
     >
       <TimeSeriesChart mode="area" percentMode={percentMode} {...chart} />

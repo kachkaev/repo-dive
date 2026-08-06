@@ -8,22 +8,28 @@ export function Section({
 }: {
   title: string;
   subtitle?: string | undefined;
-  /** Optional controls rendered between the subtitle and the chart card. */
+  /**
+   * Optional controls, laid out in a wrapping row right under the title —
+   * above the subtitle, whose length can change with the selection; the other
+   * way around, every switch would shift the controls away from the cursor.
+   */
   controls?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="mb-10">
       <h2 className="text-base font-semibold">{title}</h2>
+      {controls ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">{controls}</div>
+      ) : undefined}
       {subtitle ? (
-        <p className="mt-0.5 mb-3 text-sm text-(--text-secondary)">
+        <p
+          className={`${controls ? "mt-1.5" : "mt-0.5"} text-sm text-(--text-secondary)`}
+        >
           {subtitle}
         </p>
-      ) : (
-        <div className="mb-3" />
-      )}
-      {controls}
-      <div className="rounded-lg border border-(--grid-line) bg-(--surface-1) p-4">
+      ) : undefined}
+      <div className="mt-3 rounded-lg border border-(--grid-line) bg-(--surface-1) p-4">
         {children}
       </div>
     </section>

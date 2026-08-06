@@ -2,9 +2,9 @@ import { ToggleGroup, ToggleGroupItem } from "./@ui-primitive/toggle-group.tsx";
 
 /**
  * A single-select control — the pattern every chart's above-the-frame controls
- * share. A thin wrapper over the @ui-primitive ToggleGroup (smallest size)
- * that keeps exactly one option pressed and adds per-option disabling with an
- * explanatory tooltip.
+ * share. A thin wrapper over the @ui-primitive ToggleGroup (joined outline
+ * look, xs size) that keeps exactly one option pressed and adds per-option
+ * disabling with an explanatory tooltip.
  */
 export function SegmentedControl<Value extends string>({
   label,
@@ -27,7 +27,8 @@ export function SegmentedControl<Value extends string>({
   return (
     <ToggleGroup
       aria-label={label}
-      size="sm"
+      variant="outline"
+      size="xs"
       className="shrink-0"
       value={[value]}
       onValueChange={(next) => {
@@ -46,6 +47,10 @@ export function SegmentedControl<Value extends string>({
           value={option.value}
           title={option.title}
           disabled={option.disabled}
+          // Unpressed options read as quiet labels (muted text, text-only
+          // hover) so the pressed one's fill is the sole "selected" signal;
+          // disabled options stay hoverable so their explanatory tooltip shows.
+          className="not-data-pressed:text-(--text-muted) not-data-pressed:hover:bg-transparent not-data-pressed:hover:text-(--text-secondary) disabled:pointer-events-auto"
         >
           {option.label}
         </ToggleGroupItem>
