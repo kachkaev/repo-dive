@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 
 import {
   type CalendarKindFilter,
@@ -13,7 +13,6 @@ import {
 import { DivergingBars } from "./app/diverging-bars.tsx";
 import { LinesTimeline } from "./app/lines-timeline.tsx";
 import { ReportHeader } from "./app/report-header.tsx";
-import { Label } from "./app/shared/@ui-primitive/label.tsx";
 import {
   Select,
   SelectContent,
@@ -106,7 +105,6 @@ export function App({ data }: { data: DashboardData }) {
     useState<CalendarKindFilter>("all");
   const [contributorKindFilter, setContributorKindFilter] =
     useState<KindFilter>("all");
-  const calendarRangeSelectId = useId();
 
   // The contributor list spans the whole history: it is already sampled by
   // contributor (capped per kind at index time), so sampling it by time too
@@ -439,12 +437,14 @@ export function App({ data }: { data: DashboardData }) {
           subtitle="commits per day; days bucketed by the committer's local date, i.e. when each commit landed"
           controls={
             <>
-              <Label
-                htmlFor={calendarRangeSelectId}
-                className="text-xs font-normal text-(--text-secondary)"
-              >
-                Range
-              </Label>
+              <KindFilterControl
+                label="Filter calendar by contributor kind"
+                value={calendarKindFilter}
+                onChange={setCalendarKindFilter}
+                presentKinds={commitKinds}
+              />
+              {/* Last in the row: the trigger is as wide as the picked value,
+                  so anything after it would shift on change. */}
               <Select
                 value={calendarRange}
                 onValueChange={(value) => {
@@ -455,13 +455,9 @@ export function App({ data }: { data: DashboardData }) {
                 }}
                 items={calendarRangeItems}
               >
-                <SelectTrigger
-                  id={calendarRangeSelectId}
-                  size="sm"
-                  // No height override: the sm variant's data-[size=sm]:h-8
-                  // out-specifies any bare h-* utility passed here.
-                  className="px-2 py-1 text-xs"
-                >
+                {/* The options ("Last 12 months", …) make the purpose plain,
+                    so the label is a11y-only. */}
+                <SelectTrigger size="xs" aria-label="Calendar range">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -476,12 +472,6 @@ export function App({ data }: { data: DashboardData }) {
                   ))}
                 </SelectContent>
               </Select>
-              <KindFilterControl
-                label="Filter calendar by contributor kind"
-                value={calendarKindFilter}
-                onChange={setCalendarKindFilter}
-                presentKinds={commitKinds}
-              />
             </>
           }
         >
