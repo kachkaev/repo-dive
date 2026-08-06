@@ -252,9 +252,6 @@ importers:
       '@types/babel__core':
         specifier: 7.20.5
         version: 7.20.5
-      '@types/d3-array':
-        specifier: 3.2.2
-        version: 3.2.2
       '@types/node':
         specifier: 26.1.2
         version: 26.1.2
@@ -297,9 +294,6 @@ importers:
       cspell:
         specifier: 10.0.1
         version: 10.0.1
-      d3-array:
-        specifier: 3.2.4
-        version: 3.2.4
       effect:
         specifier: 4.0.0-beta.102
         version: 4.0.0-beta.102
@@ -1472,9 +1466,6 @@ packages:
 
   '@types/d3-array@3.0.3':
     resolution: {integrity: sha512-Reoy+pKnvsksN0lQUlcH6dOGjRZ/3WRwXR//m+/8lt1BXeI4xyaUZoqULNjyXXRuh0Mj4LNpkCvhUpQlY3X5xQ==}
-
-  '@types/d3-array@3.2.2':
-    resolution: {integrity: sha512-hOLWVbm7uRza0BYXpIIW5pxfrKe0W+D5lrFiAEYR+pb6w3N2SwSMaJbXdUfSEv+dT4MfHBLtn5js0LAWaO6otw==}
 
   '@types/d3-color@3.1.0':
     resolution: {integrity: sha512-HKuicPHJuvPgCD+np6Se9MQvS6OCbJmOjGvylzMJRlDwUXjKTTXs6Pwgk79O09Vj/ho3u1ofXnhFOaEWWPrlwA==}
@@ -5119,8 +5110,6 @@ snapshots:
       assertion-error: 2.0.1
 
   '@types/d3-array@3.0.3': {}
-
-  '@types/d3-array@3.2.2': {}
 
   '@types/d3-color@3.1.0': {}
 

@@ -52,6 +52,7 @@ React Compiler 1.0 bails on these; avoid them:
 
 - **A default value inside a typed destructured parameter** — `function C({ color = "red" }: { color?: string })`. Destructure without the default and resolve it in the body: `const c = color ?? "red";`.
 - **Logical-assignment operators** `??=`, `||=`, `&&=` — use a plain assignment: `obj[k] = obj[k] ?? {}` instead of `obj[k] ??= {}`.
+- **A logical expression (`??`, `&&`, `||`) inside a ternary's test** — hoist it into a named `const` first.
 
 The compiler runs in the **production build** (`vite build`, what the `repo-dive dashboard` CLI serves), **not** the Vite dev server.
 To check what actually compiled, temporarily pass a logger and rebuild:
@@ -71,6 +72,21 @@ babel({
 ```
 
 Every component should log `CompileSuccess`; a `CompileError` marks a bail.
+
+## `CompileSuccess` is not enough: fused memo scopes
+
+A component can compile cleanly and still recompute everything on every hover, because the compiler **fuses** values into one memo scope whose deps include the frequently-changing state.
+This made `TimeSeriesChart` re-render all its marks on every mouse move (~30 ms/frame) while logging `CompileSuccess` — three separate causes, all real:
+
+- **Calling a method on an opaque object with hover-scoped code nearby** — `bisectDate.center(rows, hoverMs)`, `xScale(crosshairMs)`.
+  The compiler cannot see into d3, so the call "may mutate" `rows`/`xScale`, extending their mutable ranges into hover-reactive code; overlapping ranges merge scopes, so `rows` lands in a scope keyed on `hoverMs`.
+  Fix: inline the logic as plain reads (hand-rolled binary search instead of d3's bisector), or move the call into a child component (`CrosshairLine`, `HoverTooltip`) where it runs on a frozen prop.
+- **A mid-body early return** — `if (rows.length === 0) return <p>…</p>;` after derivation forces one merged scope (`react.early_return_sentinel`) around everything it spans.
+  Guard at the top of the component, right after the hooks, before any derived values.
+- **Unknown array methods** — `rows.at(-1)` counts as a potential mutation of `rows`; use `rows[rows.length - 1]` (with a `unicorn/prefer-at` disable) where the array must stay out of hotter scopes.
+
+To diagnose, build with `minify: false`, find the component in `dist/dashboard/assets/index-*.js`, and read the `if ($[n] !== …)` guard above the value: if `hoverMs` (or similar hot state) is in that dep list, the scope is fused.
+Verify fixes empirically — a temporary `useEffect` render counter on the marks component plus dispatched `mousemove` events shows whether the element is actually reused.
 
 ## Isolating a subtree that must not re-render on hover/interaction
 

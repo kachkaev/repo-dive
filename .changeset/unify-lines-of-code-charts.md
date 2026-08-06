@@ -10,4 +10,5 @@ Legends render centered below their chart like a figure caption — subtitles ke
 The calendar's intensity scale and range summary are centered the same way.
 The calendar's range select drops its visible "Range" label, matches the toggle height, and opens as a plain dropdown, so the selected value no longer nudges when it expands.
 Controls render flat — no shadows — and the select keeps the toggles' transparent background in dark mode too.
+Hovering a stacked chart is much cheaper: the crosshair and tooltip moved into their own components and the d3 bisector was replaced with an inline search, so React Compiler keeps the areas and bars memoized instead of re-rendering the whole SVG on every mouse move.
 Existing catalogs render without a re-scan; per-year shading options light up only where the catalog already carries per-year survival data.
