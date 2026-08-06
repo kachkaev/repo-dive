@@ -1,10 +1,10 @@
+import { ToggleGroup, ToggleGroupItem } from "./@ui-primitive/toggle-group.tsx";
+
 /**
- * A compact single-select segmented control — joined buttons in one rounded
- * border, the pattern every chart's above-the-frame controls share. Extracted
- * from the #/% toggle that used to live inside the time-series chart frame;
- * plain buttons with `aria-pressed` rather than the @ui-primitive ToggleGroup,
- * whose shadcn sizing/hover styling is built for standalone toolbar toggles,
- * not a joined text-xs group.
+ * A single-select control — the pattern every chart's above-the-frame controls
+ * share. A thin wrapper over the @ui-primitive ToggleGroup (smallest size)
+ * that keeps exactly one option pressed and adds per-option disabling with an
+ * explanatory tooltip.
  */
 export function SegmentedControl<Value extends string>({
   label,
@@ -25,31 +25,32 @@ export function SegmentedControl<Value extends string>({
   }>;
 }) {
   return (
-    <div
-      role="group"
+    <ToggleGroup
       aria-label={label}
-      className="flex w-fit shrink-0 overflow-hidden rounded-md border border-(--grid-line) text-xs"
+      size="sm"
+      className="shrink-0"
+      value={[value]}
+      onValueChange={(next) => {
+        // The group reports single-select state as an array; an empty one is
+        // the pressed item being clicked again — ignore it so exactly one
+        // option stays selected.
+        const nextValue = next.at(-1) as Value | undefined;
+        if (nextValue !== undefined) {
+          onChange(nextValue);
+        }
+      }}
     >
       {options.map((option) => (
-        <button
+        <ToggleGroupItem
           key={option.value}
-          type="button"
+          value={option.value}
           title={option.title}
           disabled={option.disabled}
-          aria-pressed={value === option.value}
-          onClick={() => {
-            onChange(option.value);
-          }}
-          className={`px-2 py-0.5 disabled:opacity-40 ${
-            value === option.value
-              ? "bg-(--surface-2) font-medium"
-              : "text-(--text-muted) enabled:hover:text-(--text-secondary)"
-          }`}
         >
           {option.label}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }
 
