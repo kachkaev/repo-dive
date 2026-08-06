@@ -5,7 +5,8 @@
 Unify the lines-of-code timelines into one "Lines of code" chart with toggles.
 The former "Lines by language", "Code survival by cohort" and "Code survival by contributor" charts become a single chart — placed before all others — switched by three segmented controls: all lines | by language | by contributor, no shading | shade by year written, and absolute counts | percentage.
 The legend and "View data" table adapt to the selection, and options whose data is missing from an older dashboard.json are disabled rather than hidden.
-Chart controls now follow one universal pattern: they sit between the section header and the frame (which keeps only the chart and the legend), so the #/% toggle of the dependency and commit charts moved out of the frame and gained the same "absolute counts | percentage" labels, and the calendar's and contributors' kind filters moved above the frame in the same segmented style.
+Chart controls now follow one universal pattern: they sit between the section header and the frame (which keeps only the chart, its legend and an optional caption), so the #/% toggle of the dependency and commit charts moved out of the frame and gained the same "absolute counts | percentage" labels, and the calendar's and contributors' kind filters moved above the frame in the same segmented style.
+"View data" tables and the contributors list moved below the frame for the same reason.
 Legends render centered below their chart like a figure caption — subtitles keep constant wording and legends no longer sit above the marks, so toggling never shifts the chart or the controls.
 The chart's x-axis is pinned to the union of the per-commit and sampled datasets' date extents, so switching the dimension never nudges the axis either.
 The calendar's intensity scale and range summary are centered the same way.

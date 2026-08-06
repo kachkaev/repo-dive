@@ -4,6 +4,7 @@ export function Section({
   title,
   subtitle,
   controls,
+  footer,
   children,
 }: {
   title: string;
@@ -15,6 +16,11 @@ export function Section({
   subtitle?: string | undefined;
   /** Optional controls, laid out in a wrapping row above the chart card. */
   controls?: ReactNode;
+  /**
+   * Rendered after the frame — "View data" tables and the like. The frame
+   * itself holds only the visual, its legend and an optional caption.
+   */
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -29,6 +35,7 @@ export function Section({
       <div className="mt-3 rounded-lg border border-(--grid-line) bg-(--surface-1) p-4">
         {children}
       </div>
+      {footer}
     </section>
   );
 }

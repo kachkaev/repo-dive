@@ -440,6 +440,21 @@ export function LinesTimeline({
           />
         </>
       }
+      footer={
+        <DataTable
+          caption="View data"
+          header={["date", ...tableColumns.map((column) => column.label)]}
+          rows={chart.points.map((point) => [
+            formatDate(new Date(point.dateMs).toISOString()),
+            ...tableColumns.map((column) =>
+              column.keys.reduce(
+                (sum, key) => sum + (point.values[key] ?? 0),
+                0,
+              ),
+            ),
+          ])}
+        />
+      }
     >
       <TimeSeriesChart
         mode="area"
@@ -447,16 +462,6 @@ export function LinesTimeline({
         domainStartMs={domainStartMs}
         domainEndMs={domainEndMs}
         {...chart}
-      />
-      <DataTable
-        caption="View data"
-        header={["date", ...tableColumns.map((column) => column.label)]}
-        rows={chart.points.map((point) => [
-          formatDate(new Date(point.dateMs).toISOString()),
-          ...tableColumns.map((column) =>
-            column.keys.reduce((sum, key) => sum + (point.values[key] ?? 0), 0),
-          ),
-        ])}
       />
     </Section>
   );

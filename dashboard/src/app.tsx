@@ -372,6 +372,25 @@ export function App({ data }: { data: DashboardData }) {
               onChange={setDirectDependenciesPercent}
             />
           }
+          footer={
+            <DataTable
+              caption="View data"
+              header={[
+                "date",
+                ...(hasManifestCounts ? ["package.json files"] : []),
+                "dependencies",
+                "devDependencies",
+                "optionalDependencies",
+              ]}
+              rows={dependencies.map((row) => [
+                formatDate(row.date),
+                ...(hasManifestCounts ? [row.manifestCount ?? 0] : []),
+                row.directProd,
+                row.directDev,
+                row.directOptional,
+              ])}
+            />
+          }
         >
           <TimeSeriesChart
             mode="area"
@@ -379,23 +398,6 @@ export function App({ data }: { data: DashboardData }) {
             {...directDependenciesChart}
             domainStartMs={repoStartMs}
             zeroLabel="No package.json"
-          />
-          <DataTable
-            caption="View data"
-            header={[
-              "date",
-              ...(hasManifestCounts ? ["package.json files"] : []),
-              "dependencies",
-              "devDependencies",
-              "optionalDependencies",
-            ]}
-            rows={dependencies.map((row) => [
-              formatDate(row.date),
-              ...(hasManifestCounts ? [row.manifestCount ?? 0] : []),
-              row.directProd,
-              row.directDev,
-              row.directOptional,
-            ])}
           />
         </Section>
       )}
@@ -412,6 +414,16 @@ export function App({ data }: { data: DashboardData }) {
               />
             ) : undefined
           }
+          footer={
+            <DataTable
+              caption="View data"
+              header={["date", "resolved"]}
+              rows={dependencies.map((row) => [
+                formatDate(row.date),
+                row.resolved,
+              ])}
+            />
+          }
         >
           <TimeSeriesChart
             mode="area"
@@ -419,14 +431,6 @@ export function App({ data }: { data: DashboardData }) {
             {...dependenciesChart}
             domainStartMs={repoStartMs}
             zeroLabel="No lockfile"
-          />
-          <DataTable
-            caption="View data"
-            header={["date", "resolved"]}
-            rows={dependencies.map((row) => [
-              formatDate(row.date),
-              row.resolved,
-            ])}
           />
         </Section>
       )}
@@ -563,46 +567,48 @@ export function App({ data }: { data: DashboardData }) {
             presentKinds={contributorKinds}
           />
         }
+        footer={
+          <DataTable
+            caption={`All ${data.contributors.length} listed contributors`}
+            header={["contributor", "commits", "added", "deleted"]}
+            rows={data.contributors.map((contributor) => [
+              <>
+                {contributor.kind && contributor.kind !== "human" ? (
+                  <span
+                    title={kindBadge[contributor.kind].title}
+                    className="mr-1 select-none"
+                  >
+                    <span
+                      className="mr-1 inline-block size-2.5 rounded-xs"
+                      style={{ background: kindColors[contributor.kind] }}
+                    />
+                    {kindBadge[contributor.kind].icon}
+                  </span>
+                ) : undefined}
+                {contributor.url ? (
+                  <a
+                    href={contributor.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium hover:underline"
+                  >
+                    {contributor.name}
+                  </a>
+                ) : (
+                  contributor.name
+                )}{" "}
+                <span className="text-(--text-muted)">
+                  &lt;{contributor.email}&gt;
+                </span>
+              </>,
+              contributor.commits,
+              formatCount(contributor.added),
+              formatCount(contributor.deleted),
+            ])}
+          />
+        }
       >
         <ContributorBars items={filteredContributorItems} />
-        <DataTable
-          caption={`All ${data.contributors.length} listed contributors`}
-          header={["contributor", "commits", "added", "deleted"]}
-          rows={data.contributors.map((contributor) => [
-            <>
-              {contributor.kind && contributor.kind !== "human" ? (
-                <span
-                  title={kindBadge[contributor.kind].title}
-                  className="mr-1 select-none"
-                >
-                  <span
-                    className="mr-1 inline-block size-2.5 rounded-xs"
-                    style={{ background: kindColors[contributor.kind] }}
-                  />
-                  {kindBadge[contributor.kind].icon}
-                </span>
-              ) : undefined}
-              {contributor.url ? (
-                <a
-                  href={contributor.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium hover:underline"
-                >
-                  {contributor.name}
-                </a>
-              ) : (
-                contributor.name
-              )}{" "}
-              <span className="text-(--text-muted)">
-                &lt;{contributor.email}&gt;
-              </span>
-            </>,
-            contributor.commits,
-            formatCount(contributor.added),
-            formatCount(contributor.deleted),
-          ])}
-        />
       </Section>
     </main>
   );
