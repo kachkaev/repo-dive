@@ -377,35 +377,40 @@ export function BelowFoldSections({
                 onChange={setCalendarKindFilter}
                 presentKinds={commitKinds}
               />
-              {/* Last in the row: the trigger is as wide as the picked value,
-                  so anything after it would shift on change. */}
-              <Select
-                value={calendarRange}
-                onValueChange={(value) => {
-                  // null is the "cleared" value; the range select always has one.
-                  if (value !== null) {
-                    setCalendarRange(value);
-                  }
-                }}
-                items={calendarRangeItems}
-              >
-                {/* The options ("Last 12 months", …) make the purpose plain,
-                    so the label is a11y-only. */}
-                <SelectTrigger size="xs" aria-label="Calendar range">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {calendarRangeItems.map((item) => (
-                    <SelectItem
-                      key={item.value}
-                      value={item.value}
-                      className="text-xs"
-                    >
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* A fixed-width slot for the trigger, which keeps hugging its
+                  own value: the options differ by ~60px ("2019" against the
+                  widest, "Last 12 months", which needs 128px at this size), and
+                  a trigger claiming a different slice of the row on every change
+                  hopped between rows once the row wraps on a narrow viewport. */}
+              <div className="w-36">
+                <Select
+                  value={calendarRange}
+                  onValueChange={(value) => {
+                    // null is the "cleared" value; the range select always has one.
+                    if (value !== null) {
+                      setCalendarRange(value);
+                    }
+                  }}
+                  items={calendarRangeItems}
+                >
+                  {/* The options ("Last 12 months", …) make the purpose plain,
+                      so the label is a11y-only. */}
+                  <SelectTrigger size="xs" aria-label="Calendar range">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {calendarRangeItems.map((item) => (
+                      <SelectItem
+                        key={item.value}
+                        value={item.value}
+                        className="text-xs"
+                      >
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </>
           }
         >

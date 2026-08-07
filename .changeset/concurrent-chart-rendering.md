@@ -1,5 +1,5 @@
 ---
-"repo-dive": minor
+"repo-dive": patch
 ---
 
 Keep the dashboard responsive while charts re-render, and stagger the initial load.
