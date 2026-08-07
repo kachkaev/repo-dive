@@ -4,7 +4,7 @@ import { GridRows } from "@visx/grid";
 import { Group } from "@visx/group";
 import { scaleLinear, scaleTime } from "@visx/scale";
 import { AreaStack, BarStack, LinePath } from "@visx/shape";
-import { useId, useState } from "react";
+import { useDeferredValue, useId, useState } from "react";
 
 import { formatCount, formatDate, formatPercent } from "./shared/format.ts";
 import { Legend, Swatch } from "./shared/primitives.tsx";
@@ -353,21 +353,7 @@ function HoverTooltip({
  * Stacked series over time — areas for dense series, bars for monthly buckets,
  * lines for non-stacked comparison. Crosshair tooltip on hover.
  */
-export function TimeSeriesChart({
-  points,
-  seriesKeys,
-  colors,
-  seriesHatch,
-  mode,
-  percentMode,
-  valueFormat,
-  legendItems,
-  tooltipGroups,
-  separateGroups,
-  domainStartMs,
-  domainEndMs,
-  zeroLabel,
-}: {
+export function TimeSeriesChart(props: {
   points: TimePoint[];
   seriesKeys: string[];
   colors: string[];
@@ -417,6 +403,33 @@ export function TimeSeriesChart({
   // crosshair reaches the whole domain, including stretches with no data point.
   const [hoverMs, setHoverMs] = useState<number | undefined>();
   const patternIdBase = useId();
+
+  // A toggle above the frame (split, shading, #/%) swaps most of these props
+  // at once, and re-shaping plus reconciling hundreds of SVG paths can take
+  // long enough to freeze the click feedback. Rendering from a deferred copy
+  // keeps that urgent render cheap — every derivation below is memoized on the
+  // old props, so the previous marks are reused as-is — and the expensive
+  // render with the new props follows as an interruptible deferred pass. The
+  // chart dims while it lags so the wait reads as loading, not as a dead
+  // control. Hover state is not deferred: the crosshair stays urgent and
+  // consistent with whichever props are on screen.
+  const deferredProps = useDeferredValue(props);
+  const stale = deferredProps !== props;
+  const {
+    points,
+    seriesKeys,
+    colors,
+    seriesHatch,
+    mode,
+    percentMode,
+    valueFormat,
+    legendItems,
+    tooltipGroups,
+    separateGroups,
+    domainStartMs,
+    domainEndMs,
+    zeroLabel,
+  } = deferredProps;
 
   // Bail out before any derivation (only hooks may precede this): an early
   // return further down would make React Compiler fuse everything after it
@@ -615,7 +628,7 @@ export function TimeSeriesChart({
     }));
 
   return (
-    <div>
+    <div className="transition-opacity" style={{ opacity: stale ? 0.6 : 1 }}>
       <div ref={containerRef} className="relative">
         <svg width={width} height={height} role="img">
           {hatchColors.length > 0 && (

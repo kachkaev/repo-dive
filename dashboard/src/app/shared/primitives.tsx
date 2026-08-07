@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useDeferredValue } from "react";
 
 export function Section({
   title,
@@ -113,15 +113,21 @@ export function Legend({ items }: { items: LegendEntry[] }) {
   );
 }
 
-export function DataTable({
-  caption,
-  header,
-  rows,
-}: {
+export function DataTable(props: {
   caption: string;
   header: string[];
   rows: ReactNode[][];
 }) {
+  // The body can hold thousands of rows (one per commit) that sit unseen
+  // behind a closed <details>. Mount it empty and fill it — like every later
+  // change, e.g. a toggle above the chart swapping the columns — in a
+  // deferred, interruptible render, so neither first paint nor a click blocks
+  // on it. Header and rows travel as one value so the columns never mismatch.
+  const { header, rows } = useDeferredValue(
+    { header: props.header, rows: props.rows },
+    { header: props.header, rows: [] },
+  );
+  const caption = props.caption;
   return (
     <details className="mt-3 text-xs text-(--text-secondary)">
       <summary className="select-none hover:text-(--text-primary)">
