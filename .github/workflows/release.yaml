@@ -18,6 +18,7 @@ jobs:
     if: github.repository == 'kachkaev/repo-dive'
     name: Release
     permissions:
+      actions: write
       contents: write
       id-token: write
       pull-requests: write
@@ -61,3 +62,14 @@ jobs:
           publish: pnpm changesets:publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rebuild the example dashboards
+        # The release the step above publishes is created with GITHUB_TOKEN, so
+        # its `release: published` event starts no workflow runs. Dispatching
+        # the examples workflow works because workflow_dispatch is exempt from
+        # that rule
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run examples.yaml --ref ${{ github.ref_name }}
