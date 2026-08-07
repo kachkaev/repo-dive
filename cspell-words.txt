@@ -17,6 +17,7 @@ EAV
 Effectful
 ENOENT
 env
+esac
 esbuild
 explorable
 gapless
@@ -39,6 +40,7 @@ knip
 libsql
 LLM
 lockfiles
+loglevel
 maat
 matplotlib
 MCP
