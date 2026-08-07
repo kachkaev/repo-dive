@@ -9,6 +9,49 @@ on:
       - main
 
 jobs:
+  action-smoke-test:
+    name: Smoke-test the GitHub Action
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The action runs the CLI published to npm, so this exercises the
+      # composite glue in action.yml (input handling, the scan → index →
+      # report chain, outputs), not the code built from this commit
+      - name: Create a small repository to analyze
+        run: |
+          git init --quiet --initial-branch=main analyzed
+          cd analyzed
+          git config user.name "Smoke Test"
+          git config user.email "smoke-test@example.com"
+          echo 'console.log("one");' > index.js
+          git add --all
+          git commit --quiet --message "Add index.js"
+          echo "# Analyzed" > README.md
+          git add --all
+          git commit --quiet --message "Add README.md"
+          echo 'console.log("two");' >> index.js
+          git add --all
+          git commit --quiet --message "Extend index.js"
+
+      - name: Run the action
+        id: action
+        uses: ./
+        with:
+          repo: analyzed
+          cache: false
+          upload-artifact: false
+          report-path: smoke-test-report.html
+
+      - name: Verify the report
+        env:
+          REPORT_PATH: ${{ steps.action.outputs.report-path }}
+        run: |
+          test -s "$REPORT_PATH"
+          grep -q "<title>" "$REPORT_PATH"
+          du -h "$REPORT_PATH"
+
   checks:
     name: Run checks
     runs-on: ubuntu-24.04

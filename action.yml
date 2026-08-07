@@ -1,0 +1,220 @@
+# Composite GitHub Action wrapping the published repo-dive CLI, so any
+# repository can produce and refresh its report right in CI — see
+# docs/github-action.md for usage and recipes.
+#
+# The action runs scan → index → report with the catalog cached across runs:
+# a scan that hits the time limit still banks its progress, and the next run
+# resumes where the previous one stopped.
+
+name: repo-dive
+description: >-
+  Dive into a git repo's history right in CI: scan it, index the metrics and
+  export a self-contained HTML report, with progress cached across runs.
+author: Alexander Kachkaev
+branding:
+  icon: bar-chart-2
+  color: blue
+
+inputs:
+  version:
+    description: >-
+      The repo-dive npm package version to run — an exact version, a range or
+      a dist-tag. Pin an exact version for reproducible runs.
+    required: false
+    default: latest
+  repo:
+    description: >-
+      Path to the repository to analyze, relative to the workspace. It must be
+      a full clone — shallow checkouts have no history to dive into.
+    required: false
+    default: "."
+  report-path:
+    description: >-
+      Where to write the self-contained HTML report, relative to the
+      workspace. The file name doubles as the artifact name when
+      upload-artifact is on.
+    required: false
+    default: repo-dive-report.html
+  scan-timeout-minutes:
+    description: >-
+      Interrupt scan gracefully after this many minutes, so that the catalog
+      cache is still saved and the next run resumes where this one stopped.
+      Keep it below the job's own timeout, which would kill the whole job
+      before the cache save.
+    required: false
+    default: "300"
+  cache:
+    description: Cache the catalog across runs with actions/cache.
+    required: false
+    default: "true"
+  cache-key-prefix:
+    description: >-
+      Prefix of the catalog cache key. Override it when one workflow analyzes
+      several repositories, so that their catalogs do not overwrite each
+      other.
+    required: false
+    default: repo-dive-catalog
+  upload-artifact:
+    description: >-
+      Upload the report as a non-zipped workflow artifact, viewable straight
+      from the run page in the browser.
+    required: false
+    default: "true"
+
+outputs:
+  report-path:
+    description: Path of the exported HTML report, relative to the workspace.
+    value: ${{ inputs.report-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the analyzed repository
+      shell: bash
+      env:
+        REPO: ${{ inputs.repo }}
+      run: |
+        if ! git -C "$REPO" rev-parse --git-dir > /dev/null 2>&1; then
+          echo "::error::No git repository found at '$REPO'. Check out the repository first (actions/checkout) or point the 'repo' input at a clone."
+          exit 1
+        fi
+        if [ "$(git -C "$REPO" rev-parse --is-shallow-repository)" = "true" ]; then
+          echo "::error::The repository at '$REPO' is a shallow clone, so there is no history to dive into. Check it out with 'fetch-depth: 0'."
+          exit 1
+        fi
+
+    - name: Check the preinstalled Node version
+      id: node
+      shell: bash
+      run: |
+        required=22.13.0
+        current=$(node --version 2> /dev/null | sed 's/^v//' || true)
+        if [ -n "$current" ] && [ "$(printf '%s\n' "$required" "$current" | sort -V | head -n1)" = "$required" ]; then
+          echo "adequate=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "adequate=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Setup node
+      if: steps.node.outputs.adequate != 'true'
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: 22
+
+    - name: Install repo-dive
+      id: install
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      # One install shared by the scan, index and report steps below, so all
+      # three run the exact same version even when a dist-tag moves mid-run
+      run: |
+        prefix="$RUNNER_TEMP/repo-dive-action"
+        npm install --prefix "$prefix" --no-audit --no-fund --loglevel=error "repo-dive@$VERSION"
+        bin="$prefix/node_modules/.bin/repo-dive"
+        "$bin" --version
+        echo "bin=$bin" >> "$GITHUB_OUTPUT"
+
+    - name: Load the catalog cache
+      if: inputs.cache == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        key: ${{ inputs.cache-key-prefix }}-${{ github.run_id }}
+        path: ${{ inputs.repo }}/.repo-dive
+        restore-keys: |
+          ${{ inputs.cache-key-prefix }}-
+
+    - name: Run repo-dive scan
+      id: scan
+      shell: bash
+      env:
+        BIN: ${{ steps.install.outputs.bin }}
+        REPO: ${{ inputs.repo }}
+        TIMEOUT_MINUTES: ${{ inputs.scan-timeout-minutes }}
+      # The step reports the exit code instead of failing right away, so the
+      # cache save below banks the progress even when the scan runs out of
+      # time. `timeout` is a graceful fallback for exotic runners without GNU
+      # coreutils: no time limit there, the job's own timeout is the backstop.
+      run: |
+        set +e
+        if command -v timeout > /dev/null 2>&1; then
+          timeout --signal=INT --kill-after=60 "${TIMEOUT_MINUTES}m" "$BIN" scan --repo "$REPO"
+        else
+          "$BIN" scan --repo "$REPO"
+        fi
+        echo "exit-code=$?" >> "$GITHUB_OUTPUT"
+
+    - name: Save the catalog cache
+      # Saved before `index` adds the heavy metrics.sqlite to the catalog
+      if: inputs.cache == 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        key: ${{ inputs.cache-key-prefix }}-${{ github.run_id }}
+        path: ${{ inputs.repo }}/.repo-dive
+
+    - name: Check the scan outcome
+      shell: bash
+      env:
+        EXIT_CODE: ${{ steps.scan.outputs.exit-code }}
+        TIMEOUT_MINUTES: ${{ inputs.scan-timeout-minutes }}
+        CACHE: ${{ inputs.cache }}
+      run: |
+        case "$EXIT_CODE" in
+          0) ;;
+          124 | 137)
+            if [ "$CACHE" = "true" ]; then
+              echo "::error::The scan did not finish within the $TIMEOUT_MINUTES-minute limit. The progress made so far is cached — re-run the workflow to continue where this run stopped."
+            else
+              echo "::error::The scan did not finish within the $TIMEOUT_MINUTES-minute limit and caching is off, so the progress is lost. Raise 'scan-timeout-minutes' or enable the 'cache' input."
+            fi
+            exit 1
+            ;;
+          *)
+            echo "::error::repo-dive scan failed with exit code $EXIT_CODE."
+            exit "$EXIT_CODE"
+            ;;
+        esac
+
+    - name: Run repo-dive index
+      shell: bash
+      env:
+        BIN: ${{ steps.install.outputs.bin }}
+        REPO: ${{ inputs.repo }}
+      run: |
+        "$BIN" index --repo "$REPO"
+
+    - name: Run repo-dive report
+      shell: bash
+      env:
+        BIN: ${{ steps.install.outputs.bin }}
+        REPO: ${{ inputs.repo }}
+        REPORT_PATH: ${{ inputs.report-path }}
+      run: |
+        mkdir -p "$(dirname "$REPORT_PATH")"
+        "$BIN" report --repo "$REPO" --out "$REPORT_PATH"
+
+    - name: Add the report to the job summary
+      shell: bash
+      env:
+        REPORT_PATH: ${{ inputs.report-path }}
+        UPLOAD: ${{ inputs.upload-artifact }}
+      run: |
+        raw=$(du -h "$REPORT_PATH" | cut -f1)
+        gzipped=$(gzip -c "$REPORT_PATH" | wc -c)
+        {
+          echo "Report: $raw raw, $((gzipped / 1024)) kB gzipped."
+          if [ "$UPLOAD" = "true" ]; then
+            echo ""
+            echo "Click **$(basename "$REPORT_PATH")** under _Artifacts_ to view it in the browser."
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload the report
+      # archive: false keeps the report non-zipped, so the run page can render
+      # it in the browser without a download. It also makes the file name the
+      # artifact name (a `name` input would be ignored).
+      if: inputs.upload-artifact == 'true'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        path: ${{ inputs.report-path }}
+        archive: false

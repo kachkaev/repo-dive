@@ -122,6 +122,36 @@ The dashboard badges bots and AI agents, listing them apart from humans.
 Apart from `catalog`, which every command needs, the config is read by `index`.
 See [docs/specs/07-config.md](docs/specs/07-config.md) for details.
 
+## GitHub Action
+
+The repository doubles as a composite GitHub Action, so any project can produce and refresh its report right in CI instead of on somebody's laptop.
+Commit a workflow like this to the repository you want to analyze:
+
+```yaml
+name: repo-dive
+
+on:
+  schedule:
+    - cron: "27 5 * * 1" # weekly
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the whole history is the whole point
+
+      - uses: kachkaev/repo-dive@main
+```
+
+Every run restores the catalog from the Actions cache, scans only the commits that are new since the previous run and uploads the self-contained report as an artifact, viewable straight from the run page.
+Long first scans are banked too: when the scan hits its time limit, the progress is cached and the next run resumes where this one stopped.
+See [docs/github-action.md](docs/github-action.md) for all inputs, publishing the report to GitHub Pages and analyzing repositories other than the workflow's own.
+
 ## AI agents (MCP)
 
 `repo-dive mcp` serves the metrics cube over the Model Context Protocol on stdio, so an agent can explore a repository's history by asking SQL questions.
