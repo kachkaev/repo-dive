@@ -1,11 +1,22 @@
 import { generateBaseConfigs } from "@kachkaev/eslint-config-base";
 import { defineConfig } from "eslint/config";
+import reactHooks from "eslint-plugin-react-hooks";
 
 export default defineConfig([
   ...generateBaseConfigs({ tsconfigRootDir: import.meta.dirname }),
 
   {
     ignores: [".claude/**", ".husky/**", "dist/**"],
+  },
+
+  {
+    // The dashboard build relies on React Compiler for memoization, and a
+    // component that breaks the Rules of React silently bails out of it
+    // instead of failing the build. These rules are the compiler's own
+    // analysis surfaced at lint time, so a bail-out is caught while editing
+    // rather than as an unexplained re-render later.
+    ...reactHooks.configs.flat.recommended,
+    files: ["dashboard/**/*.ts", "dashboard/**/*.tsx"],
   },
 
   {
