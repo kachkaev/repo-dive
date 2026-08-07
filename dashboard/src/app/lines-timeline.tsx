@@ -110,9 +110,13 @@ type StackedChart = {
  */
 const yearBandSeparator = "";
 
-/** Sum of a group's living lines across all its year bands. */
-function sumYears(byYear: Record<string, number>): number {
-  return Object.values(byYear).reduce((total, lines) => total + lines, 0);
+/**
+ * Sum of a line count record — a group's living lines across its year bands, a
+ * row's across its groups. Every variant stacks one of these, so it is also
+ * what the shared y-domain is measured in.
+ */
+function sumLines(byKey: Record<string, number>): number {
+  return Object.values(byKey).reduce((total, lines) => total + lines, 0);
 }
 
 /**
@@ -134,7 +138,7 @@ function shapeYearBands(
 ): StackedChart {
   const latest = rows.at(-1)?.byGroupYear ?? {};
   const ranked = Object.entries(latest)
-    .toSorted(([, left], [, right]) => sumYears(right) - sumYears(left))
+    .toSorted(([, left], [, right]) => sumLines(right) - sumLines(left))
     .map(([name]) => name);
   const kept = ranked.slice(0, maxSeries);
   const hasOther =
@@ -322,12 +326,7 @@ export function LinesTimeline({
       : {
           points: data.languages.map((row) => ({
             dateMs: new Date(row.date).getTime(),
-            values: {
-              Lines: Object.values(row.byLanguage).reduce(
-                (sum, lines) => sum + lines,
-                0,
-              ),
-            },
+            values: { Lines: sumLines(row.byLanguage) },
           })),
           seriesKeys: ["Lines"],
           colors: [cohortBaseColor],
@@ -402,17 +401,37 @@ export function LinesTimeline({
 
   const supportsPercent = chart.seriesKeys.length > 1;
 
-  // One x-domain across every variant: language rows cover each commit while
-  // survival rows are sampled, so their extents differ slightly — without the
-  // shared union, toggling the dimension would nudge the axis.
+  // One domain on both axes across every variant, so the toggles change what
+  // the stack is made of and nothing else. The variants are drawn from two
+  // sources — per-commit language counts and blame at sampled commits — whose
+  // extents differ slightly, and whose totals can differ outright when the two
+  // collectors disagree about which files count.
+  //
+  // The y bound is a row total rather than a stack height because no variant
+  // loses lines on the way to the chart: the ranked tail folds into "Other",
+  // and age shading splits a group into year bands rather than trimming it. So
+  // the tallest stack the section can draw is simply the largest row total
+  // across both sources. Pinning it also stops each variant from rescaling to
+  // fill the frame, which used to hide those disagreements between sources
+  // instead of showing them.
   let domainStartMs: number | undefined;
   let domainEndMs: number | undefined;
+  let domainPeak = 0;
   for (const row of [...data.languages, ...data.survival]) {
     const dateMs = new Date(row.date).getTime();
     domainStartMs =
       domainStartMs === undefined ? dateMs : Math.min(domainStartMs, dateMs);
     domainEndMs =
       domainEndMs === undefined ? dateMs : Math.max(domainEndMs, dateMs);
+  }
+  for (const row of data.languages) {
+    domainPeak = Math.max(domainPeak, sumLines(row.byLanguage));
+  }
+  for (const row of data.survival) {
+    // Every survival cross-tab partitions the same living lines, so `byCohort`
+    // — the one field present in every dashboard.json — gives the row's total
+    // for the by-contributor and year-banded variants alike.
+    domainPeak = Math.max(domainPeak, sumLines(row.byCohort));
   }
 
   // The data table follows the selection, collapsing year bands back into one
@@ -517,6 +536,7 @@ export function LinesTimeline({
         percentMode={deferredPercentMode}
         domainStartMs={domainStartMs}
         domainEndMs={domainEndMs}
+        domainPeak={domainPeak}
         {...chart}
       />
     </Section>

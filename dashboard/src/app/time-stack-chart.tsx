@@ -385,6 +385,15 @@ export function TimeSeriesChart(props: {
   /** Like {@link domainStartMs}, extending the axis forward past the last point. */
   domainEndMs?: number | undefined;
   /**
+   * Raises the value axis to at least this. Sibling variants of one chart —
+   * switched by a control above it, each with its own tallest stack — pass a
+   * shared peak so they draw against a single y scale instead of every toggle
+   * resizing the areas under the cursor. Like {@link domainStartMs} it only
+   * ever widens the domain, and it has no effect in percentage mode, which
+   * always spans 0–100%.
+   */
+  domainPeak?: number | undefined;
+  /**
    * Tooltip text for a data point whose series all sum to zero — a value that
    * was collected and came back empty, as opposed to a stretch with no data
    * point at all (which always reads "No data"). Lets a chart say something
@@ -428,6 +437,7 @@ export function TimeSeriesChart(props: {
     separateGroups,
     domainStartMs,
     domainEndMs,
+    domainPeak,
     zeroLabel,
   } = deferredProps;
 
@@ -532,6 +542,11 @@ export function TimeSeriesChart(props: {
         ? Math.max(...seriesKeys.map((key) => row[key] ?? 0))
         : seriesKeys.reduce((sum, key) => sum + (row[key] ?? 0), 0);
     yPeak = Math.max(yPeak, total);
+  }
+  // Widen (never crop) to a caller-supplied peak, the same way the time domain
+  // takes its bounds — so one variant of a chart never rescales away another's.
+  if (domainPeak !== undefined) {
+    yPeak = Math.max(yPeak, domainPeak);
   }
   const yMax = yPeak || 1;
 
