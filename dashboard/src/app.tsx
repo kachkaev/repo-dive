@@ -455,41 +455,40 @@ export function App({ data }: { data: DashboardData }) {
                 onChange={setCalendarKindFilter}
                 presentKinds={commitKinds}
               />
-              <Select
-                value={calendarRange}
-                onValueChange={(value) => {
-                  // null is the "cleared" value; the range select always has one.
-                  if (value !== null) {
-                    setCalendarRange(value);
-                  }
-                }}
-                items={calendarRangeItems}
-              >
-                {/* The options ("Last 12 months", …) make the purpose plain,
-                    so the label is a11y-only. The width is pinned rather than
-                    fitted to the value: the options differ by ~60px ("2019"
-                    against the widest, "Last 12 months", which needs 128px at
-                    this size), which was enough to hop the trigger between rows
-                    once the control row wraps on a narrow viewport. */}
-                <SelectTrigger
-                  size="xs"
-                  aria-label="Calendar range"
-                  className="w-36"
+              {/* A fixed-width slot for the trigger, which keeps hugging its
+                  own value: the options differ by ~60px ("2019" against the
+                  widest, "Last 12 months", which needs 128px at this size), and
+                  a trigger claiming a different slice of the row on every change
+                  hopped between rows once the row wraps on a narrow viewport. */}
+              <div className="w-36">
+                <Select
+                  value={calendarRange}
+                  onValueChange={(value) => {
+                    // null is the "cleared" value; the range select always has one.
+                    if (value !== null) {
+                      setCalendarRange(value);
+                    }
+                  }}
+                  items={calendarRangeItems}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {calendarRangeItems.map((item) => (
-                    <SelectItem
-                      key={item.value}
-                      value={item.value}
-                      className="text-xs"
-                    >
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  {/* The options ("Last 12 months", …) make the purpose plain,
+                      so the label is a11y-only. */}
+                  <SelectTrigger size="xs" aria-label="Calendar range">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {calendarRangeItems.map((item) => (
+                      <SelectItem
+                        key={item.value}
+                        value={item.value}
+                        className="text-xs"
+                      >
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </>
           }
         >
