@@ -11,12 +11,14 @@ on:
       - main
     paths:
       - examples/**
-  release:
-    types:
-      - published
   schedule:
     # Weekly, Monday 05:13 UTC — keeps the dashboards "more or less up to date"
     - cron: "13 5 * * 1"
+  # Also dispatched by the release workflow once a publish succeeds. A
+  # `release: published` trigger looks like the obvious way to do that, but it
+  # never fires: the changesets action creates the release with GITHUB_TOKEN,
+  # and GitHub starts no workflow runs from GITHUB_TOKEN-raised events —
+  # workflow_dispatch being one of the two exceptions
   workflow_dispatch:
 
 # One deploy at a time; a fresh run supersedes a queued (not running) one
