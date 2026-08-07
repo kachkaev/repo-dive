@@ -8,7 +8,9 @@
  * size matches the xs ToggleGroup (h-7) in mixed control rows,
  * `alignItemWithTrigger` defaults to false — the canonical overlay mode
  * repaints the value with the popup item's padding, nudging it ~1px on every
- * open — and only the parts the dashboard uses are exported.
+ * open — the trigger lays its value and chevron out in a two-column grid
+ * rather than a flex row so `reserveWidthFor` can stack invisible labels in
+ * the value's cell, and only the parts the dashboard uses are exported.
  */
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
@@ -33,10 +35,19 @@ export function SelectValue({
 export function SelectTrigger({
   className,
   size,
+  reserveWidthFor,
   children,
   ...props
 }: PropsWithPlainClassName<SelectPrimitive.Trigger.Props> & {
   size?: "xs" | "sm" | "default" | undefined;
+  /**
+   * Every label this trigger can end up showing. Each is rendered invisibly in
+   * the value's grid cell, so the trigger is always as wide as its widest
+   * option instead of as wide as the picked one — a trigger that resizes on
+   * change reflows whatever sits next to it, and in a wrapping control row
+   * (narrow viewports) makes it hop between rows.
+   */
+  reserveWidthFor?: readonly string[] | undefined;
 }) {
   return (
     <SelectPrimitive.Trigger
@@ -46,13 +57,20 @@ export function SelectTrigger({
         // Mirrors an unpressed outline toggle item (no shadow, no dark-mode
         // tint, text-only hover — an accent fill would read as a pressed
         // item), so mixed control rows read as one family.
-        "flex w-fit items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap text-(--text-secondary) transition-[color,box-shadow] outline-none hover:text-(--text-primary) focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 data-[size=xs]:h-7 data-[size=xs]:px-2 data-[size=xs]:text-xs *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        "grid w-fit grid-cols-[1fr_auto] items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap text-(--text-secondary) transition-[color,box-shadow] outline-none hover:text-(--text-primary) focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 data-[size=xs]:h-7 data-[size=xs]:px-2 data-[size=xs]:text-xs *:data-[slot=select-value]:col-start-1 *:data-[slot=select-value]:row-start-1 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
         className,
       )}
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon>
+      {[...new Set(reserveWidthFor)].map((label) => (
+        // `invisible` (visibility: hidden) keeps these out of hit testing and
+        // the accessibility tree while they still size the column.
+        <span key={label} className="invisible col-start-1 row-start-1">
+          {label}
+        </span>
+      ))}
+      <SelectPrimitive.Icon className="col-start-2">
         <ChevronDownIcon />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>

@@ -455,8 +455,6 @@ export function App({ data }: { data: DashboardData }) {
                 onChange={setCalendarKindFilter}
                 presentKinds={commitKinds}
               />
-              {/* Last in the row: the trigger is as wide as the picked value,
-                  so anything after it would shift on change. */}
               <Select
                 value={calendarRange}
                 onValueChange={(value) => {
@@ -468,8 +466,13 @@ export function App({ data }: { data: DashboardData }) {
                 items={calendarRangeItems}
               >
                 {/* The options ("Last 12 months", …) make the purpose plain,
-                    so the label is a11y-only. */}
-                <SelectTrigger size="xs" aria-label="Calendar range">
+                    so the label is a11y-only. Their widths differ a lot ("2019"
+                    against "Last 12 months"), hence the reserved width. */}
+                <SelectTrigger
+                  size="xs"
+                  aria-label="Calendar range"
+                  reserveWidthFor={calendarRangeItems.map((item) => item.label)}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
