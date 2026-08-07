@@ -466,12 +466,15 @@ export function App({ data }: { data: DashboardData }) {
                 items={calendarRangeItems}
               >
                 {/* The options ("Last 12 months", …) make the purpose plain,
-                    so the label is a11y-only. Their widths differ a lot ("2019"
-                    against "Last 12 months"), hence the reserved width. */}
+                    so the label is a11y-only. The width is pinned rather than
+                    fitted to the value: the options differ by ~60px ("2019"
+                    against the widest, "Last 12 months", which needs 128px at
+                    this size), which was enough to hop the trigger between rows
+                    once the control row wraps on a narrow viewport. */}
                 <SelectTrigger
                   size="xs"
                   aria-label="Calendar range"
-                  reserveWidthFor={calendarRangeItems.map((item) => item.label)}
+                  className="w-36"
                 >
                   <SelectValue />
                 </SelectTrigger>
