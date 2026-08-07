@@ -116,10 +116,12 @@ runs:
         echo "bin=$bin" >> "$GITHUB_OUTPUT"
 
     - name: Load the catalog cache
+      # The key includes the run attempt so that re-running a timed-out scan
+      # banks its own progress instead of colliding with the attempt before
       if: inputs.cache == 'true'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        key: ${{ inputs.cache-key-prefix }}-${{ github.run_id }}
+        key: ${{ inputs.cache-key-prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
         path: ${{ inputs.repo }}/.repo-dive
         restore-keys: |
           ${{ inputs.cache-key-prefix }}-
@@ -133,11 +135,12 @@ runs:
         TIMEOUT_MINUTES: ${{ inputs.scan-timeout-minutes }}
       # The step reports the exit code instead of failing right away, so the
       # cache save below banks the progress even when the scan runs out of
-      # time. `timeout` is a graceful fallback for exotic runners without GNU
-      # coreutils: no time limit there, the job's own timeout is the backstop.
+      # time. The GNU check keeps lookalikes such as Windows' timeout.exe from
+      # swallowing the command; runners without GNU coreutils get no time
+      # limit, with the job's own timeout as the backstop.
       run: |
         set +e
-        if command -v timeout > /dev/null 2>&1; then
+        if timeout --version 2> /dev/null | grep -q GNU; then
           timeout --signal=INT --kill-after=60 "${TIMEOUT_MINUTES}m" "$BIN" scan --repo "$REPO"
         else
           "$BIN" scan --repo "$REPO"
@@ -149,7 +152,7 @@ runs:
       if: inputs.cache == 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        key: ${{ inputs.cache-key-prefix }}-${{ github.run_id }}
+        key: ${{ inputs.cache-key-prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
         path: ${{ inputs.repo }}/.repo-dive
 
     - name: Check the scan outcome

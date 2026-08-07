@@ -15,7 +15,8 @@ on:
     - cron: "27 5 * * 1" # weekly, Monday morning
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read # enough for the checkout; private repositories need it too
 
 # One analysis at a time, so parallel runs don't redo each other's work
 concurrency:

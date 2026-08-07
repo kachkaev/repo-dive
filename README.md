@@ -135,7 +135,8 @@ on:
     - cron: "27 5 * * 1" # weekly
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   report:
