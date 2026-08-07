@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 
 import type { DashboardData } from "../data.ts";
 import { kindColors } from "./shared/contributor-kinds.tsx";
@@ -288,6 +288,14 @@ export function LinesTimeline({
   const wantsShading = shadeByYear || !flatAvailable[dimension];
   const shaded = shadedAvailable[dimension] && wantsShading;
 
+  // The controls above the frame track a click instantly (they read the values
+  // above); the chart and the data table re-shape from these deferred copies
+  // in a follow-up render that React keeps interruptible, so switching the
+  // split on a large repo no longer freezes the toggles mid-press.
+  const deferredDimension = useDeferredValue(dimension);
+  const deferredShaded = useDeferredValue(shaded);
+  const deferredPercentMode = useDeferredValue(percentMode);
+
   // One age scale shared by every shaded variant, so a given year reads the
   // same lightness band whether lines are split by language or by contributor.
   const survivalYearScale = makeYearScale(
@@ -297,8 +305,8 @@ export function LinesTimeline({
   );
 
   let chart: StackedChart;
-  if (dimension === "all") {
-    chart = shaded
+  if (deferredDimension === "all") {
+    chart = deferredShaded
       ? {
           points: data.survival.map((row) => {
             const values: Record<string, number> = {};
@@ -325,8 +333,8 @@ export function LinesTimeline({
           // A one-entry legend explains nothing — hide it.
           legendItems: [],
         };
-  } else if (dimension === "language") {
-    if (shaded) {
+  } else if (deferredDimension === "language") {
+    if (deferredShaded) {
       // Blame-based counterpart to the per-commit stack: the same lines over
       // the same files, shaded by the year each was written. Languages the flat
       // variant also shows keep its colors so toggling doesn't recolor the
@@ -364,7 +372,7 @@ export function LinesTimeline({
       );
     }
   } else {
-    if (shaded) {
+    if (deferredShaded) {
       chart = shapeYearBands(
         data.survival.map((row) => ({
           date: row.date,
@@ -525,7 +533,7 @@ export function LinesTimeline({
     >
       <TimeSeriesChart
         mode="area"
-        percentMode={percentMode}
+        percentMode={deferredPercentMode}
         domainStartMs={domainStartMs}
         domainEndMs={domainEndMs}
         domainPeak={domainPeak}

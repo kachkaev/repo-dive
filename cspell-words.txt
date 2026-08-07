@@ -33,6 +33,7 @@ hoverable
 incrementality
 insighter
 inspectable
+interruptible
 jdrouet
 JVM
 Kachkaev
