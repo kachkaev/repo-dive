@@ -1,5 +1,29 @@
 # repo-dive
 
+## 0.10.0
+
+### Minor Changes
+
+- [#119](https://github.com/kachkaev/repo-dive/pull/119) [`72566b4`](https://github.com/kachkaev/repo-dive/commit/72566b41e0e35bab7583a04721f63db2265ae78c) - Unify the lines-of-code timelines into one "Lines of code" chart with toggles.
+  The former "Lines by language", "Code survival by cohort" and "Code survival by contributor" charts become a single chart — placed before all others — switched by three segmented controls: all lines | by language | by contributor, no shading | shade by year written, and absolute counts | percentage; the legend and "View data" table follow the selection, and options whose data is missing from an older dashboard.json are disabled with an explanatory tooltip.
+  Every chart section now shares one layout: title, constant-wording subtitle, controls, then a frame holding only the visual with its legend centered below like a figure caption, with data tables after the frame — so the #/% toggles and the kind filters of the calendar and contributors moved out of their frames into one flat segmented style, and the calendar's range select matches it (no visible label, no value nudge when opened).
+  The unified chart keeps a single x-axis across every variant, so no toggle shifts the marks, the controls or the axis.
+  Hovering a stacked chart no longer re-renders the whole SVG (~30 ms → ~8 ms per frame): the crosshair and tooltip are separate components and d3-array is dropped, keeping the marks memoized by React Compiler.
+  Existing catalogs render without a re-scan; per-year shading lights up only where the catalog already carries per-year survival data.
+  A catalog scanned with only some collectors (say `repo-dive scan --collectors survival`) picks a split it can actually draw instead of opening on an empty chart.
+
+### Patch Changes
+
+- [#121](https://github.com/kachkaev/repo-dive/pull/121) [`6d06aee`](https://github.com/kachkaev/repo-dive/commit/6d06aeea247dca06196bdb71a4a458ab66797ebb) - Anchor the dashboard's AI-commit share to when the catalog was generated instead of to wall-clock now.
+  The tile covers the last 90 days, but the window was measured back from the moment the page happened to be opened, so any dashboard.json older than 90 days matched no commits at all and the tile rendered an em dash instead of a percentage.
+  The window now runs back from `generatedAt`, which is what every other date in the report is already anchored to, so the same catalog renders the same share however long after the scan it is opened.
+  Existing catalogs heal on reload — no re-index needed.
+
+- [#120](https://github.com/kachkaev/repo-dive/pull/120) [`cd99310`](https://github.com/kachkaev/repo-dive/commit/cd993106d1f5671890c3df6013e62c83e7754a2b) - Include the repository's first commit in every sampling policy.
+  Period policies (weekly, monthly, quarterly) keep the newest commit per period, so the very first commit was only sampled when it happened to be the newest in its bucket — sampled collectors like survival started their timelines at the first period boundary instead of the repository's birth.
+  Every policy now anchors both endpoints: HEAD and the first commit are always included.
+  Existing catalogs heal on the next regular `repo-dive scan` (it picks up the newly sampled first commit as a single new collector run — no `--force` needed); run `repo-dive index` afterwards to refresh the dashboard data.
+
 ## 0.9.0
 
 ### Minor Changes
