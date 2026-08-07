@@ -73,7 +73,9 @@ const bucketOf = (
 /**
  * Picks the sampled subset of commits for a policy. `commits` must be ordered
  * newest first (as `git log` emits them); period policies keep the newest
- * commit of each period, so HEAD is always included.
+ * commit of each period. Both endpoints are anchored: HEAD is always included,
+ * and so is the oldest commit, so sampled timelines start at the repository's
+ * first commit rather than at the first period boundary after it.
  *
  * Periods are committer-date periods: a policy asks for one snapshot per week
  * or month of the repository's own history, and a rebased commit belongs to
@@ -87,18 +89,29 @@ export const sampleCommits = (
     return [...commits];
   }
 
+  const sampled: CommitMeta[] = [];
   if (typeof policy === "object") {
-    return commits.filter((_, index) => index % policy.everyNth === 0);
+    for (const [index, commit] of commits.entries()) {
+      if (index % policy.everyNth === 0) {
+        sampled.push(commit);
+      }
+    }
+  } else {
+    const seenBuckets = new Set<string>();
+    for (const commit of commits) {
+      const bucket = bucketOf(policy, commit.committerDate);
+      if (!seenBuckets.has(bucket)) {
+        seenBuckets.add(bucket);
+        sampled.push(commit);
+      }
+    }
   }
 
-  const seenBuckets = new Set<string>();
-  const sampled: CommitMeta[] = [];
-  for (const commit of commits) {
-    const bucket = bucketOf(policy, commit.committerDate);
-    if (!seenBuckets.has(bucket)) {
-      seenBuckets.add(bucket);
-      sampled.push(commit);
-    }
+  // The oldest commit is the last element of both arrays when it was sampled,
+  // so this reference check is enough to avoid duplicating it.
+  const oldest = commits.at(-1);
+  if (oldest !== undefined && sampled.at(-1) !== oldest) {
+    sampled.push(oldest);
   }
   return sampled;
 };

@@ -33,13 +33,13 @@ test("sampleCommits keeps everything for all", () => {
 test("sampleCommits keeps the newest commit per month", () => {
   expect(
     sampleCommits(commits, "monthly").map((entry) => entry.hash),
-  ).toStrictEqual(["e", "c", "b"]);
+  ).toStrictEqual(["e", "c", "b", "a"]);
 });
 
 test("sampleCommits keeps the newest commit per quarter", () => {
   expect(
     sampleCommits(commits, "quarterly").map((entry) => entry.hash),
-  ).toStrictEqual(["e", "b"]);
+  ).toStrictEqual(["e", "b", "a"]);
 });
 
 test("sampleCommits buckets periods by the committer date", () => {
@@ -60,6 +60,22 @@ test("sampleCommits supports every-nth", () => {
   expect(
     sampleCommits(commits, { everyNth: 2 }).map((entry) => entry.hash),
   ).toStrictEqual(["e", "c", "a"]);
+});
+
+test("sampleCommits anchors the oldest commit for every-nth", () => {
+  // Indices 0 and 3 are the regular picks; "a" (index 4) rides along anyway.
+  expect(
+    sampleCommits(commits, { everyNth: 3 }).map((entry) => entry.hash),
+  ).toStrictEqual(["e", "b", "a"]);
+});
+
+test("sampleCommits anchors the oldest commit without duplicating it", () => {
+  // "a" is both the newest commit of its bucket and the oldest commit overall.
+  const single = [commit("a", "2025-12-01T10:00:00Z")];
+  expect(
+    sampleCommits(single, "monthly").map((entry) => entry.hash),
+  ).toStrictEqual(["a"]);
+  expect(sampleCommits([], "monthly")).toStrictEqual([]);
 });
 
 test("samplingLabel spells out every policy shape", () => {

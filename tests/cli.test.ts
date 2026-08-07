@@ -134,9 +134,10 @@ test.concurrent(
 
       expect(firstRun.status, firstRun.stderr).toBe(0);
       expect(firstRun.stdout).toMatch(/Commits: 2 \(1 authors/);
-      // 6 all-sampled collectors × 2 commits + survival on 1 monthly sample.
+      // 6 all-sampled collectors × 2 commits + survival on both monthly
+      // samples (HEAD and the first commit are always anchored).
       expect(firstRun.stdout).toMatch(
-        /Collector runs: 13 new, 0 already collected/,
+        /Collector runs: 14 new, 0 already collected/,
       );
 
       const headSha = runGit(repoPath, "rev-parse", "HEAD").trim();
@@ -180,7 +181,7 @@ test.concurrent(
       );
       expect(secondRun.status, secondRun.stderr).toBe(0);
       expect(secondRun.stdout).toMatch(
-        /Collector runs: 0 new, 13 already collected/,
+        /Collector runs: 0 new, 14 already collected/,
       );
     } finally {
       rmSync(repoPath, { force: true, recursive: true });
