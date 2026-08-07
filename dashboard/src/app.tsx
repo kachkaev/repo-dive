@@ -374,6 +374,7 @@ export function App({ data }: { data: DashboardData }) {
           subtitle="dependencies, devDependencies and optionalDependencies declared across all package.json files at each commit"
           controls={
             <PercentControl
+              label="Direct dependencies value display"
               value={directDependenciesPercent}
               onChange={setDirectDependenciesPercent}
             />
@@ -415,6 +416,7 @@ export function App({ data }: { data: DashboardData }) {
           controls={
             dependenciesChart.seriesKeys.length > 1 ? (
               <PercentControl
+                label="Dependencies value display"
                 value={dependenciesPercent}
                 onChange={setDependenciesPercent}
               />
@@ -506,6 +508,7 @@ export function App({ data }: { data: DashboardData }) {
         controls={
           commitsChart.seriesKeys.length > 1 ? (
             <PercentControl
+              label="Commits per month value display"
               value={commitsPercent}
               onChange={setCommitsPercent}
             />

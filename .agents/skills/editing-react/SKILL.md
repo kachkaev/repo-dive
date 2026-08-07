@@ -83,7 +83,7 @@ Causes seen in `TimeSeriesChart` (~30 ms/frame until fixed):
 - **`rows.at(-1)`** — unknown array methods count as potential mutations; index instead.
 
 Diagnose by building with `minify: false` and reading the `if ($[n] !== …)` guard above the value in `dist/dashboard/assets/index-*.js`: hot state in the dep list means the scope is fused.
-Verify fixes with a temporary depless-`useEffect` render counter on the marks component.
+Verify fixes with a temporary render counter on the marks component — a `useEffect` with no dependency array, so it fires on every render.
 
 ## Isolating a subtree that must not re-render on hover/interaction
 

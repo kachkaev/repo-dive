@@ -67,11 +67,18 @@ export function SegmentedControl<Value extends string>({
  * chart's `percentMode` prop from section-level state.
  */
 export function PercentControl({
+  label,
   value,
   onChange,
   disabled,
   disabledTitle,
 }: {
+  /**
+   * Accessible name for the group, e.g. "Commits per month value display".
+   * Names the section too, since a report renders several of these and
+   * "Value display" alone would not tell them apart.
+   */
+  label: string;
   value: boolean;
   onChange: (value: boolean) => void;
   /** Disables the percentage option — e.g. a single series is always 100%. */
@@ -80,7 +87,7 @@ export function PercentControl({
 }) {
   return (
     <SegmentedControl
-      label="Value display"
+      label={label}
       value={value && !disabled ? "percent" : "absolute"}
       onChange={(next) => {
         onChange(next === "percent");

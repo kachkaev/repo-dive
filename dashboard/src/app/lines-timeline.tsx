@@ -215,7 +215,22 @@ const contributorBaseColorOf = (label: string, rank: number): string =>
 /** Newest year at full color, oldest palest — shared by the "all lines" stack. */
 const cohortBaseColor = "var(--series-1)";
 
+/**
+ * How many languages the split-by-language variants name before folding the
+ * rest into "Other". Shared by the flat and the shaded variant so both rank
+ * the same number of stacks. (Intended to become a config option, alongside
+ * `contributors.maxInCharts`.)
+ */
+const maxLanguagesInCharts = 7;
+
 type LinesDimension = "all" | "language" | "contributor";
+
+/** Split options in display order, which is also the fallback order. */
+const linesDimensions: readonly LinesDimension[] = [
+  "all",
+  "language",
+  "contributor",
+];
 
 /**
  * The unified lines-of-code timeline: one chart covering what used to be
@@ -231,30 +246,43 @@ export function LinesTimeline({
   data: DashboardData;
   maxContributorsInCharts: number;
 }) {
-  const [dimension, setDimension] = useState<LinesDimension>("language");
+  const [preferredDimension, setDimension] =
+    useState<LinesDimension>("language");
   const [shadeByYear, setShadeByYear] = useState(false);
   const [percentMode, setPercentMode] = useState(false);
 
+  // Every variant is drawn either from the dense per-commit rows ("flat") or
+  // from the sampled blame cross-tabs ("shaded"), and a catalog can carry one
+  // without the other: `repo-dive scan --collectors survival` writes no
+  // language rows, and a dashboard.json written before a per-year field landed
+  // simply lacks it. Tracking the two sources separately lets the toggles, the
+  // effective selection and the fallbacks all follow what is actually there.
+  const hasLanguages = data.languages.length > 0;
   const hasSurvival = data.survival.length > 0;
-  const languagesHaveYears = data.survival.some(
-    (row) => row.byLanguageYear !== undefined,
-  );
-  const contributorsHaveYears = data.survival.some(
-    (row) => row.byContributorYear !== undefined,
-  );
+  const flatAvailable: Record<LinesDimension, boolean> = {
+    all: hasLanguages,
+    language: hasLanguages,
+    contributor: hasSurvival,
+  };
+  const shadedAvailable: Record<LinesDimension, boolean> = {
+    all: hasSurvival,
+    language: data.survival.some((row) => row.byLanguageYear !== undefined),
+    contributor: data.survival.some(
+      (row) => row.byContributorYear !== undefined,
+    ),
+  };
+  const canDraw = (candidate: LinesDimension) =>
+    flatAvailable[candidate] || shadedAvailable[candidate];
 
-  // The per-dimension availability of age shading: the flat charts come from
-  // dense per-commit data, the shaded ones from (optional, sampled) survival
-  // data — a dashboard.json written before a per-year field landed simply
-  // lacks it. `shadeByYear` is remembered across dimension switches; only its
-  // effective value follows availability.
-  const shadingAvailable =
-    dimension === "all"
-      ? hasSurvival
-      : dimension === "language"
-        ? languagesHaveYears
-        : contributorsHaveYears;
-  const shaded = shadeByYear && shadingAvailable;
+  // Both selections are remembered across data that cannot express them; only
+  // their effective values follow availability. Shading is additionally forced
+  // on where it is the only source that can draw the current split.
+  const preferredIsDrawable = canDraw(preferredDimension);
+  const dimension = preferredIsDrawable
+    ? preferredDimension
+    : (linesDimensions.find(canDraw) ?? preferredDimension);
+  const wantsShading = shadeByYear || !flatAvailable[dimension];
+  const shaded = shadedAvailable[dimension] && wantsShading;
 
   // One age scale shared by every shaded variant, so a given year reads the
   // same lightness band whether lines are split by language or by contributor.
@@ -310,14 +338,14 @@ export function LinesTimeline({
           date: row.date,
           values: row.byLanguage,
         })),
-        7,
+        maxLanguagesInCharts,
       ).seriesKeys;
       chart = shapeYearBands(
         data.survival.map((row) => ({
           date: row.date,
           byGroupYear: row.byLanguageYear ?? {},
         })),
-        7,
+        maxLanguagesInCharts,
         survivalYearScale,
         (label, rank) => {
           const matched = flatKeys.indexOf(label);
@@ -333,7 +361,7 @@ export function LinesTimeline({
           date: row.date,
           values: row.byLanguage,
         })),
-        7,
+        maxLanguagesInCharts,
       );
     }
   } else {
@@ -402,13 +430,25 @@ export function LinesTimeline({
             value={dimension}
             onChange={setDimension}
             options={[
-              { value: "all", label: "all lines" },
-              { value: "language", label: "by language" },
+              {
+                value: "all",
+                label: "all lines",
+                disabled: !canDraw("all"),
+                title: canDraw("all") ? undefined : "No lines collected yet",
+              },
+              {
+                value: "language",
+                label: "by language",
+                disabled: !canDraw("language"),
+                title: canDraw("language")
+                  ? undefined
+                  : "No per-language data collected yet",
+              },
               {
                 value: "contributor",
                 label: "by contributor",
-                disabled: !hasSurvival,
-                title: hasSurvival
+                disabled: !canDraw("contributor"),
+                title: canDraw("contributor")
                   ? undefined
                   : "No survival samples collected yet",
               },
@@ -421,18 +461,26 @@ export function LinesTimeline({
               setShadeByYear(next === "shade");
             }}
             options={[
-              { value: "none", label: "no shading" },
+              {
+                value: "none",
+                label: "no shading",
+                disabled: !flatAvailable[dimension],
+                title: flatAvailable[dimension]
+                  ? undefined
+                  : "This split only exists in the blame samples, which are always dated",
+              },
               {
                 value: "shade",
                 label: "shade by year written",
-                disabled: !shadingAvailable,
-                title: shadingAvailable
+                disabled: !shadedAvailable[dimension],
+                title: shadedAvailable[dimension]
                   ? undefined
                   : "No per-year survival data collected yet",
               },
             ]}
           />
           <PercentControl
+            label="Lines of code value display"
             value={percentMode}
             onChange={setPercentMode}
             disabled={!supportsPercent}
