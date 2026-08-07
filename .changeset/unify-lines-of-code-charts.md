@@ -3,14 +3,8 @@
 ---
 
 Unify the lines-of-code timelines into one "Lines of code" chart with toggles.
-The former "Lines by language", "Code survival by cohort" and "Code survival by contributor" charts become a single chart — placed before all others — switched by three segmented controls: all lines | by language | by contributor, no shading | shade by year written, and absolute counts | percentage.
-The legend and "View data" table adapt to the selection, and options whose data is missing from an older dashboard.json are disabled rather than hidden.
-Chart controls now follow one universal pattern: they sit between the section header and the frame (which keeps only the chart, its legend and an optional caption), so the #/% toggle of the dependency and commit charts moved out of the frame and gained the same "absolute counts | percentage" labels, and the calendar's and contributors' kind filters moved above the frame in the same segmented style.
-"View data" tables and the contributors list moved below the frame for the same reason.
-Legends render centered below their chart like a figure caption — subtitles keep constant wording and legends no longer sit above the marks, so toggling never shifts the chart or the controls.
-The chart's x-axis is pinned to the union of the per-commit and sampled datasets' date extents, so switching the dimension never nudges the axis either.
-The calendar's intensity scale and range summary are centered the same way.
-The calendar's range select drops its visible "Range" label, matches the toggle height, and opens as a plain dropdown, so the selected value no longer nudges when it expands.
-Controls render flat — no shadows — and the select keeps the toggles' transparent background in dark mode too.
-Hovering a stacked chart is much cheaper: the crosshair and tooltip moved into their own components and the d3 bisector was replaced with an inline search, so React Compiler keeps the areas and bars memoized instead of re-rendering the whole SVG on every mouse move.
-Existing catalogs render without a re-scan; per-year shading options light up only where the catalog already carries per-year survival data.
+The former "Lines by language", "Code survival by cohort" and "Code survival by contributor" charts become a single chart — placed before all others — switched by three segmented controls: all lines | by language | by contributor, no shading | shade by year written, and absolute counts | percentage; the legend and "View data" table follow the selection, and options whose data is missing from an older dashboard.json are disabled with an explanatory tooltip.
+Every chart section now shares one layout: title, constant-wording subtitle, controls, then a frame holding only the visual with its legend centered below like a figure caption, with data tables after the frame — so the #/% toggles and the kind filters of the calendar and contributors moved out of their frames into one flat segmented style, and the calendar's range select matches it (no visible label, no value nudge when opened).
+The unified chart keeps a single x-axis across every variant, so no toggle shifts the marks, the controls or the axis.
+Hovering a stacked chart no longer re-renders the whole SVG (~30 ms → ~8 ms per frame): the crosshair and tooltip are separate components and d3-array is dropped, keeping the marks memoized by React Compiler.
+Existing catalogs render without a re-scan; per-year shading lights up only where the catalog already carries per-year survival data.

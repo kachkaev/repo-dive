@@ -75,18 +75,15 @@ Every component should log `CompileSuccess`; a `CompileError` marks a bail.
 
 ## `CompileSuccess` is not enough: fused memo scopes
 
-A component can compile cleanly and still recompute everything on every hover, because the compiler **fuses** values into one memo scope whose deps include the frequently-changing state.
-This made `TimeSeriesChart` re-render all its marks on every mouse move (~30 ms/frame) while logging `CompileSuccess` — three separate causes, all real:
+A component can compile cleanly — and pass the react-hooks lint rules, which only catch Rules-of-React violations — yet recompute everything on every hover: the compiler **fuses** values into one memo scope keyed on the hot state.
+Causes seen in `TimeSeriesChart` (~30 ms/frame until fixed):
 
-- **Calling a method on an opaque object with hover-scoped code nearby** — `bisectDate.center(rows, hoverMs)`, `xScale(crosshairMs)`.
-  The compiler cannot see into d3, so the call "may mutate" `rows`/`xScale`, extending their mutable ranges into hover-reactive code; overlapping ranges merge scopes, so `rows` lands in a scope keyed on `hoverMs`.
-  Fix: inline the logic as plain reads (hand-rolled binary search instead of d3's bisector), or move the call into a child component (`CrosshairLine`, `HoverTooltip`) where it runs on a frozen prop.
-- **A mid-body early return** — `if (rows.length === 0) return <p>…</p>;` after derivation forces one merged scope (`react.early_return_sentinel`) around everything it spans.
-  Guard at the top of the component, right after the hooks, before any derived values.
-- **Unknown array methods** — `rows.at(-1)` counts as a potential mutation of `rows`; use `rows[rows.length - 1]` (with a `unicorn/prefer-at` disable) where the array must stay out of hotter scopes.
+- **Opaque calls near hot-state code** — `bisectDate.center(rows, hoverMs)`, `xScale(crosshairMs)`: the call "may mutate" its argument/receiver, extending its range into hover-reactive code, and overlapping ranges merge scopes. Inline the logic as plain reads, or move the call into a hover-scoped child (`CrosshairLine`, `HoverTooltip`).
+- **A mid-body early return** — merges one scope around everything it spans; guard right after the hooks instead.
+- **`rows.at(-1)`** — unknown array methods count as potential mutations; index instead.
 
-To diagnose, build with `minify: false`, find the component in `dist/dashboard/assets/index-*.js`, and read the `if ($[n] !== …)` guard above the value: if `hoverMs` (or similar hot state) is in that dep list, the scope is fused.
-Verify fixes empirically — a temporary `useEffect` render counter on the marks component plus dispatched `mousemove` events shows whether the element is actually reused.
+Diagnose by building with `minify: false` and reading the `if ($[n] !== …)` guard above the value in `dist/dashboard/assets/index-*.js`: hot state in the dep list means the scope is fused.
+Verify fixes with a temporary depless-`useEffect` render counter on the marks component.
 
 ## Isolating a subtree that must not re-render on hover/interaction
 
