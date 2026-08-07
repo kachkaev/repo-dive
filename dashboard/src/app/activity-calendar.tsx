@@ -6,7 +6,6 @@ import { Tooltip, TooltipContent } from "./shared/@ui-primitive/tooltip.tsx";
 import {
   kindColors,
   type KindFilter,
-  KindFilterChips,
   kindNouns,
 } from "./shared/contributor-kinds.tsx";
 import { formatMonth, monthShortNames } from "./shared/format.ts";
@@ -472,7 +471,6 @@ export function CommitCalendar({
   weekStartsOn,
   range,
   kindFilter,
-  onKindFilterChange,
 }: {
   commits: readonly CalendarCommit[];
   /** ISO timestamp the data was generated at — the calendar's "today". */
@@ -482,7 +480,6 @@ export function CommitCalendar({
   weekStartsOn: WeekStart;
   range: CalendarRange;
   kindFilter: CalendarKindFilter;
-  onKindFilterChange: (filter: CalendarKindFilter) => void;
 }) {
   // The hovered cell outlives its hover so the tooltip has something to render
   // while it animates out; `tooltipOpen` is what the pointer actually drives.
@@ -509,19 +506,6 @@ export function CommitCalendar({
       total.agent += 1;
     }
     dayTotals.set(isoDate, total);
-  }
-
-  const presentKinds = new Set<ContributorKind>();
-  for (const total of dayTotals.values()) {
-    if (total.human > 0) {
-      presentKinds.add("human");
-    }
-    if (total.bot > 0) {
-      presentKinds.add("bot");
-    }
-    if (total.agent > 0) {
-      presentKinds.add("ai");
-    }
   }
 
   // Intensity thresholds are quartiles of nonzero daily counts over the WHOLE
@@ -665,12 +649,6 @@ export function CommitCalendar({
 
   return (
     <div>
-      <KindFilterChips
-        label="Filter calendar by contributor kind"
-        value={kindFilter}
-        onChange={onKindFilterChange}
-        presentKinds={presentKinds}
-      />
       <ScrollArea>
         {/* Strips are only as wide as the months they hold, so how much room
             they need swings by a year's worth of week columns. `mx-auto`
@@ -727,19 +705,11 @@ export function CommitCalendar({
           </TooltipContent>
         )}
       </Tooltip>
-      <div className="mt-2 flex items-center justify-between gap-4 text-xs text-(--text-secondary)">
-        {/* One claim per line: the range's own total, then the day that stands
-            out — the two used to run together behind nested parentheses. */}
-        <div className="tabular-nums">
-          <div>{rangeSummary}</div>
-          {busiest && (
-            <div>
-              Busiest day {stampOf(busiest.isoDate, busiest.row)}:{" "}
-              {summarize(busiest.day)}
-            </div>
-          )}
-        </div>
-        <span className="flex shrink-0 items-center gap-1 text-(--text-muted)">
+      {/* Centered under the strips like a figure caption (see Legend): the
+          intensity scale first, then one claim per line — the range's own
+          total and the day that stands out. */}
+      <div className="mt-3 flex flex-col items-center gap-2.5 text-center text-xs text-(--text-secondary)">
+        <span className="flex items-center gap-1 text-(--text-muted)">
           Less
           {levelOpacities.map((opacity, level) => (
             <span
@@ -754,6 +724,15 @@ export function CommitCalendar({
           ))}
           More
         </span>
+        <div className="tabular-nums">
+          <div>{rangeSummary}</div>
+          {busiest && (
+            <div>
+              Busiest day {stampOf(busiest.isoDate, busiest.row)}:{" "}
+              {summarize(busiest.day)}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

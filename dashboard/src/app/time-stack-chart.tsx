@@ -4,7 +4,6 @@ import { GridRows } from "@visx/grid";
 import { Group } from "@visx/group";
 import { scaleLinear, scaleTime } from "@visx/scale";
 import { AreaStack, BarStack, LinePath } from "@visx/shape";
-import { bisector } from "d3-array";
 import { useId, useState } from "react";
 
 import { formatCount, formatDate, formatPercent } from "./shared/format.ts";
@@ -201,6 +200,156 @@ function ChartMarks({
 }
 
 /**
+ * The dashed cursor line. Split out (like {@link HoverTooltip}) so the parent
+ * body never calls `xScale(crosshairMs)`: React Compiler cannot know a d3
+ * scale function is pure, so a call with a hover-reactive argument would
+ * extend the scale's mutable range into the hover scope, fusing every derived
+ * value — including ChartMarks' props — into one memo block that recomputes on
+ * each mouse move. Inside a child, the call runs on a frozen prop instead.
+ */
+function CrosshairLine({
+  xScale,
+  crosshairMs,
+  innerHeight,
+}: {
+  xScale: TimeScale;
+  crosshairMs: number;
+  innerHeight: number;
+}) {
+  return (
+    <line
+      x1={xScale(crosshairMs)}
+      x2={xScale(crosshairMs)}
+      y1={0}
+      y2={innerHeight}
+      stroke="var(--text-muted)"
+      strokeWidth={1}
+      strokeDasharray="3,3"
+      pointerEvents="none"
+    />
+  );
+}
+
+/**
+ * The floating value card next to the cursor. Hover-reactive by nature — it
+ * re-renders on every mouse move, which is cheap; what matters is that its
+ * work (positioning via `xScale`, per-series rows) happens here and not in the
+ * parent body (see {@link CrosshairLine} for why).
+ */
+function HoverTooltip({
+  crosshairMs,
+  hovered,
+  hoveredTotal,
+  xScale,
+  width,
+  supportsPercent,
+  showPercent,
+  seriesKeys,
+  colors,
+  seriesHatch,
+  tooltipGroups,
+  legendRank,
+  formatValue,
+  zeroLabel,
+}: {
+  crosshairMs: number;
+  hovered: Record<string, number> | undefined;
+  hoveredTotal: number;
+  xScale: TimeScale;
+  width: number;
+  supportsPercent: boolean;
+  showPercent: boolean;
+  seriesKeys: string[];
+  colors: string[];
+  seriesHatch: Record<string, string> | undefined;
+  tooltipGroups: SeriesGroup[] | undefined;
+  legendRank: (label: string) => number;
+  formatValue: (value: number) => string;
+  zeroLabel: string | undefined;
+}) {
+  return (
+    <div
+      className="pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm"
+      style={{
+        left: Math.min(
+          Math.max(0, margin.left + xScale(crosshairMs) + 10),
+          Math.max(0, width - (supportsPercent ? 220 : 180)),
+        ),
+      }}
+    >
+      <div
+        className={
+          hovered
+            ? "mb-1 font-medium text-(--text-secondary)"
+            : "font-medium text-(--text-secondary)"
+        }
+      >
+        {formatDate(new Date(crosshairMs).toISOString())}
+      </div>
+      {hovered === undefined ? (
+        // Nothing was collected at this instant — a genuine gap.
+        <div className="text-(--text-muted)">No data</div>
+      ) : zeroLabel !== undefined && hoveredTotal === 0 ? (
+        // A collected point that came back empty; say so concretely.
+        <div className="text-(--text-muted)">{zeroLabel}</div>
+      ) : (
+        (tooltipGroups
+          ? tooltipGroups.map((group) => ({
+              key: group.label,
+              color: group.color,
+              hatch: undefined,
+              value: group.keys.reduce(
+                (sum, key) => sum + (hovered[key] ?? 0),
+                0,
+              ),
+            }))
+          : seriesKeys
+              .map((key, index) => ({
+                key,
+                color: colors[index] ?? "var(--series-1)",
+                hatch: seriesHatch?.[key],
+                value: hovered[key] ?? 0,
+              }))
+              .toSorted(
+                (left, right) => legendRank(left.key) - legendRank(right.key),
+              )
+        )
+          .filter((entry) => entry.value !== 0 || seriesKeys.length <= 3)
+          .slice(0, 10)
+          .map((entry) => (
+            <div key={entry.key} className="flex items-center gap-1.5">
+              <Swatch
+                color={entry.color}
+                hatch={entry.hatch}
+                className="inline-block size-2 rounded-xs"
+              />
+              <span className="text-(--text-secondary)">{entry.key}</span>
+              <span
+                className={`ml-auto pl-3 tabular-nums ${
+                  showPercent ? "text-(--text-muted)" : "font-medium"
+                }`}
+              >
+                {formatValue(entry.value)}
+              </span>
+              {supportsPercent && (
+                <span
+                  className={`min-w-9 pl-2 text-right tabular-nums ${
+                    showPercent ? "font-medium" : "text-(--text-muted)"
+                  }`}
+                >
+                  {hoveredTotal === 0
+                    ? "—"
+                    : formatPercent(entry.value / hoveredTotal)}
+                </span>
+              )}
+            </div>
+          ))
+      )}
+    </div>
+  );
+}
+
+/**
  * Stacked series over time — areas for dense series, bars for monthly buckets,
  * lines for non-stacked comparison. Crosshair tooltip on hover.
  */
@@ -210,6 +359,7 @@ export function TimeSeriesChart({
   colors,
   seriesHatch,
   mode,
+  percentMode,
   valueFormat,
   legendItems,
   tooltipGroups,
@@ -228,6 +378,12 @@ export function TimeSeriesChart({
    */
   seriesHatch?: Record<string, string>;
   mode: "area" | "bar" | "line";
+  /**
+   * Draw per-row shares instead of raw values. Owned by the section's controls
+   * (above the frame); ignored when the chart can't show shares — lines aren't
+   * parts of a whole, and a single series is always 100%.
+   */
+  percentMode?: boolean | undefined;
   valueFormat?: (value: number) => string;
   /** Overrides the per-series legend — e.g. one swatch per contributor. */
   legendItems?: LegendItem[];
@@ -260,8 +416,17 @@ export function TimeSeriesChart({
   // The instant under the cursor (continuous), not a data index — so the
   // crosshair reaches the whole domain, including stretches with no data point.
   const [hoverMs, setHoverMs] = useState<number | undefined>();
-  const [percentMode, setPercentMode] = useState(false);
   const patternIdBase = useId();
+
+  // Bail out before any derivation (only hooks may precede this): an early
+  // return further down would make React Compiler fuse everything after it
+  // into one memo scope whose deps include the hover state — recomputing every
+  // derived array and re-rendering all the marks on each mouse move.
+  if (points.length === 0) {
+    return (
+      <p className="text-sm text-(--text-muted)">No data collected yet.</p>
+    );
+  }
 
   // One <pattern> per distinct hatch color; series map to them by color.
   const hatchColors = [...new Set(Object.values(seriesHatch ?? {}))];
@@ -279,7 +444,7 @@ export function TimeSeriesChart({
 
   // Lines aren't parts of a whole, and a single series is always 100%.
   const supportsPercent = mode !== "line" && seriesKeys.length > 1;
-  const showPercent = supportsPercent && percentMode;
+  const showPercent = supportsPercent && (percentMode ?? false);
 
   // Sorted here rather than trusted from the caller: everything downstream —
   // the area paths, the bisector, the first/last row read as the data's span —
@@ -365,10 +530,6 @@ export function TimeSeriesChart({
         nice: true,
       });
 
-  const bisectDate = bisector<Record<string, number>, number>(
-    (row) => row["dateMs"] ?? 0,
-  );
-
   // The topmost sub-series of every group but the last — where a crisp divider
   // is drawn between adjacent primary categories.
   const groupBoundaryKeys = new Set<string>();
@@ -390,17 +551,42 @@ export function TimeSeriesChart({
   // Snap to the nearest data point while the cursor is within the data's own
   // span; outside it (e.g. before the first lockfile) there is nothing to snap
   // to, so the crosshair follows the cursor and the tooltip reports "no data".
+  // Indexed (not `.at(-1)`) so the compiler sees a plain read — an opaque
+  // method call would count as a potential mutation of `rows`.
   const dataMinMs = rows[0]?.["dateMs"];
-  const dataMaxMs = rows.at(-1)?.["dateMs"];
+  // eslint-disable-next-line unicorn/prefer-at -- see the comment above
+  const dataMaxMs = rows[rows.length - 1]?.["dateMs"];
   const hoverInData =
     hoverMs !== undefined &&
     dataMinMs !== undefined &&
     dataMaxMs !== undefined &&
     hoverMs >= dataMinMs &&
     hoverMs <= dataMaxMs;
-  const hoverIndex = hoverInData
-    ? Math.max(0, Math.min(rows.length - 1, bisectDate.center(rows, hoverMs)))
-    : undefined;
+  // Nearest row to the cursor, searched inline rather than with d3's bisector:
+  // React Compiler cannot see into an opaque `.center(rows, hoverMs)` call, so
+  // it had to assume the call mutates `rows` — which pulled `rows` (and every
+  // derived prop of ChartMarks) into the hover-reactive scope and re-rendered
+  // all the marks on every mouse move. Plain reads keep `rows` hover-free.
+  let hoverIndex: number | undefined;
+  if (hoverInData) {
+    let low = 0;
+    let high = rows.length - 1;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if ((rows[mid]?.["dateMs"] ?? 0) < hoverMs) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    // `low` is the first row at/after the cursor; its predecessor may be
+    // nearer. Coalesced outside the ternary test: the compiler bails on a
+    // logical expression inside one ("Unexpected terminal kind `logical`").
+    const previous = Math.max(0, low - 1);
+    const previousMs = rows[previous]?.["dateMs"] ?? Number.NEGATIVE_INFINITY;
+    const nextMs = rows[low]?.["dateMs"] ?? Number.POSITIVE_INFINITY;
+    hoverIndex = hoverMs - previousMs <= nextMs - hoverMs ? previous : low;
+  }
   const hovered = hoverIndex === undefined ? undefined : rows[hoverIndex];
   const hoveredTotal = hoverIndex === undefined ? 0 : (totals[hoverIndex] ?? 0);
   // Crosshair x: the snapped point in the data range, else the raw cursor date.
@@ -418,57 +604,18 @@ export function TimeSeriesChart({
     return index === -1 ? Number.MAX_SAFE_INTEGER : index;
   };
 
-  if (points.length === 0) {
-    return (
-      <p className="text-sm text-(--text-muted)">No data collected yet.</p>
-    );
-  }
+  // An empty `legendItems` hides the legend — a one-entry legend for a chart
+  // like the all-lines total explains nothing.
+  const resolvedLegendItems =
+    legendItems ??
+    seriesKeys.map((key, index) => ({
+      label: key,
+      color: colors[index] ?? "var(--series-1)",
+      hatch: seriesHatch?.[key],
+    }));
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-4">
-        <Legend
-          items={
-            legendItems ??
-            seriesKeys.map((key, index) => ({
-              label: key,
-              color: colors[index] ?? "var(--series-1)",
-              hatch: seriesHatch?.[key],
-            }))
-          }
-        />
-        {supportsPercent && (
-          <div
-            role="group"
-            aria-label="Value display"
-            className="flex shrink-0 overflow-hidden rounded-md border border-(--grid-line) text-xs"
-          >
-            {(
-              [
-                { percent: false, label: "#", title: "Absolute values" },
-                { percent: true, label: "%", title: "Share of total" },
-              ] as const
-            ).map((option) => (
-              <button
-                key={option.label}
-                type="button"
-                title={option.title}
-                aria-pressed={percentMode === option.percent}
-                onClick={() => {
-                  setPercentMode(option.percent);
-                }}
-                className={`px-2 py-0.5 ${
-                  percentMode === option.percent
-                    ? "bg-(--surface-2) font-medium"
-                    : "text-(--text-muted) hover:text-(--text-secondary)"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
       <div ref={containerRef} className="relative">
         <svg width={width} height={height} role="img">
           {hatchColors.length > 0 && (
@@ -504,15 +651,10 @@ export function TimeSeriesChart({
               hatchUrlOf={hatchUrlOf}
             />
             {crosshairMs !== undefined && (
-              <line
-                x1={xScale(crosshairMs)}
-                x2={xScale(crosshairMs)}
-                y1={0}
-                y2={innerHeight}
-                stroke="var(--text-muted)"
-                strokeWidth={1}
-                strokeDasharray="3,3"
-                pointerEvents="none"
+              <CrosshairLine
+                xScale={xScale}
+                crosshairMs={crosshairMs}
+                innerHeight={innerHeight}
               />
             )}
             <AxisLeft
@@ -555,87 +697,25 @@ export function TimeSeriesChart({
           </Group>
         </svg>
         {crosshairMs !== undefined && (
-          <div
-            className="pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm"
-            style={{
-              left: Math.min(
-                Math.max(0, margin.left + xScale(crosshairMs) + 10),
-                Math.max(0, width - (supportsPercent ? 220 : 180)),
-              ),
-            }}
-          >
-            <div
-              className={
-                hovered
-                  ? "mb-1 font-medium text-(--text-secondary)"
-                  : "font-medium text-(--text-secondary)"
-              }
-            >
-              {formatDate(new Date(crosshairMs).toISOString())}
-            </div>
-            {hovered === undefined ? (
-              // Nothing was collected at this instant — a genuine gap.
-              <div className="text-(--text-muted)">No data</div>
-            ) : zeroLabel !== undefined && hoveredTotal === 0 ? (
-              // A collected point that came back empty; say so concretely.
-              <div className="text-(--text-muted)">{zeroLabel}</div>
-            ) : (
-              (tooltipGroups
-                ? tooltipGroups.map((group) => ({
-                    key: group.label,
-                    color: group.color,
-                    hatch: undefined,
-                    value: group.keys.reduce(
-                      (sum, key) => sum + (hovered[key] ?? 0),
-                      0,
-                    ),
-                  }))
-                : seriesKeys
-                    .map((key, index) => ({
-                      key,
-                      color: colors[index] ?? "var(--series-1)",
-                      hatch: seriesHatch?.[key],
-                      value: hovered[key] ?? 0,
-                    }))
-                    .toSorted(
-                      (left, right) =>
-                        legendRank(left.key) - legendRank(right.key),
-                    )
-              )
-                .filter((entry) => entry.value !== 0 || seriesKeys.length <= 3)
-                .slice(0, 10)
-                .map((entry) => (
-                  <div key={entry.key} className="flex items-center gap-1.5">
-                    <Swatch
-                      color={entry.color}
-                      hatch={entry.hatch}
-                      className="inline-block size-2 rounded-xs"
-                    />
-                    <span className="text-(--text-secondary)">{entry.key}</span>
-                    <span
-                      className={`ml-auto pl-3 tabular-nums ${
-                        showPercent ? "text-(--text-muted)" : "font-medium"
-                      }`}
-                    >
-                      {formatValue(entry.value)}
-                    </span>
-                    {supportsPercent && (
-                      <span
-                        className={`min-w-9 pl-2 text-right tabular-nums ${
-                          showPercent ? "font-medium" : "text-(--text-muted)"
-                        }`}
-                      >
-                        {hoveredTotal === 0
-                          ? "—"
-                          : formatPercent(entry.value / hoveredTotal)}
-                      </span>
-                    )}
-                  </div>
-                ))
-            )}
-          </div>
+          <HoverTooltip
+            crosshairMs={crosshairMs}
+            hovered={hovered}
+            hoveredTotal={hoveredTotal}
+            xScale={xScale}
+            width={width}
+            supportsPercent={supportsPercent}
+            showPercent={showPercent}
+            seriesKeys={seriesKeys}
+            colors={colors}
+            seriesHatch={seriesHatch}
+            tooltipGroups={tooltipGroups}
+            legendRank={legendRank}
+            formatValue={formatValue}
+            zeroLabel={zeroLabel}
+          />
         )}
       </div>
+      {resolvedLegendItems.length > 0 && <Legend items={resolvedLegendItems} />}
     </div>
   );
 }

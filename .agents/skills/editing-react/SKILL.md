@@ -52,6 +52,7 @@ React Compiler 1.0 bails on these; avoid them:
 
 - **A default value inside a typed destructured parameter** — `function C({ color = "red" }: { color?: string })`. Destructure without the default and resolve it in the body: `const c = color ?? "red";`.
 - **Logical-assignment operators** `??=`, `||=`, `&&=` — use a plain assignment: `obj[k] = obj[k] ?? {}` instead of `obj[k] ??= {}`.
+- **A logical expression (`??`, `&&`, `||`) inside a ternary's test** — hoist it into a named `const` first.
 
 The compiler runs in the **production build** (`vite build`, what the `repo-dive dashboard` CLI serves), **not** the Vite dev server.
 To check what actually compiled, temporarily pass a logger and rebuild:
@@ -71,6 +72,18 @@ babel({
 ```
 
 Every component should log `CompileSuccess`; a `CompileError` marks a bail.
+
+## `CompileSuccess` is not enough: fused memo scopes
+
+A component can compile cleanly — and pass the react-hooks lint rules, which only catch Rules-of-React violations — yet recompute everything on every hover: the compiler **fuses** values into one memo scope keyed on the hot state.
+Causes seen in `TimeSeriesChart` (~30 ms/frame until fixed):
+
+- **Opaque calls near hot-state code** — `bisectDate.center(rows, hoverMs)`, `xScale(crosshairMs)`: the call "may mutate" its argument/receiver, extending its range into hover-reactive code, and overlapping ranges merge scopes. Inline the logic as plain reads, or move the call into a hover-scoped child (`CrosshairLine`, `HoverTooltip`).
+- **A mid-body early return** — merges one scope around everything it spans; guard right after the hooks instead.
+- **`rows.at(-1)`** — unknown array methods count as potential mutations; index instead.
+
+Diagnose by building with `minify: false` and reading the `if ($[n] !== …)` guard above the value in `dist/dashboard/assets/index-*.js`: hot state in the dep list means the scope is fused.
+Verify fixes with a temporary render counter on the marks component — a `useEffect` with no dependency array, so it fires on every render.
 
 ## Isolating a subtree that must not re-render on hover/interaction
 

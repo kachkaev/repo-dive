@@ -6,8 +6,10 @@
  * when one appears. Base UI marks a pressed item with `data-pressed`, and the
  * group's `value`/`onValueChange` deal in arrays even in single-select mode.
  * Deviations from the canonical file: no spacing/orientation machinery (the
- * dashboard only needs a horizontal gap group), and variant defaults resolve in
- * function bodies (typed destructured defaults silently bail React Compiler).
+ * dashboard only needs a horizontal group), an extra `xs` size, and variant
+ * defaults resolve in function bodies (typed destructured defaults silently
+ * bail React Compiler). The outline variant keeps the canonical segmented
+ * look: items join into one bordered pill, rounded only at the group's ends.
  */
 import { Toggle as TogglePrimitive } from "@base-ui/react/toggle";
 import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group";
@@ -17,18 +19,23 @@ import { createContext, useContext } from "react";
 import { cn, type PropsWithPlainClassName } from "./shared/cn.ts";
 
 const toggleVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-pressed:bg-accent data-pressed:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  // Hover styles are enabled-only: a disabled item may stay hoverable for its
+  // explanatory tooltip (pointer-events restored by the caller) and must not
+  // light up then.
+  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none enabled:hover:bg-muted enabled:hover:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-pressed:bg-accent data-pressed:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bg-transparent",
         outline:
-          "border border-input bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground",
+          "border border-input bg-transparent enabled:hover:bg-accent enabled:hover:text-accent-foreground",
       },
       size: {
         default: "h-9 min-w-9 px-2",
         sm: "h-8 min-w-8 px-1.5",
         lg: "h-10 min-w-10 px-2.5",
+        // h-7 matches the xs SelectTrigger, so mixed control rows line up.
+        xs: "h-7 px-2 text-xs",
       },
     },
     defaultVariants: {
@@ -55,7 +62,10 @@ export function ToggleGroup({
       data-slot="toggle-group"
       data-variant={variant}
       data-size={size}
-      className={cn("flex w-fit items-center gap-2", className)}
+      className={cn(
+        "flex w-fit items-center gap-2 data-[variant=outline]:gap-0 data-[variant=outline]:rounded-md",
+        className,
+      )}
       {...props}
     >
       <ToggleGroupContext.Provider value={{ variant, size }}>
@@ -84,7 +94,7 @@ export function ToggleGroupItem({
           variant: context.variant ?? variant,
           size: context.size ?? size,
         }),
-        "shrink-0 focus:z-10 focus-visible:z-10",
+        "shrink-0 focus:z-10 focus-visible:z-10 data-[variant=outline]:rounded-none data-[variant=outline]:border-l-0 data-[variant=outline]:first:rounded-l-md data-[variant=outline]:first:border-l data-[variant=outline]:last:rounded-r-md",
         className,
       )}
       {...props}

@@ -84,21 +84,6 @@ export function DivergingBars({
 
   return (
     <div>
-      <Legend
-        items={[
-          { label: positiveLabel, color: "var(--diverge-pos)" },
-          ...(showSecondary
-            ? [
-                {
-                  label: positiveSecondaryLabel,
-                  color: "var(--diverge-pos)",
-                  hatch: positiveSecondaryHatch,
-                },
-              ]
-            : []),
-          { label: negativeLabel, color: "var(--diverge-neg)" },
-        ]}
-      />
       <div ref={containerRef} className="relative">
         <svg width={width} height={height} role="img">
           {showSecondary && (
@@ -261,6 +246,21 @@ export function DivergingBars({
           </div>
         )}
       </div>
+      <Legend
+        items={[
+          { label: positiveLabel, color: "var(--diverge-pos)" },
+          ...(showSecondary
+            ? [
+                {
+                  label: positiveSecondaryLabel,
+                  color: "var(--diverge-pos)",
+                  hatch: positiveSecondaryHatch,
+                },
+              ]
+            : []),
+          { label: negativeLabel, color: "var(--diverge-neg)" },
+        ]}
+      />
     </div>
   );
 }

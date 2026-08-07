@@ -4,28 +4,38 @@ export function Section({
   title,
   subtitle,
   controls,
+  footer,
   children,
 }: {
   title: string;
+  /**
+   * Keep the wording constant across whatever the controls select: the
+   * subtitle sits between the title and the controls, so a length change on
+   * switch would shift the controls away from the cursor.
+   */
   subtitle?: string | undefined;
-  /** Optional controls rendered between the subtitle and the chart card. */
+  /** Optional controls, laid out in a wrapping row above the chart card. */
   controls?: ReactNode;
+  /**
+   * Rendered after the frame — "View data" tables and the like. The frame
+   * itself holds only the visual, its legend and an optional caption.
+   */
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="mb-10">
       <h2 className="text-base font-semibold">{title}</h2>
       {subtitle ? (
-        <p className="mt-0.5 mb-3 text-sm text-(--text-secondary)">
-          {subtitle}
-        </p>
-      ) : (
-        <div className="mb-3" />
-      )}
-      {controls}
-      <div className="rounded-lg border border-(--grid-line) bg-(--surface-1) p-4">
+        <p className="mt-0.5 text-sm text-(--text-secondary)">{subtitle}</p>
+      ) : undefined}
+      {controls ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">{controls}</div>
+      ) : undefined}
+      <div className="mt-3 rounded-lg border border-(--grid-line) bg-(--surface-1) p-4">
         {children}
       </div>
+      {footer}
     </section>
   );
 }
@@ -85,9 +95,14 @@ export function Swatch({
   );
 }
 
+/**
+ * Rendered below its chart, centered like a figure caption: legends change
+ * with the controls, and above the marks a height change would shift them
+ * mid-read.
+ */
 export function Legend({ items }: { items: LegendEntry[] }) {
   return (
-    <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-(--text-secondary)">
+    <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-(--text-secondary)">
       {items.map((item) => (
         <span key={item.label} className="inline-flex items-center gap-1.5">
           <Swatch color={item.color} hatch={item.hatch} />

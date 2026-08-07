@@ -4,8 +4,11 @@
  * tokens in styles.css. Deviations from the canonical file: defaults are
  * resolved in function bodies rather than destructured parameters (typed
  * destructured defaults silently bail React Compiler), the popup takes
- * `min-w-(--anchor-width)` so long labels never clip, and only the parts the
- * dashboard uses are exported.
+ * `min-w-(--anchor-width)` so long labels never clip, an extra `xs` trigger
+ * size matches the xs ToggleGroup (h-7) in mixed control rows,
+ * `alignItemWithTrigger` defaults to false — the canonical overlay mode
+ * repaints the value with the popup item's padding, nudging it ~1px on every
+ * open — and only the parts the dashboard uses are exported.
  */
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
@@ -33,14 +36,17 @@ export function SelectTrigger({
   children,
   ...props
 }: PropsWithPlainClassName<SelectPrimitive.Trigger.Props> & {
-  size?: "sm" | "default" | undefined;
+  size?: "xs" | "sm" | "default" | undefined;
 }) {
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       data-size={size ?? "default"}
       className={cn(
-        "flex w-fit items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 dark:bg-input/30 dark:hover:bg-input/50 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        // Mirrors an unpressed outline toggle item (no shadow, no dark-mode
+        // tint, text-only hover — an accent fill would read as a pressed
+        // item), so mixed control rows read as one family.
+        "flex w-fit items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap text-(--text-secondary) transition-[color,box-shadow] outline-none hover:text-(--text-primary) focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 data-[size=xs]:h-7 data-[size=xs]:px-2 data-[size=xs]:text-xs *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
         className,
       )}
       {...props}
@@ -110,7 +116,7 @@ export function SelectContent({
         sideOffset={sideOffset ?? 4}
         align={align ?? "center"}
         alignOffset={alignOffset ?? 0}
-        alignItemWithTrigger={alignItemWithTrigger ?? true}
+        alignItemWithTrigger={alignItemWithTrigger ?? false}
         className="isolate z-50"
       >
         <SelectPrimitive.Popup
