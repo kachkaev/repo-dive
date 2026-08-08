@@ -5,6 +5,7 @@ export function Section({
   subtitle,
   controls,
   footer,
+  skeleton,
   children,
 }: {
   title: string;
@@ -21,37 +22,57 @@ export function Section({
    * itself holds only the visual, its legend and an optional caption.
    */
   footer?: ReactNode;
+  /**
+   * Render only the heading over a pulsing empty card frame, skipping the
+   * controls, the children and the footer. The reveal tail shows the next
+   * section this way — its title and subtitle are plain props, unaffected by
+   * the chart body they wait for, so they can land early and never reflow.
+   */
+  skeleton?: boolean | undefined;
   children: ReactNode;
 }) {
+  const controlsRow = skeleton ? undefined : controls;
   return (
     <section className="mb-10">
       <h2 className="text-base font-semibold">{title}</h2>
       {subtitle ? (
         <p className="mt-0.5 text-sm text-(--text-secondary)">{subtitle}</p>
       ) : undefined}
-      {controls ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2">{controls}</div>
+      {controlsRow ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {controlsRow}
+        </div>
       ) : undefined}
-      <div className="mt-3 rounded-lg border border-(--grid-line) bg-(--surface-1) p-4">
-        {children}
-      </div>
-      {footer}
+      {skeleton ? (
+        <div
+          aria-hidden="true"
+          className="mt-3 h-[292px] rounded-lg border border-border bg-background motion-safe:animate-pulse"
+        />
+      ) : (
+        <div className="mt-3 rounded-lg border border-(--grid-line) bg-(--surface-1) p-4">
+          {children}
+        </div>
+      )}
+      {skeleton ? undefined : footer}
     </section>
   );
 }
 
 /**
  * Ghost of a {@link Section} — muted title and subtitle bars over an empty
- * chart-card frame. Rendered where the next section will land while it is
- * still being prepared, so the page visibly promises more content instead of
- * ending at the last mounted section. Sized to a typical chart section
- * (260px chart + card padding) so the reveal mostly fills the frame in rather
- * than pushing the rest of the page down.
+ * chart-card frame. Rendered where the report will start while nothing about
+ * its first section is known yet (the reveal tail knows the next section and
+ * shows its real heading via {@link Section}'s `skeleton` mode instead), so
+ * the page visibly promises more content. Sized to a typical chart section
+ * (260px chart + card padding), with the ghost bars kept narrower than any
+ * real title ("Contributors" is the shortest) so the text that replaces them
+ * only ever extends — pixels appearing reads as loading, pixels vanishing as
+ * a flash.
  */
 export function SectionSkeleton() {
   return (
     <div aria-hidden="true" className="mb-10 motion-safe:animate-pulse">
-      <div className="h-5 w-44 rounded-sm bg-muted" />
+      <div className="h-5 w-20 rounded-sm bg-muted" />
       <div className="mt-1.5 h-3.5 w-80 max-w-full rounded-sm bg-muted" />
       <div className="mt-3 h-[292px] rounded-lg border border-border bg-background" />
     </div>

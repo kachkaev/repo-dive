@@ -1,5 +1,8 @@
 import {
   Children,
+  cloneElement,
+  isValidElement,
+  type ReactElement,
   type ReactNode,
   startTransition,
   useDeferredValue,
@@ -87,14 +90,17 @@ type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
 
 /**
  * Reveals its children one per paint: the first child renders right away,
- * everything after it hides behind a {@link SectionSkeleton} until the effect
- * below replaces the skeleton with the next level of the recursion — which
- * repeats the same move for the rest. Each section thus lands in its own
- * commit with a browser paint in between (an effect only fires after its own
- * level has painted), and because the swap happens inside a transition the
- * passes stay interruptible — a click on an already-visible section jumps the
- * queue. The skeleton at the tail keeps signalling that more of the report is
- * on the way.
+ * everything after it hides behind a skeleton placeholder until the effect
+ * below replaces it with the next level of the recursion — which repeats the
+ * same move for the rest. Each section thus lands in its own commit with a
+ * browser paint in between (an effect only fires after its own level has
+ * painted), and because the swap happens inside a transition the passes stay
+ * interruptible — a click on an already-visible section jumps the queue. The
+ * placeholder at the tail keeps signalling that more of the report is on the
+ * way — as the next section's real heading over a pulsing card when that
+ * section is a plain {@link Section} element (its title and subtitle are
+ * props, available long before the chart body), and as anonymous
+ * {@link SectionSkeleton} ghost bars otherwise.
  *
  * Chained `useDeferredValue(value, initialValue)` cannot do this: the levels
  * below the first all mount inside the deferred lane's render, so their own
@@ -112,12 +118,18 @@ function RevealSequentially({ children }: { children: ReactNode }) {
     });
   }, []);
   const [first, ...rest] = items;
+  const next = rest[0];
+  const nextIsSection = isValidElement(next) && next.type === Section;
   return (
     <>
       {first}
       {rest.length > 0 &&
         (restRevealed ? (
           <RevealSequentially>{rest}</RevealSequentially>
+        ) : nextIsSection ? (
+          cloneElement(next as ReactElement<{ skeleton?: boolean }>, {
+            skeleton: true,
+          })
         ) : (
           <SectionSkeleton />
         ))}
