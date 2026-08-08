@@ -1,5 +1,19 @@
 # repo-dive
 
+## 0.11.1
+
+### Patch Changes
+
+- [#136](https://github.com/kachkaev/repo-dive/pull/136) [`945baed`](https://github.com/kachkaev/repo-dive/commit/945baed017248996ee876817cef37d5e2c49c384) - Reveal dashboard sections one per paint behind a loading placeholder.
+  First paint stops at the header and the stat tiles; each section then mounts in its own interruptible pass while a placeholder — the next section's heading over a small spinner — marks what is still on the way.
+  The page also reserves its scrollbar from the start, so always-visible scrollbars no longer shift the layout mid-load.
+
+- [#135](https://github.com/kachkaev/repo-dive/pull/135) [`916f2ff`](https://github.com/kachkaev/repo-dive/commit/916f2ff6c373bad0c8cc144830cd78a8b4c1d0fc) - Spell out the day of the week, and name it in every chart tooltip that shows a date.
+
+  Two-letter abbreviations stay in the commit calendar's row gutter, where they have to fit 10px cells; everywhere a weekday follows a date it is now written out ("2025-10-02 · Thursday").
+  The commits-per-month tooltip names the month instead of the mid-month timestamp it had been reporting as a date.
+  Dates and counts render in tabular figures, and the weekday sits in a fixed slot, so hover cards no longer resize under the cursor.
+
 ## 0.11.0
 
 ### Minor Changes
