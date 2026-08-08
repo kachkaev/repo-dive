@@ -110,6 +110,14 @@
   }
 }
 
+html {
+  /* The page grows as sections reveal one per paint, so with classic
+     always-visible scrollbars (Windows, macOS with the accessibility setting)
+     the scrollbar would kick in mid-reveal and reflow the whole page. Keep the
+     track there from the start so the width never changes. */
+  overflow-y: scroll;
+}
+
 body {
   background: var(--surface-1);
   color: var(--text-primary);
