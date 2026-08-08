@@ -155,15 +155,15 @@ function RepoHeading({
   );
 }
 
-/** The dotted underline that marks "hover or focus me for a tooltip". */
+/** The dotted underline that marks "this tooltip trigger is also a link". */
 const tooltipUnderline =
   "underline decoration-dotted decoration-(--text-muted) underline-offset-4";
 
 /**
  * A date whose exact meaning lives in a tooltip, optionally linking out. When
  * there is nowhere to link, the trigger is a focusable span (so the tooltip
- * still opens from the keyboard) with a `help` cursor — a pointer would
- * promise a click that does nothing.
+ * still opens from the keyboard) with a `help` cursor and no underline — both
+ * a pointer and an underline would promise a click that does nothing.
  */
 function AnnotatedDate({
   isoDate,
@@ -180,7 +180,7 @@ function AnnotatedDate({
         delay={200}
         render={
           href === undefined ? (
-            <span tabIndex={0} className={`${tooltipUnderline} cursor-help`} />
+            <span tabIndex={0} className="cursor-help" />
           ) : (
             <a
               href={href}
@@ -275,7 +275,7 @@ export function ReportHeader({
             kachkaev/repo-dive on GitHub
           </TooltipContent>
         </Tooltip>{" "}
-        at{" "}
+        on{" "}
         <AnnotatedDate
           isoDate={generatedAt}
           tooltip={formatTimestamp(generatedAt)}
