@@ -1,5 +1,52 @@
 # repo-dive
 
+## 0.11.0
+
+### Minor Changes
+
+- [#125](https://github.com/kachkaev/repo-dive/pull/125) [`c5ede81`](https://github.com/kachkaev/repo-dive/commit/c5ede81a0e104c991955257126942a6798973848) - Add a GitHub Action for generating reports in CI
+
+  The repository now doubles as a composite GitHub Action, so any project can produce and refresh its report right inside GitHub Actions instead of on somebody's laptop:
+
+  ```yaml
+  - uses: actions/checkout@v7
+    with:
+      fetch-depth: 0
+  - uses: kachkaev/repo-dive@main
+  ```
+
+  The action installs the published CLI, restores the catalog from the Actions cache, runs scan → index → report and uploads the self-contained HTML report as an artifact viewable straight from the run page.
+  Scans that hit the configurable time limit still bank their progress to the cache, so re-runs resume where the previous run stopped — long histories catch up over a few runs, after which scheduled increments take minutes.
+  See [docs/github-action.md](https://github.com/kachkaev/repo-dive/blob/main/docs/github-action.md) for all inputs, publishing the report to GitHub Pages and analyzing repositories other than the workflow's own.
+
+### Patch Changes
+
+- [#129](https://github.com/kachkaev/repo-dive/pull/129) [`5b0b667`](https://github.com/kachkaev/repo-dive/commit/5b0b667e3c9770dbf0a43e5cc3a79db1f90d6103) - Align the dashboard header's hover states and unify tooltip styling with the charts.
+
+  The repo breadcrumb now takes its hover color as a whole — group, separators and name together — so it reads as one link.
+  Dates without a link lose the link-like dotted underline and show a `help` cursor instead of pretending to be clickable, and the repo-dive link explains itself in a tooltip.
+  The design-system tooltip drops shadcn's inverted look for the muted bordered card the chart hover tooltips already use, so every floating readout in the dashboard shares one appearance.
+
+- [#128](https://github.com/kachkaev/repo-dive/pull/128) [`150edb3`](https://github.com/kachkaev/repo-dive/commit/150edb3e35a8ffee41eb1567b522e388e28c6be2) - Keep the dashboard responsive while charts re-render, and stagger the initial load.
+  Chart controls (split, shading, absolute/percentage, calendar range and kind filters) now apply instantly: the expensive SVG re-render happens in an interruptible deferred pass via React's concurrent features, with the outgoing chart dimming slightly until the new one is ready.
+  First paint stops at the header, the stat tiles and the first chart; the sections below the fold — and the hidden "View data" table bodies, which can hold one row per commit — mount in a deferred render behind it, so the report appears sooner and stays interactive while the rest fills in.
+  Purely a dashboard rendering change: existing catalogs and dashboard.json files work as they are.
+
+- [#126](https://github.com/kachkaev/repo-dive/pull/126) [`cddd986`](https://github.com/kachkaev/repo-dive/commit/cddd9868293d3301bfbdba299bfa4307ca60c260) - Hold the "Lines of code" value axis still across the chart's toggles.
+
+  The chart scaled its y axis to whichever variant was on screen, so switching the split or the age shading could rescale the areas under the cursor.
+  The variants come from two sources — per-commit language counts and git blame at sampled commits — whose totals differ slightly, and the axis followed each in turn.
+
+  Both axes now share one domain across every toggle combination, computed from the union of the two sources, matching what the time axis already did.
+  Where the two sources disagree about how many lines a tree holds, the areas now differ visibly instead of each stretching to fill the frame.
+  Percentage mode is unaffected: it always spans 0–100%.
+
+- [#124](https://github.com/kachkaev/repo-dive/pull/124) [`96d01cd`](https://github.com/kachkaev/repo-dive/commit/96d01cd0280ecb8c08be83aa10ff626ee1d1a486) - Keep the commit calendar's range select from hopping between rows on narrow screens.
+
+  The select was as wide as the label it happened to be showing, and the range options differ a lot in width ("2019" against "Last 12 months").
+  On a viewport narrow enough for the control row to wrap, picking a different range resized it by up to 60px, which was enough to move it onto — or off — the second row.
+  It now sits in a fixed-width slot, so the space it takes up in the row no longer depends on the picked value, while the control itself still hugs its own label.
+
 ## 0.10.0
 
 ### Minor Changes
