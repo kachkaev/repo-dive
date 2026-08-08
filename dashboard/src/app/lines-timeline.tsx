@@ -237,6 +237,21 @@ const linesDimensions: readonly LinesDimension[] = [
 ];
 
 /**
+ * The section heading, exported so {@link ../app.tsx App} can paint it in its
+ * placeholder before this component has mounted — this chart sits above the
+ * scroll cut, so anonymous ghost bars flashing into the real heading would be
+ * the first thing a reload shows. The subtitle is constant across every
+ * toggle combination (see {@link Section}): language splits count source
+ * files at each commit, while contributor splits and age shading are
+ * attributed via git blame at sampled commits.
+ */
+export const linesTimelineHeading = {
+  title: "Lines of code",
+  subtitle:
+    "lines in source files over the whole history; contributor split and age shading come from git blame at sampled commits; lockfiles, minified bundles and generated data are not counted",
+};
+
+/**
  * The unified lines-of-code timeline: one chart covering what used to be
  * "Lines by language", "Code survival by cohort" and "Code survival by
  * contributor", switched by three segmented controls (split dimension, age
@@ -445,11 +460,8 @@ export function LinesTimeline({
 
   return (
     <Section
-      title="Lines of code"
-      // Constant across every toggle combination (see Section): language
-      // splits count source files at each commit, while contributor splits
-      // and age shading are attributed via git blame at sampled commits.
-      subtitle="lines in source files over the whole history; contributor split and age shading come from git blame at sampled commits; lockfiles, minified bundles and generated data are not counted"
+      title={linesTimelineHeading.title}
+      subtitle={linesTimelineHeading.subtitle}
       controls={
         <>
           <SegmentedControl

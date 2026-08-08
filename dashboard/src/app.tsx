@@ -1,5 +1,6 @@
 import { useDeferredValue } from "react";
 
+import { linesTimelineHeading } from "./app/lines-timeline.tsx";
 import { ReportHeader } from "./app/report-header.tsx";
 import { ReportSections } from "./app/report-sections.tsx";
 import {
@@ -7,7 +8,11 @@ import {
   formatCount,
   formatPercent,
 } from "./app/shared/format.ts";
-import { SectionSkeleton, StatTile } from "./app/shared/primitives.tsx";
+import {
+  Section,
+  SectionSkeleton,
+  StatTile,
+} from "./app/shared/primitives.tsx";
 import type { DashboardData } from "./data.ts";
 
 /** Falls back when serving a dashboard.json written before configurable caps. */
@@ -54,6 +59,13 @@ export function App({ data }: { data: DashboardData }) {
   // paint (six charts and their thousands of hidden table rows in total)
   // without ever blocking interaction.
   const sectionsMounted = useDeferredValue(true, false);
+
+  // Mirrors ReportSections' own condition for rendering LinesTimeline. When
+  // the lines chart will exist — it sits above the scroll cut, so its heading
+  // is the first thing a reload shows — the placeholder carries that real
+  // heading from the very first paint; ghost bars would flash into text.
+  const firstSectionIsLines =
+    data.languages.length > 0 || data.survival.length > 0;
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
@@ -123,6 +135,14 @@ export function App({ data }: { data: DashboardData }) {
           data={data}
           maxContributorsInCharts={maxContributorsInCharts}
         />
+      ) : firstSectionIsLines ? (
+        <Section
+          title={linesTimelineHeading.title}
+          subtitle={linesTimelineHeading.subtitle}
+          skeleton
+        >
+          {undefined}
+        </Section>
       ) : (
         <SectionSkeleton />
       )}
