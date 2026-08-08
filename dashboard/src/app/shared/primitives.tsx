@@ -1,3 +1,4 @@
+import { LoaderCircleIcon } from "lucide-react";
 import { type ReactNode, useDeferredValue } from "react";
 
 export function Section({
@@ -23,10 +24,13 @@ export function Section({
    */
   footer?: ReactNode;
   /**
-   * Render only the heading over a pulsing empty card frame, skipping the
-   * controls, the children and the footer. The reveal tail shows the next
-   * section this way — its title and subtitle are plain props, unaffected by
-   * the chart body they wait for, so they can land early and never reflow.
+   * Render only the heading over a small spinner, skipping the controls, the
+   * children and the footer. The reveal tail shows the next section this way
+   * — its title and subtitle are plain props, unaffected by the chart body
+   * they wait for, so they can land early and never reflow. The spinner row
+   * copies the controls row's spacing and height (mt-2, h-7 — the xs control
+   * size), so when the real section arrives the controls replace it without
+   * any shift and the chart card only extends below.
    */
   skeleton?: boolean | undefined;
   children: ReactNode;
@@ -44,10 +48,9 @@ export function Section({
         </div>
       ) : undefined}
       {skeleton ? (
-        <div
-          aria-hidden="true"
-          className="mt-3 h-[292px] rounded-lg border border-border bg-background motion-safe:animate-pulse"
-        />
+        <div aria-hidden="true" className="mt-2 flex h-7 items-center">
+          <LoaderCircleIcon className="size-4 text-muted-foreground motion-safe:animate-spin" />
+        </div>
       ) : (
         <div className="mt-3 rounded-lg border border-(--grid-line) bg-(--surface-1) p-4">
           {children}
@@ -59,22 +62,23 @@ export function Section({
 }
 
 /**
- * Ghost of a {@link Section} — muted title and subtitle bars over an empty
- * chart-card frame. Rendered where the report will start while nothing about
- * its first section is known yet (the reveal tail knows the next section and
- * shows its real heading via {@link Section}'s `skeleton` mode instead), so
- * the page visibly promises more content. Sized to a typical chart section
- * (260px chart + card padding), with the ghost bars kept narrower than any
- * real title ("Contributors" is the shortest) so the text that replaces them
- * only ever extends — pixels appearing reads as loading, pixels vanishing as
- * a flash.
+ * Ghost of a {@link Section} — muted title and subtitle bars over the same
+ * spinner row {@link Section}'s `skeleton` mode uses. Rendered where the
+ * report will start while nothing about its first section is known yet (the
+ * reveal tail knows the next section and shows its real heading instead), so
+ * the page visibly promises more content. The ghost bars are kept narrower
+ * than any real title ("Contributors" is the shortest) so the text that
+ * replaces them only ever extends — pixels appearing reads as loading, pixels
+ * vanishing as a flash.
  */
 export function SectionSkeleton() {
   return (
-    <div aria-hidden="true" className="mb-10 motion-safe:animate-pulse">
-      <div className="h-5 w-20 rounded-sm bg-muted" />
-      <div className="mt-1.5 h-3.5 w-80 max-w-full rounded-sm bg-muted" />
-      <div className="mt-3 h-[292px] rounded-lg border border-border bg-background" />
+    <div aria-hidden="true" className="mb-10">
+      <div className="h-5 w-20 rounded-sm bg-muted motion-safe:animate-pulse" />
+      <div className="mt-1.5 h-3.5 w-80 max-w-full rounded-sm bg-muted motion-safe:animate-pulse" />
+      <div className="mt-2 flex h-7 items-center">
+        <LoaderCircleIcon className="size-4 text-muted-foreground motion-safe:animate-spin" />
+      </div>
     </div>
   );
 }
