@@ -690,7 +690,7 @@ export function CommitCalendar({
           <TooltipContent
             anchor={hovered.target}
             arrow={false}
-            className="rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-(--text-primary) tabular-nums shadow-sm"
+            className="tabular-nums"
           >
             <div className="mb-1 font-medium text-(--text-secondary)">
               {stampOf(hovered.cell.isoDate, hovered.cell.row)}
