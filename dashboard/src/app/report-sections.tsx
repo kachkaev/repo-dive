@@ -517,6 +517,7 @@ export function ReportSections({
       >
         <TimeSeriesChart
           mode="bar"
+          pointUnit="month"
           percentMode={commitsPercent}
           {...commitsChart}
         />

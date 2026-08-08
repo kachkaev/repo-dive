@@ -8,7 +8,12 @@ import {
   type KindFilter,
   kindNouns,
 } from "./shared/contributor-kinds.tsx";
-import { formatMonth, monthShortNames } from "./shared/format.ts";
+import {
+  formatDateWithDayOfWeek,
+  formatMonth,
+  monthShortNames,
+} from "./shared/format.ts";
+import { DateStamp } from "./shared/primitives.tsx";
 
 export type WeekStart = "monday" | "sunday";
 
@@ -40,7 +45,11 @@ const marginTop = 16;
 /** Horizontal breathing room between months — makes month boundaries readable. */
 const gapColumns = 2;
 
-/** Two letters: the grid is 10px cells, so the gutter should not cost more. */
+/**
+ * Two letters: the grid is 10px cells, so the gutter should not cost more —
+ * and seven labels stacked in weekday order carry each other. Everywhere a
+ * weekday stands alone next to a date it is spelled out in full instead.
+ */
 const dayLabels: Record<WeekStart, string[]> = {
   monday: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
   sunday: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
@@ -576,9 +585,7 @@ export function CommitCalendar({
   }));
 
   const rangeTotal: DayTotal = { ...emptyDay };
-  // `row` rides along so the caption can name the weekday the way a cell's
-  // tooltip does — the strip's row order already is the weekday order.
-  let busiest: { isoDate: string; row: number; day: DayTotal } | undefined;
+  let busiest: { isoDate: string; day: DayTotal } | undefined;
   for (const { layout } of layouts) {
     for (const cell of layout.cells) {
       if (cell.day === undefined) {
@@ -592,7 +599,7 @@ export function CommitCalendar({
         filterValueOf(cell.day, kindFilter) >
         filterValueOf(busiest?.day ?? emptyDay, kindFilter)
       ) {
-        busiest = { isoDate: cell.isoDate, row: cell.row, day: cell.day };
+        busiest = { isoDate: cell.isoDate, day: cell.day };
       }
     }
   }
@@ -634,10 +641,6 @@ export function CommitCalendar({
     isoDate < minIsoDate
       ? "Before the first commit"
       : "After this report was generated";
-
-  /** How every day is stamped, in a cell's tooltip and in the caption alike. */
-  const stampOf = (isoDate: string, row: number): string =>
-    `${isoDate} · ${dayLabels[weekStartsOn][row]}`;
 
   const rangeDetail = detailOf(rangeTotal);
   const rangeSummary = `${countPhrase(rangeTotal)} in this range${
@@ -693,7 +696,7 @@ export function CommitCalendar({
             className="tabular-nums"
           >
             <div className="mb-1 font-medium text-(--text-secondary)">
-              {stampOf(hovered.cell.isoDate, hovered.cell.row)}
+              <DateStamp isoDate={hovered.cell.isoDate} />
             </div>
             {hovered.cell.day === undefined ? (
               <div className="text-(--text-muted)">
@@ -728,7 +731,7 @@ export function CommitCalendar({
           <div>{rangeSummary}</div>
           {busiest && (
             <div>
-              Busiest day {stampOf(busiest.isoDate, busiest.row)}:{" "}
+              Busiest day {formatDateWithDayOfWeek(busiest.isoDate)}:{" "}
               {summarize(busiest.day)}
             </div>
           )}

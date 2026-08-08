@@ -12,10 +12,10 @@ import { resolveRepoRoot } from "./scan.ts";
  * Failure of a metrics-cube query. Schema-backed so it can cross the MCP
  * serialization boundary (see {@link ./mcp.ts}).
  */
-export class QueryError extends Schema.TaggedErrorClass<QueryError>()(
-  "QueryError",
-  { reason: Schema.String },
-) {
+// eslint-disable-next-line unicorn/throw-new-error -- false positive: Schema.TaggedError is a class factory, not an error constructor
+export class QueryError extends Schema.TaggedError<QueryError>()("QueryError", {
+  reason: Schema.String,
+}) {
   override get message(): string {
     return this.reason;
   }

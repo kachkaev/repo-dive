@@ -220,7 +220,7 @@ export function DivergingBars({
               ),
             }}
           >
-            <div className="mb-1 font-medium text-(--text-secondary)">
+            <div className="mb-1 font-medium tabular-nums text-(--text-secondary)">
               {formatMonth(hovered.month)}
             </div>
             <div>
