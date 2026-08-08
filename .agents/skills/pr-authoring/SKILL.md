@@ -18,9 +18,17 @@ Create `.changeset/<kebab-slug>.md` (pick a descriptive slug, not the generator'
 ---
 
 Imperative first sentence matching the PR title.
-Then paragraphs (and bullets where they help) written for CHANGELOG readers: what changed, why, and what — if anything — users must do.
-Mention when existing catalogs heal without a re-scan, or when they don't.
+Then at most one short paragraph — three or four sentences — of what changed and, if it matters, what users must do.
 ```
+
+**Keep it compact.**
+A changeset is a CHANGELOG entry, not a design document: someone skimming a release wants to know what moved, not why every judgement call went the way it did.
+Budget the whole body at roughly five sentences.
+
+- Say what changed, in the reader's terms. Reasoning belongs in the PR body and the code comments, not here.
+- One example beats a list of every site touched — "now stamps `2025-10-02 · Thursday`" says more than naming four charts.
+- Add a line about existing catalogs only when the answer isn't "nothing to do": a re-scan is needed, an option changed name, output moved. Pure rendering changes need no such note.
+- Bullets are for genuinely separate user-facing changes in one PR, not for decomposing a single one.
 
 Changesets are Markdown, so they follow [editing-markdown](../editing-markdown/SKILL.md) — one sentence per line, no hard-wrapping.
 
