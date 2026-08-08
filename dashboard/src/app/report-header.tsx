@@ -114,11 +114,16 @@ function RepoHeading({
 
   return (
     <h1 className="text-2xl font-semibold">
+      {/*
+        `group-hover` pulls the dimmed segments (group, host, separators) up to
+        the link color along with the rest, so a hover reads as "the whole
+        breadcrumb is one link" rather than highlighting only the repo name.
+      */}
       <a
         href={remote.url}
         target="_blank"
         rel="noreferrer"
-        className="inline-flex cursor-pointer items-center gap-2 hover:text-(--series-1)"
+        className="group inline-flex cursor-pointer items-center gap-2 hover:text-(--series-1)"
       >
         {remote.hostKind === "github" ? (
           <GitHubMark />
@@ -129,7 +134,7 @@ function RepoHeading({
           {sections.map((section, index) => (
             <Fragment key={index}>
               {index > 0 ? (
-                <span className="mx-1.5 font-normal text-(--text-muted)">
+                <span className="mx-1.5 font-normal text-(--text-muted) group-hover:text-(--series-1)">
                   /
                 </span>
               ) : undefined}
@@ -137,7 +142,7 @@ function RepoHeading({
                 className={
                   index === sections.length - 1
                     ? undefined
-                    : "font-normal text-(--text-secondary)"
+                    : "font-normal text-(--text-secondary) group-hover:text-(--series-1)"
                 }
               >
                 {section}
@@ -150,7 +155,16 @@ function RepoHeading({
   );
 }
 
-/** A date whose exact meaning lives in a tooltip, optionally linking out. */
+/** The dotted underline that marks "this tooltip trigger is also a link". */
+const tooltipUnderline =
+  "underline decoration-dotted decoration-(--text-muted) underline-offset-4";
+
+/**
+ * A date whose exact meaning lives in a tooltip, optionally linking out. When
+ * there is nowhere to link, the trigger is a focusable span (so the tooltip
+ * still opens from the keyboard) with a `help` cursor and no underline — both
+ * a pointer and an underline would promise a click that does nothing.
+ */
 function AnnotatedDate({
   isoDate,
   tooltip,
@@ -160,21 +174,19 @@ function AnnotatedDate({
   tooltip: ReactNode;
   href?: string | undefined;
 }) {
-  const underline =
-    "underline decoration-dotted decoration-(--text-muted) underline-offset-4";
   return (
     <Tooltip>
       <TooltipTrigger
         delay={200}
         render={
           href === undefined ? (
-            <span tabIndex={0} className={underline} />
+            <span tabIndex={0} className="cursor-help" />
           ) : (
             <a
               href={href}
               target="_blank"
               rel="noreferrer"
-              className={`${underline} cursor-pointer hover:text-(--series-1)`}
+              className={`${tooltipUnderline} cursor-pointer hover:text-(--series-1)`}
             />
           )
         }
@@ -244,15 +256,26 @@ export function ReportHeader({
       <RepoHeading name={repo.name} remote={remote} />
       <p className="mt-1.5 text-sm text-(--text-secondary)">
         Analyzed by{" "}
-        <a
-          href={repoDiveUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="cursor-pointer hover:text-(--series-1)"
-        >
-          repo-dive
-        </a>{" "}
-        at{" "}
+        <Tooltip>
+          <TooltipTrigger
+            delay={200}
+            render={
+              <a
+                href={repoDiveUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={`${tooltipUnderline} cursor-pointer hover:text-(--series-1)`}
+              />
+            }
+          >
+            repo-dive
+          </TooltipTrigger>
+          <TooltipContent>
+            The open-source tool that generated this report — opens
+            kachkaev/repo-dive on GitHub
+          </TooltipContent>
+        </Tooltip>{" "}
+        on{" "}
         <AnnotatedDate
           isoDate={generatedAt}
           tooltip={formatTimestamp(generatedAt)}
