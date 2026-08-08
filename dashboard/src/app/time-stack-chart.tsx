@@ -6,13 +6,8 @@ import { scaleLinear, scaleTime } from "@visx/scale";
 import { AreaStack, BarStack, LinePath } from "@visx/shape";
 import { useDeferredValue, useId, useState } from "react";
 
-import {
-  formatCount,
-  formatDateWithDayOfWeek,
-  formatMonth,
-  formatPercent,
-} from "./shared/format.ts";
-import { Legend, Swatch } from "./shared/primitives.tsx";
+import { formatCount, formatMonth, formatPercent } from "./shared/format.ts";
+import { DateStamp, Legend, Swatch } from "./shared/primitives.tsx";
 import { useMeasuredWidth } from "./shared/use-measure.ts";
 
 export type TimePoint = {
@@ -299,9 +294,11 @@ function HoverTooltip({
             : "font-medium text-(--text-secondary)"
         }
       >
-        {pointUnit === "month"
-          ? formatMonth(new Date(crosshairMs).toISOString().slice(0, 7))
-          : formatDateWithDayOfWeek(new Date(crosshairMs).toISOString())}
+        {pointUnit === "month" ? (
+          formatMonth(new Date(crosshairMs).toISOString().slice(0, 7))
+        ) : (
+          <DateStamp isoDate={new Date(crosshairMs).toISOString()} />
+        )}
       </div>
       {hovered === undefined ? (
         // Nothing was collected at this instant — a genuine gap.

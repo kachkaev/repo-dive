@@ -13,6 +13,7 @@ import {
   formatMonth,
   monthShortNames,
 } from "./shared/format.ts";
+import { DateStamp } from "./shared/primitives.tsx";
 
 export type WeekStart = "monday" | "sunday";
 
@@ -695,7 +696,7 @@ export function CommitCalendar({
             className="tabular-nums"
           >
             <div className="mb-1 font-medium text-(--text-secondary)">
-              {formatDateWithDayOfWeek(hovered.cell.isoDate)}
+              <DateStamp isoDate={hovered.cell.isoDate} />
             </div>
             {hovered.cell.day === undefined ? (
               <div className="text-(--text-muted)">

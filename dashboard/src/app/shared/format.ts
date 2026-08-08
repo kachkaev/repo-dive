@@ -64,7 +64,7 @@ const dayNames = [
  * gutter, where seven of them stand side by side over 10px cells; anywhere a
  * weekday follows a date, it is spelled out.
  */
-const formatDayOfWeek = (isoDate: string): string => {
+export const formatDayOfWeek = (isoDate: string): string => {
   const [year, month, day] = isoDate.slice(0, 10).split("-").map(Number);
   const utcDay = new Date(
     Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1),
@@ -72,7 +72,11 @@ const formatDayOfWeek = (isoDate: string): string => {
   return dayNames[utcDay] ?? "";
 };
 
-/** How a date is stamped wherever there is room for its weekday: `2025-06-09 · Monday`. */
+/**
+ * How a date is stamped in running text: `2025-06-09 · Monday`. Hover cards use
+ * {@link ../primitives.tsx DateStamp} instead, which reserves a fixed slot for
+ * the weekday.
+ */
 export const formatDateWithDayOfWeek = (isoDate: string): string =>
   `${formatDate(isoDate)} · ${formatDayOfWeek(isoDate)}`;
 

@@ -11,4 +11,6 @@ Dates elsewhere in the report gain the weekday they were missing.
 Every chart whose tooltip names a day — lines of code, direct dependencies, dependencies, fighting the linter — now stamps it "2025-10-02 · Thursday", and the header's generated-at and coverage tooltips lead with the weekday too.
 The commits-per-month tooltip, which had been reporting a bucket's synthetic mid-month timestamp as though it were a date, now names the month ("Jan 2024") the way the churn chart beside it already did.
 
+Hover cards give the stamp a fixed slot — wide enough for "Wednesday", with the date in tabular figures — so a card whose value rows are shorter than its date line no longer resizes under the cursor as the weekday's name changes length.
+
 Purely a dashboard rendering change: existing catalogs and dashboard.json files work as they are.
