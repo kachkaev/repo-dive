@@ -40,6 +40,24 @@ export function Section({
   );
 }
 
+/**
+ * Ghost of a {@link Section} — muted title and subtitle bars over an empty
+ * chart-card frame. Rendered where the next section will land while it is
+ * still being prepared, so the page visibly promises more content instead of
+ * ending at the last mounted section. Sized to a typical chart section
+ * (260px chart + card padding) so the reveal mostly fills the frame in rather
+ * than pushing the rest of the page down.
+ */
+export function SectionSkeleton() {
+  return (
+    <div aria-hidden="true" className="mb-10 motion-safe:animate-pulse">
+      <div className="h-5 w-44 rounded-sm bg-muted" />
+      <div className="mt-1.5 h-3.5 w-80 max-w-full rounded-sm bg-muted" />
+      <div className="mt-3 h-[292px] rounded-lg border border-border bg-background" />
+    </div>
+  );
+}
+
 export function StatTile({
   label,
   value,

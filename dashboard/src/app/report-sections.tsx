@@ -1,4 +1,11 @@
-import { useDeferredValue, useState } from "react";
+import {
+  Children,
+  type ReactNode,
+  startTransition,
+  useDeferredValue,
+  useEffect,
+  useState,
+} from "react";
 
 import type { ContributorKind, DashboardData } from "../data.ts";
 import {
@@ -12,6 +19,7 @@ import {
   type ContributorBarsItem,
 } from "./contributor-bars.tsx";
 import { DivergingBars } from "./diverging-bars.tsx";
+import { LinesTimeline } from "./lines-timeline.tsx";
 import {
   Select,
   SelectContent,
@@ -26,7 +34,7 @@ import {
   KindFilterControl,
 } from "./shared/contributor-kinds.tsx";
 import { formatCount, formatDate } from "./shared/format.ts";
-import { DataTable, Section } from "./shared/primitives.tsx";
+import { DataTable, Section, SectionSkeleton } from "./shared/primitives.tsx";
 import { PercentControl } from "./shared/segmented-control.tsx";
 import { shapeStacked } from "./shared/stacked-series.ts";
 import { TimeSeriesChart } from "./time-stack-chart.tsx";
@@ -78,12 +86,53 @@ type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
 };
 
 /**
- * Every report section after the fold — the fold being the header, the stat
- * tiles and the first chart, which {@link ../app.tsx App} renders on first
- * paint. This component (its derivations included) only mounts in the deferred
- * render App schedules right after, so none of it delays the initial paint.
+ * Reveals its children one per paint: the first child renders right away,
+ * everything after it hides behind a {@link SectionSkeleton} until the effect
+ * below replaces the skeleton with the next level of the recursion — which
+ * repeats the same move for the rest. Each section thus lands in its own
+ * commit with a browser paint in between (an effect only fires after its own
+ * level has painted), and because the swap happens inside a transition the
+ * passes stay interruptible — a click on an already-visible section jumps the
+ * queue. The skeleton at the tail keeps signalling that more of the report is
+ * on the way.
+ *
+ * Chained `useDeferredValue(value, initialValue)` cannot do this: the levels
+ * below the first all mount inside the deferred lane's render, so their own
+ * deferred updates join that same lane and the whole recursion unrolls into
+ * one big commit — measured at ~2s without a paint between sections.
  */
-export function BelowFoldSections({
+function RevealSequentially({ children }: { children: ReactNode }) {
+  // Conditional sections arrive as booleans/nulls; toArray drops those, so a
+  // repo without, say, dependency data spends no reveal step on it.
+  const items = Children.toArray(children);
+  const [restRevealed, setRestRevealed] = useState(false);
+  useEffect(() => {
+    startTransition(() => {
+      setRestRevealed(true);
+    });
+  }, []);
+  const [first, ...rest] = items;
+  return (
+    <>
+      {first}
+      {rest.length > 0 &&
+        (restRevealed ? (
+          <RevealSequentially>{rest}</RevealSequentially>
+        ) : (
+          <SectionSkeleton />
+        ))}
+    </>
+  );
+}
+
+/**
+ * Every report section below the stat tiles, revealed one at a time. The whole
+ * component (its derivations included) only mounts in the deferred render
+ * {@link ../app.tsx App} schedules right after first paint, so none of it
+ * delays the header and the tiles; from there {@link RevealSequentially}
+ * mounts one section per pass, charts first in reading order.
+ */
+export function ReportSections({
   data,
   maxContributorsInCharts,
 }: {
@@ -289,7 +338,14 @@ export function BelowFoldSections({
     (row) => row.manifestCount !== undefined,
   );
   return (
-    <>
+    <RevealSequentially>
+      {(data.languages.length > 0 || data.survival.length > 0) && (
+        <LinesTimeline
+          data={data}
+          maxContributorsInCharts={maxContributorsInCharts}
+        />
+      )}
+
       {hasManifestData && (
         <Section
           title="Direct dependencies over time"
@@ -556,6 +612,6 @@ export function BelowFoldSections({
           <ContributorBars items={filteredContributorItems} />
         </div>
       </Section>
-    </>
+    </RevealSequentially>
   );
 }
