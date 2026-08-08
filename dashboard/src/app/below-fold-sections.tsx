@@ -449,6 +449,7 @@ export function BelowFoldSections({
       >
         <TimeSeriesChart
           mode="bar"
+          pointUnit="month"
           percentMode={commitsPercent}
           {...commitsChart}
         />

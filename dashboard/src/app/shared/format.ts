@@ -46,5 +46,39 @@ export const formatMonth = (isoMonth: string): string => {
 
 export const formatDate = (isoDate: string): string => isoDate.slice(0, 10);
 
+/** Indexed the way `Date.prototype.getUTCDay` numbers weekdays. */
+const dayNames = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+/**
+ * The weekday a date falls on, named in full. Read as UTC, so the date part of
+ * an ISO string always names its own weekday rather than the adjacent day in
+ * the viewer's timezone. Two-letter abbreviations exist only in the calendar's row
+ * gutter, where seven of them stand side by side over 10px cells; anywhere a
+ * weekday follows a date, it is spelled out.
+ */
+export const formatDayOfWeek = (isoDate: string): string => {
+  const [year, month, day] = isoDate.slice(0, 10).split("-").map(Number);
+  const utcDay = new Date(
+    Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1),
+  ).getUTCDay();
+  return dayNames[utcDay] ?? "";
+};
+
+/**
+ * How a date is stamped in running text: `2025-06-09 · Monday`. Hover cards use
+ * {@link ../primitives.tsx DateStamp} instead, which reserves a fixed slot for
+ * the weekday.
+ */
+export const formatDateWithDayOfWeek = (isoDate: string): string =>
+  `${formatDate(isoDate)} · ${formatDayOfWeek(isoDate)}`;
+
 export const formatPercent = (ratio: number): string =>
   `${(ratio * 100).toFixed(ratio >= 0.1 ? 0 : 1)}%`;

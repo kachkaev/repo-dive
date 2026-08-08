@@ -1,5 +1,37 @@
 import { type ReactNode, useDeferredValue } from "react";
 
+import { formatDate, formatDayOfWeek } from "./format.ts";
+
+/** The longest weekday name — what the slot below is sized against. */
+const widestDayName = "Wednesday";
+
+/**
+ * A date and the weekday it fell on, as a hover card stamps it. A card is only
+ * as wide as its widest line, so on charts with short value rows the weekday
+ * sets that width — and the card would grow and shrink under the cursor as the
+ * name changed length. The name therefore sits in a slot as wide as
+ * {@link widestDayName}: an invisible copy holds the width open and the real
+ * name overlays it in the same grid cell, which keeps the slot correct in any
+ * font rather than at one hand-measured pixel width.
+ */
+export function DateStamp({ isoDate }: { isoDate: string }) {
+  return (
+    // `tabular-nums` does for the date what the slot does for the weekday: with
+    // both fixed, the whole stamp is one width for every day of the calendar.
+    <span className="tabular-nums">
+      {formatDate(isoDate)} ·{" "}
+      <span className="inline-grid">
+        <span aria-hidden className="invisible col-start-1 row-start-1">
+          {widestDayName}
+        </span>
+        <span className="col-start-1 row-start-1">
+          {formatDayOfWeek(isoDate)}
+        </span>
+      </span>
+    </span>
+  );
+}
+
 export function Section({
   title,
   subtitle,
@@ -56,7 +88,9 @@ export function StatTile({
       </div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
       {hint ? (
-        <div className="mt-0.5 text-xs text-(--text-secondary)">{hint}</div>
+        <div className="mt-0.5 text-xs tabular-nums text-(--text-secondary)">
+          {hint}
+        </div>
       ) : undefined}
     </div>
   );
