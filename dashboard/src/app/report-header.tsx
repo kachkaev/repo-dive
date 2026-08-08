@@ -198,13 +198,18 @@ function AnnotatedDate({
   );
 }
 
-/** Date and time of `isoTimestamp` in the reader's own locale and zone. */
+/**
+ * Date and time of `isoTimestamp` in the reader's own locale and zone. The
+ * `full` date style is what names the weekday — the trigger shows a bare
+ * `YYYY-MM-DD`, so the tooltip is where "which day of the week was that?" gets
+ * answered, as it is in every chart's tooltip.
+ */
 const formatTimestamp = (isoTimestamp: string): string => {
   const parsed = new Date(isoTimestamp);
   return Number.isNaN(parsed.getTime())
     ? isoTimestamp
     : parsed.toLocaleString(undefined, {
-        dateStyle: "long",
+        dateStyle: "full",
         timeStyle: "long",
       });
 };

@@ -6,7 +6,12 @@ import { scaleLinear, scaleTime } from "@visx/scale";
 import { AreaStack, BarStack, LinePath } from "@visx/shape";
 import { useDeferredValue, useId, useState } from "react";
 
-import { formatCount, formatDate, formatPercent } from "./shared/format.ts";
+import {
+  formatCount,
+  formatDateWithDayOfWeek,
+  formatMonth,
+  formatPercent,
+} from "./shared/format.ts";
 import { Legend, Swatch } from "./shared/primitives.tsx";
 import { useMeasuredWidth } from "./shared/use-measure.ts";
 
@@ -16,6 +21,14 @@ export type TimePoint = {
 };
 
 export type LegendItem = { label: string; color: string; hatch?: string };
+
+/**
+ * What a data point stands for on the time axis, and so how the tooltip names
+ * the instant under the cursor: a day gets its date and weekday, a month gets
+ * its name — a monthly bucket is pinned to a synthetic mid-month timestamp, and
+ * "2025-06-15 · Sunday" would read as a claim about one particular Sunday.
+ */
+export type PointUnit = "day" | "month";
 
 /**
  * Collapses several stacked sub-series (e.g. one contributor's per-year bands)
@@ -238,6 +251,7 @@ function CrosshairLine({
  */
 function HoverTooltip({
   crosshairMs,
+  pointUnit,
   hovered,
   hoveredTotal,
   xScale,
@@ -253,6 +267,7 @@ function HoverTooltip({
   zeroLabel,
 }: {
   crosshairMs: number;
+  pointUnit: PointUnit;
   hovered: Record<string, number> | undefined;
   hoveredTotal: number;
   xScale: TimeScale;
@@ -284,7 +299,9 @@ function HoverTooltip({
             : "font-medium text-(--text-secondary)"
         }
       >
-        {formatDate(new Date(crosshairMs).toISOString())}
+        {pointUnit === "month"
+          ? formatMonth(new Date(crosshairMs).toISOString().slice(0, 7))
+          : formatDateWithDayOfWeek(new Date(crosshairMs).toISOString())}
       </div>
       {hovered === undefined ? (
         // Nothing was collected at this instant — a genuine gap.
@@ -364,6 +381,8 @@ export function TimeSeriesChart(props: {
    */
   seriesHatch?: Record<string, string>;
   mode: "area" | "bar" | "line";
+  /** What one point covers; defaults to a day. See {@link PointUnit}. */
+  pointUnit?: PointUnit | undefined;
   /**
    * Draw per-row shares instead of raw values. Owned by the section's controls
    * (above the frame); ignored when the chart can't show shares — lines aren't
@@ -430,6 +449,7 @@ export function TimeSeriesChart(props: {
     colors,
     seriesHatch,
     mode,
+    pointUnit,
     percentMode,
     valueFormat,
     legendItems,
@@ -727,6 +747,7 @@ export function TimeSeriesChart(props: {
         {crosshairMs !== undefined && (
           <HoverTooltip
             crosshairMs={crosshairMs}
+            pointUnit={pointUnit ?? "day"}
             hovered={hovered}
             hoveredTotal={hoveredTotal}
             xScale={xScale}
