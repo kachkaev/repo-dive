@@ -84,7 +84,7 @@ export function Section({
           <LoaderCircleIcon className="size-4 text-muted-foreground motion-safe:animate-spin" />
         </div>
       ) : (
-        <div className="mt-3 rounded-lg border border-(--grid-line) bg-(--surface-1) p-4">
+        <div className="mt-3 rounded-md border border-(--grid-line) bg-(--surface-1) p-4">
           {children}
         </div>
       )}
@@ -125,7 +125,7 @@ export function StatTile({
   hint?: string | undefined;
 }) {
   return (
-    <div className="rounded-lg border border-(--grid-line) bg-(--surface-1) px-4 py-3">
+    <div className="rounded-md border border-(--grid-line) bg-(--surface-1) px-4 py-3">
       <div className="text-xs font-medium tracking-wide text-(--text-muted) uppercase">
         {label}
       </div>
