@@ -290,8 +290,8 @@ function HoverTooltip({
       <div
         className={
           hovered
-            ? "mb-1 font-medium text-(--text-secondary)"
-            : "font-medium text-(--text-secondary)"
+            ? "mb-1 font-medium tabular-nums text-(--text-secondary)"
+            : "font-medium tabular-nums text-(--text-secondary)"
         }
       >
         {pointUnit === "month" ? (

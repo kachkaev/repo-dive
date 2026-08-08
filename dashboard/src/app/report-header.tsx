@@ -259,7 +259,10 @@ export function ReportHeader({
   return (
     <header className="mb-8">
       <RepoHeading name={repo.name} remote={remote} />
-      <p className="mt-1.5 text-sm text-(--text-secondary)">
+      {/* `tabular-nums` for the dates: the coverage pair sits side by side, and
+          two dates of the same shape should measure the same. The tooltips are
+          portaled out of here and keep the prose figures their sentences want. */}
+      <p className="mt-1.5 text-sm tabular-nums text-(--text-secondary)">
         Analyzed by{" "}
         <Tooltip>
           <TooltipTrigger

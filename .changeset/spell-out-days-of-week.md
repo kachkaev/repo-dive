@@ -12,5 +12,6 @@ Every chart whose tooltip names a day — lines of code, direct dependencies, de
 The commits-per-month tooltip, which had been reporting a bucket's synthetic mid-month timestamp as though it were a date, now names the month ("Jan 2024") the way the churn chart beside it already did.
 
 Hover cards give the stamp a fixed slot — wide enough for "Wednesday", with the date in tabular figures — so a card whose value rows are shorter than its date line no longer resizes under the cursor as the weekday's name changes length.
+Tabular figures now cover every date and count the report renders, including the churn tooltip's month, the stat tiles' hints and the header's coverage dates, so a 1 and an 8 always occupy the same width.
 
 Purely a dashboard rendering change: existing catalogs and dashboard.json files work as they are.

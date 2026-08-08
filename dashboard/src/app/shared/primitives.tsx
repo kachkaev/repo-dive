@@ -88,7 +88,9 @@ export function StatTile({
       </div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
       {hint ? (
-        <div className="mt-0.5 text-xs text-(--text-secondary)">{hint}</div>
+        <div className="mt-0.5 text-xs tabular-nums text-(--text-secondary)">
+          {hint}
+        </div>
       ) : undefined}
     </div>
   );
