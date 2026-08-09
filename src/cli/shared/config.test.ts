@@ -130,6 +130,20 @@ test("deriveContributorKind classifies bots and AI agents", () => {
   ).toBe("ai");
 });
 
+test("deriveContributorKind treats a trailing bot word in the name as a bot", () => {
+  expect(deriveContributorKind("Release bot <release@example.com>")).toBe(
+    "bot",
+  );
+  expect(deriveContributorKind("deploy-bot <deploy@example.com>")).toBe("bot");
+  expect(deriveContributorKind("Changeset Bot <changeset@example.com>")).toBe(
+    "bot",
+  );
+  // The word has to end the name, and be a word — not part of one, not in the email.
+  expect(deriveContributorKind("Kate Talbot <kate@example.com>")).toBe("human");
+  expect(deriveContributorKind("Alice <alice-bot@example.com>")).toBe("human");
+  expect(deriveContributorKind("Bot Smith <bs@example.com>")).toBe("human");
+});
+
 test("normalizeContributorName drops the [bot] suffix and capitalizes", () => {
   expect(normalizeContributorName("renovate[bot]")).toBe("Renovate");
   expect(normalizeContributorName("dependabot[bot]")).toBe("Dependabot");

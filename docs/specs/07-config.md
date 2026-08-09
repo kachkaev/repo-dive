@@ -70,6 +70,7 @@ Emails are matched against each commit author's email — and against the email 
 
 Every contributor has a **kind**: `human` (the default), `bot` (automation like renovate, dependabot, github-actions) or `ai` (AI coding agents like Copilot, Claude, Cursor, …).
 When a group omits `kind` — or for contributors with no alias group at all — the kind is derived from the name and email; anything unrecognized is a human.
+A name whose last word is `bot`, separated by a space or a hyphen, also counts as a bot — `Release bot` and `deploy-bot` do, `Kate Talbot` does not.
 Co-authors are classified the same way as authors, so an agent that only ever appears in trailers still gets its own row.
 
 Identity resolution differs by kind.
