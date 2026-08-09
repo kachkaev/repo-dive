@@ -38,13 +38,27 @@ export const defaultDashboardPort = 2141;
 
 /** Automation bots — commits that don't reflect authored work. */
 const botPattern = /\brenovate\b|\bdependabot\b|github-actions|\[bot\]/i;
+/**
+ * A trailing "bot" word in the display name — `Release bot`, `deploy-bot`.
+ * Requires a space or hyphen before it so ordinary names that merely end in
+ * those letters, like `Kate Talbot`, stay human.
+ */
+const botNameSuffixPattern = /[\s-]bot$/i;
 /** Known AI coding agents (mirrors the co-author heuristic in indexing.ts). */
 const aiPattern =
   /claude|copilot|cursor|chatgpt|openai|gemini|aider|devin|coderabbit|codegen|sweep|windsurf/i;
 
+/** `"Name <email>"` → `"Name"`; identities without an email part are used as-is. */
+const identityName = (identity: string): string =>
+  identity.replace(/\s*<[^<>]*>\s*$/, "").trim();
+
 /** Classifies a `"Name <email>"` identity when the config leaves `kind` unset. */
 export const deriveContributorKind = (identity: string): ContributorKind =>
-  botPattern.test(identity) ? "bot" : aiPattern.test(identity) ? "ai" : "human";
+  botPattern.test(identity) || botNameSuffixPattern.test(identityName(identity))
+    ? "bot"
+    : aiPattern.test(identity)
+      ? "ai"
+      : "human";
 
 /**
  * Tidies an auto-derived name for display. The kind badge (🤖 / ✨) already
