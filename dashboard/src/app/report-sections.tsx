@@ -40,6 +40,7 @@ import { formatCount, formatDate } from "./shared/format.ts";
 import { DataTable, Section, SectionSkeleton } from "./shared/primitives.tsx";
 import { PercentControl } from "./shared/segmented-control.tsx";
 import { shapeStacked } from "./shared/stacked-series.ts";
+import { StaleOverlay } from "./shared/stale-overlay.tsx";
 import { TimeSeriesChart } from "./time-stack-chart.tsx";
 
 /** Keeps every nth row so dense per-commit series stay light to render. */
@@ -167,7 +168,8 @@ export function ReportSections({
   // The range select and kind filter respond to a click instantly; the
   // calendar itself — laid out from scratch on each switch, and remounted on a
   // range change — re-renders from these deferred copies in an interruptible
-  // follow-up pass, dimming while it lags. Same deal for the contributor list.
+  // follow-up pass, dimming while it lags (see StaleOverlay). Same deal for
+  // the contributor list.
   const deferredCalendarRange = useDeferredValue(calendarRange);
   const deferredCalendarKindFilter = useDeferredValue(calendarKindFilter);
   const calendarStale =
@@ -482,10 +484,7 @@ export function ReportSections({
             </>
           }
         >
-          <div
-            className="transition-opacity"
-            style={{ opacity: calendarStale ? 0.6 : 1 }}
-          >
+          <StaleOverlay stale={calendarStale}>
             <CommitCalendar
               // Remount on range change so a hovered day from the previous range
               // is not reported over the new one (mouseleave never fires when the
@@ -498,7 +497,7 @@ export function ReportSections({
               range={deferredCalendarRange}
               kindFilter={deferredCalendarKindFilter}
             />
-          </div>
+          </StaleOverlay>
         </Section>
       )}
 
@@ -618,12 +617,9 @@ export function ReportSections({
           />
         }
       >
-        <div
-          className="transition-opacity"
-          style={{ opacity: contributorsStale ? 0.6 : 1 }}
-        >
+        <StaleOverlay stale={contributorsStale}>
           <ContributorBars items={filteredContributorItems} />
-        </div>
+        </StaleOverlay>
       </Section>
     </RevealSequentially>
   );
