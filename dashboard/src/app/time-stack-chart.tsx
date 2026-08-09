@@ -8,6 +8,7 @@ import { useDeferredValue, useId, useState } from "react";
 
 import { formatCount, formatMonth, formatPercent } from "./shared/format.ts";
 import { DateStamp, Legend, Swatch } from "./shared/primitives.tsx";
+import { StaleOverlay } from "./shared/stale-overlay.tsx";
 import { useMeasuredWidth } from "./shared/use-measure.ts";
 
 export type TimePoint = {
@@ -436,8 +437,9 @@ export function TimeSeriesChart(props: {
   // old props, so the previous marks are reused as-is — and the expensive
   // render with the new props follows as an interruptible deferred pass. The
   // chart dims while it lags so the wait reads as loading, not as a dead
-  // control. Hover state is not deferred: the crosshair stays urgent and
-  // consistent with whichever props are on screen.
+  // control, and a spinner joins the dimming once the wait passes half a
+  // second (see StaleOverlay). Hover state is not deferred: the crosshair
+  // stays urgent and consistent with whichever props are on screen.
   const deferredProps = useDeferredValue(props);
   const stale = deferredProps !== props;
   const {
@@ -660,7 +662,7 @@ export function TimeSeriesChart(props: {
     }));
 
   return (
-    <div className="transition-opacity" style={{ opacity: stale ? 0.6 : 1 }}>
+    <StaleOverlay stale={stale}>
       <div ref={containerRef} className="relative">
         <svg width={width} height={height} role="img">
           {hatchColors.length > 0 && (
@@ -762,6 +764,6 @@ export function TimeSeriesChart(props: {
         )}
       </div>
       {resolvedLegendItems.length > 0 && <Legend items={resolvedLegendItems} />}
-    </div>
+    </StaleOverlay>
   );
 }

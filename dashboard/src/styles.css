@@ -23,6 +23,26 @@
   --color-ring: var(--series-1);
 }
 
+@theme {
+  /*
+   * A fade-in that only starts once the wait has lasted half a second, with
+   * `both` holding the invisible first frame through the delay. Used by the
+   * spinner over a chart re-rendering from a deferred value: a switch that
+   * lands in a few frames stays silent, and only a wait long enough to read as
+   * a freeze gets an answer.
+   */
+  --animate-late-fade-in: late-fade-in 150ms ease-out 500ms both;
+
+  @keyframes late-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
 /* Data-viz palette (validated reference instance): series slots + surfaces. */
 :root {
   color-scheme: light;
