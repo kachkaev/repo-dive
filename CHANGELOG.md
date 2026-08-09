@@ -1,5 +1,33 @@
 # repo-dive
 
+## 0.12.0
+
+### Minor Changes
+
+- [#145](https://github.com/kachkaev/repo-dive/pull/145) [`f5279cf`](https://github.com/kachkaev/repo-dive/commit/f5279cf876f45ea1e37a7ab9e894ddf926acfe4a) - Name contributors in the lines-of-code chart instead of listing their email addresses.
+
+  The "by contributor" split used to label each band with an address, so a published report spelled one out for every top contributor while the Contributors section right below it showed names.
+  Both now go by name: a configured `displayName`, else the name git recorded on the person's commits, else the username their address is built around (`alice@example.com` → `alice`), and the address itself only when there is nothing else to show.
+  The contributors table keeps its email column, so people who spell their name the same way stay distinguishable.
+  Re-run `repo-dive index` to relabel an existing catalog; no re-scan needed.
+
+### Patch Changes
+
+- [#143](https://github.com/kachkaev/repo-dive/pull/143) [`2f9060a`](https://github.com/kachkaev/repo-dive/commit/2f9060a90fe0739dac113eb49bec5758cbd72d26) - Count contributors whose name ends in `bot` as bots.
+
+  The kind is derived from the name when the config leaves it unset, and previously only recognized the usual suspects — renovate, dependabot, github-actions and anything with a `[bot]` suffix.
+  A trailing `bot` word now counts too, so `Release bot` and `deploy-bot` land in the bot row while names that merely end in those letters, like `Kate Talbot`, stay human.
+  Re-run `repo-dive index` on an existing catalog to reclassify past commits — no re-scan needed.
+
+- [#138](https://github.com/kachkaev/repo-dive/pull/138) [`bdb81c1`](https://github.com/kachkaev/repo-dive/commit/bdb81c1303906c0573b35407b9255992abaea88a) - Match the corner radius of dashboard cards to the toggles and selects above them.
+
+  Section cards and the stat tiles below the page title were rounded one step more than every control in the report, which read as two competing radii on the same screen.
+  They now use the same 6px corners as the toggle groups, selects and tooltips.
+
+- [#144](https://github.com/kachkaev/repo-dive/pull/144) [`185852c`](https://github.com/kachkaev/repo-dive/commit/185852c22693a03232961ca7c0732323938f9cf2) - Show a spinner over a chart that has been dimmed for more than half a second.
+  Switching a chart's toggles dims the outgoing chart until the new one is ready, and on a large repository that wait could read as a freeze rather than as loading.
+  Quick switches look exactly as before: the spinner only fades in once the wait passes half a second.
+
 ## 0.11.1
 
 ### Patch Changes
