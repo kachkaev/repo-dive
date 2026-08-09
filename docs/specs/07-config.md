@@ -66,6 +66,14 @@ Emails are matched against each commit author's email — and against the email 
 - `url` makes that name a link (e.g. to a GitHub profile).
 - `kind` is one of `"human"`, `"bot"` or `"ai"` (see below).
 
+### How a contributor is named
+
+Charts name people rather than their addresses: a group's `displayName` if it has one, otherwise the name git recorded on their commits — the newest spelling, with a bot's `[bot]` suffix dropped, since the badge already says as much.
+Where no name was ever recorded — `git blame` can credit surviving lines to an author whose own commits were never sampled — the label falls back to the username the canonical address is built around (`alice@example.com` → `alice`), and to the address itself only when there is no username to take (a bare `Co-authored-by: Some Name`).
+
+Two people who spell their name identically therefore share one band in the survival chart, the way bots and AI agents share theirs.
+Give them an alias group with a `displayName` to tell them apart on purpose; the contributors table lists everyone separately with their own canonical email either way.
+
 ### Contributor kinds
 
 Every contributor has a **kind**: `human` (the default), `bot` (automation like renovate, dependabot, github-actions) or `ai` (AI coding agents like Copilot, Claude, Cursor, …).
