@@ -320,27 +320,70 @@ const buildDashboardData = (
   // colors without needing a label → kind mapping of its own (the contributors
   // list is truncated, so it cannot serve as one).
   //
-  // Survival facts carry only the author's email, but kind derivation also
-  // reads the name — "Claude <noreply@anthropic.com>" is an AI agent by its
-  // name alone. Feed the names the commits already carry, so a survival band
-  // folds exactly the way the contributors list classifies the same person.
-  const authorNameByEmail = new Map<string, string>();
+  // Survival facts carry only the author's email, so both halves of a band's
+  // label have to come back from the commits. Kind derivation reads the name —
+  // "Claude <noreply@anthropic.com>" is an AI agent by its name alone — and the
+  // bands humans get are named after the person rather than their address, so a
+  // published report doesn't spell out an address for every top contributor.
+  // Feeding the names the commits already carry makes a band fold, and read,
+  // exactly the way the contributors list treats the same person.
+
+  /**
+   * The name as spelled on this commit (author line or trailer): a configured
+   * displayName wins, otherwise the observed spelling, tidied so a bot's
+   * `[bot]` suffix doesn't double up with its kind badge. Falls back to the
+   * resolved label (the canonical email's username) for an identity git never
+   * spelled a name for.
+   */
+  const nameOf = (
+    resolved: ReturnType<typeof config.resolveContributor>,
+    observedName: string,
+  ): string =>
+    resolved.displayName ??
+    (observedName ? normalizeContributorName(observedName) : resolved.label);
+
+  /** Raw email → the name git spelled beside it, for kind derivation. */
+  const nameByEmail = new Map<string, string>();
+  /**
+   * Canonical email → the name that identity's chart bands carry. Keyed by the
+   * canonical email so every alias of one person names the same band, and
+   * written in commit order (oldest first) so the newest spelling wins — the
+   * rule the contributors list below follows too.
+   */
+  const nameByCanonicalEmail = new Map<string, string>();
   for (const commit of commits) {
-    if (commit.authorName) {
-      authorNameByEmail.set(
-        commit.authorEmail.toLowerCase(),
-        commit.authorName,
-      );
+    if (!commit.authorName) {
+      continue;
     }
+    nameByEmail.set(commit.authorEmail.toLowerCase(), commit.authorName);
+    const resolved = config.resolveContributor(
+      commit.authorEmail,
+      commit.authorName,
+    );
+    nameByCanonicalEmail.set(
+      resolved.canonicalEmail.toLowerCase(),
+      nameOf(resolved, commit.authorName),
+    );
   }
+
   const survivalLabelOf = (email: string): string => {
     const resolved = config.resolveContributor(
       email,
-      authorNameByEmail.get(email.toLowerCase()),
+      nameByEmail.get(email.toLowerCase()),
     );
-    return resolved.kind === "human"
-      ? resolved.label
-      : kindGroupLabels[resolved.kind];
+    if (resolved.kind !== "human") {
+      return kindGroupLabels[resolved.kind];
+    }
+    // Two people who spell their name identically share a band, the way the
+    // kind groups above do — a name is what the chart shows, so it is also what
+    // it can tell apart. `contributors.aliases` is the lever for splitting or
+    // merging them on purpose, and the contributors table still lists each of
+    // them with their own email. The label covers the person git blame credits
+    // lines to whose own commits were never sampled: no name was ever observed.
+    return (
+      nameByCanonicalEmail.get(resolved.canonicalEmail.toLowerCase()) ??
+      resolved.label
+    );
   };
 
   const survival = commits
@@ -405,17 +448,6 @@ const buildDashboardData = (
     assisted: Partial<Record<ContributorKind, number>>;
   };
   const contributorMap = new Map<string, ContributorBucket>();
-  /**
-   * The name as spelled on this commit (author line or trailer): a configured
-   * displayName wins, otherwise the observed spelling, tidied so a bot's
-   * `[bot]` suffix doesn't double up with its kind badge.
-   */
-  const nameOf = (
-    resolved: ReturnType<typeof config.resolveContributor>,
-    observedName: string,
-  ): string =>
-    resolved.displayName ??
-    (observedName ? normalizeContributorName(observedName) : resolved.label);
 
   /**
    * Fetches or creates a contributor's bucket.

@@ -12,6 +12,20 @@ export const prettifyAuthorEmail = (email: string): string => {
   return match?.[1] ?? email;
 };
 
+/**
+ * The username an address is built around: `alice@example.com` → `alice`. What
+ * a chart falls back to when nobody's name is known, so a published report
+ * names people without spelling out an address anyone can scrape.
+ *
+ * `undefined` when there is no username to take — an identity that is not an
+ * address at all (a bare `Co-authored-by: Some Name`, or an already-prettified
+ * noreply handle), which is then shown as it stands.
+ */
+export const usernameFromEmail = (email: string): string | undefined => {
+  const at = email.indexOf("@");
+  return at > 0 ? email.slice(0, at) : undefined;
+};
+
 /** Config file names, in resolution order. First match wins. */
 const configFileNames = [
   "repo-dive.config.ts",
@@ -79,7 +93,13 @@ export const normalizeContributorName = (name: string): string => {
 type ResolvedContributor = {
   /** Prettified canonical email — shown in the contributors table's email column. */
   readonly canonicalEmail: string;
-  /** The label used in charts and as the name: `displayName` if set. */
+  /**
+   * What to call this contributor when no name has been observed for them:
+   * `displayName` if set, else the canonical email's username. Charts prefer
+   * the name spelled on the person's commits (see `nameOf` in indexing.ts) and
+   * only fall back here — for someone git blame credits lines to whose commits
+   * were never sampled, say.
+   */
   readonly label: string;
   /** Explicit display-name override from the config, if any. */
   readonly displayName: string | undefined;
@@ -135,7 +155,11 @@ const bareResolveContributor = (
   const canonicalEmail = prettifyAuthorEmail(entry?.canonicalEmail ?? email);
   return {
     canonicalEmail,
-    label: entry?.displayName ?? normalizeContributorName(canonicalEmail),
+    label:
+      entry?.displayName ??
+      normalizeContributorName(
+        usernameFromEmail(canonicalEmail) ?? canonicalEmail,
+      ),
     displayName: entry?.displayName,
     url: entry?.url,
     kind: entry?.kind ?? deriveContributorKind(`${name ?? ""} <${email}>`),

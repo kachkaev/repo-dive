@@ -379,8 +379,13 @@ test.concurrent(
         GIT_COMMITTER_EMAIL: email,
         GIT_COMMITTER_NAME: name,
       };
-      // `.md` rather than `.txt`: only source files are blamed for survival.
-      writeFileSync(path.join(repoPath, "file.md"), `${subject}\n`);
+      // One file per commit, so every author keeps a living line for the
+      // survival bands to name. `.md` rather than `.txt`: only source files are
+      // blamed for survival.
+      writeFileSync(
+        path.join(repoPath, `${subject.replaceAll(" ", "-")}.md`),
+        `${subject}\n`,
+      );
       runGitAs(repoPath, identity, "add", ".");
       const message = [
         subject,
@@ -406,7 +411,6 @@ test.concurrent(
         "bump deps",
       );
       // An AI agent recognizable only by its name: the email says nothing.
-      // Committed last so its line is the one still alive under blame.
       commitAs("noreply@anthropic.com", "Claude", "agent edit");
 
       // A .ts config (exercises Node's type stripping through the real CLI). The
@@ -512,13 +516,17 @@ test.concurrent(
       // Same-second fixture commits have no stable order; compare as a multiset.
       expect(commitKinds.toSorted()).toEqual(["ai", "bot", "human", "human"]);
 
-      // Survival facts carry only an email, so folding a non-human into its
-      // kind band has to resolve the kind with the author's name too — without
-      // it "Claude <noreply@anthropic.com>" reads as an ordinary human.
+      // Survival facts carry only an email, so a band's label has to be
+      // recovered from the commits: the kind, because without the author's name
+      // "Claude <noreply@anthropic.com>" reads as an ordinary human, and the
+      // name a human's band goes by, which is never their address.
       const survivalAuthors = Object.keys(
         recordAt(arrayAt(dashboard, "survival").at(-1), "byContributor"),
       );
-      expect(survivalAuthors).toContain("AI agents");
+      expect(
+        survivalAuthors.toSorted(),
+        "bands go by name, not by email",
+      ).toEqual(["AI agents", "Alice A.", "Bots"]);
     } finally {
       rmSync(repoPath, { force: true, recursive: true });
     }

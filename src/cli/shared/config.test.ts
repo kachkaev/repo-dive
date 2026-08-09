@@ -14,6 +14,7 @@ import {
   normalizeContributorName,
   prettifyAuthorEmail,
   resolveConfig,
+  usernameFromEmail,
 } from "./config.ts";
 
 /**
@@ -27,7 +28,7 @@ test("resolveConfig defaults with no contributor config", () => {
   const resolved = resolveInRepo({});
   expect(resolved.maxInCharts).toBe(defaultMaxInCharts);
   const contributor = resolved.resolveContributor("carol@example.com", "Carol");
-  expect(contributor.label).toBe("carol@example.com");
+  expect(contributor.label).toBe("carol");
   expect(contributor.canonicalEmail).toBe("carol@example.com");
   expect(contributor.displayName).toBeUndefined();
   expect(contributor.url).toBeUndefined();
@@ -46,15 +47,20 @@ test("resolveConfig folds aliases into the first (canonical) entry", () => {
       ],
     },
   });
-  expect(resolved.resolveContributor("alice@personal.example").label).toBe(
-    "alice@work.example",
-  );
   expect(
-    resolved.resolveContributor("12345+alice@users.noreply.github.com").label,
+    resolved.resolveContributor("alice@personal.example").canonicalEmail,
+  ).toBe("alice@work.example");
+  expect(
+    resolved.resolveContributor("12345+alice@users.noreply.github.com")
+      .canonicalEmail,
   ).toBe("alice@work.example");
   // Canonical stays itself.
-  expect(resolved.resolveContributor("alice@work.example").label).toBe(
+  expect(resolved.resolveContributor("alice@work.example").canonicalEmail).toBe(
     "alice@work.example",
+  );
+  // So every spelling of her also labels the same, off the canonical address.
+  expect(resolved.resolveContributor("alice@personal.example").label).toBe(
+    "alice",
   );
 });
 
@@ -64,9 +70,25 @@ test("resolveConfig matches aliases case-insensitively", () => {
       aliases: [["Alice@Work.Example", "alice@personal.example"]],
     },
   });
-  expect(resolved.resolveContributor("ALICE@personal.EXAMPLE").label).toBe(
-    "Alice@Work.Example",
-  );
+  expect(
+    resolved.resolveContributor("ALICE@personal.EXAMPLE").canonicalEmail,
+  ).toBe("Alice@Work.Example");
+});
+
+test("resolveContributor labels a contributor without naming their address", () => {
+  const resolved = resolveInRepo({});
+  // Nothing here says what Carol is called, so the label stops one step short
+  // of her address — a published chart has no reason to spell one out.
+  expect(resolved.resolveContributor("carol@example.com").label).toBe("carol");
+  // An identity that is not an address (a bare `Co-authored-by: Some Name`,
+  // which keys off the name) has no username to take, and stands as it is.
+  expect(resolved.resolveContributor("Some Name").label).toBe("Some Name");
+});
+
+test("usernameFromEmail takes the local part, and only a real one", () => {
+  expect(usernameFromEmail("carol@example.com")).toBe("carol");
+  expect(usernameFromEmail("alice")).toBeUndefined();
+  expect(usernameFromEmail("@example.com")).toBeUndefined();
 });
 
 test("resolveConfig still prettifies a canonical noreply address", () => {
@@ -328,7 +350,7 @@ it.effect("loadConfig imports a .mjs config file", () => {
     );
     const resolved = yield* loadConfig(dir);
     expect(resolved.maxInCharts).toBe(15);
-    expect(resolved.resolveContributor("a@y.example").label).toBe(
+    expect(resolved.resolveContributor("a@y.example").canonicalEmail).toBe(
       "a@x.example",
     );
   }).pipe(
