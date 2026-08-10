@@ -175,13 +175,30 @@ export function Swatch({
 /**
  * Rendered below its chart, centered like a figure caption: legends change
  * with the controls, and above the marks a height change would shift them
- * mid-read.
+ * mid-read. Laid out as inline boxes rather than a wrapping flexbox so
+ * `text-balance` applies — it balances line boxes, which flex rows are not —
+ * and a wrapped legend fills its rows evenly instead of stranding the last
+ * item (usually "Other") alone on the final row. The margins reproduce the
+ * old flex gaps: `mx-2` meets another item's `mx-2` for the 16px column gap,
+ * `my-0.5` for the 4px row gap.
  */
-export function Legend({ items }: { items: LegendEntry[] }) {
+export function Legend({
+  items,
+  marginClassName,
+}: {
+  items: LegendEntry[];
+  /** Replaces the default `mt-2` — e.g. a second legend standing further off. */
+  marginClassName?: string | undefined;
+}) {
   return (
-    <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-(--text-secondary)">
+    <div
+      className={`${marginClassName ?? "mt-2"} text-center text-xs text-balance text-(--text-secondary)`}
+    >
       {items.map((item) => (
-        <span key={item.label} className="inline-flex items-center gap-1.5">
+        <span
+          key={item.label}
+          className="mx-2 my-0.5 inline-flex items-center gap-1.5"
+        >
           <Swatch color={item.color} hatch={item.hatch} />
           {item.label}
         </span>

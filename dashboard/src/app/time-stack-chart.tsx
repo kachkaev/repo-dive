@@ -397,6 +397,13 @@ export function TimeSeriesChart(props: {
   valueFormat?: (value: number) => string;
   /** Overrides the per-series legend — e.g. one swatch per contributor. */
   legendItems?: LegendItem[];
+  /**
+   * A second legend row on its own line below the first — e.g. the year
+   * shades when the primary legend already names the groups. A separate row
+   * (rather than more items in one) so wrapping on narrow screens never
+   * interleaves the two vocabularies.
+   */
+  secondaryLegendItems?: LegendItem[] | undefined;
   /** When set, the tooltip sums each group's sub-series into one row. */
   tooltipGroups?: SeriesGroup[];
   /**
@@ -459,6 +466,7 @@ export function TimeSeriesChart(props: {
     percentMode,
     valueFormat,
     legendItems,
+    secondaryLegendItems,
     tooltipGroups,
     separateGroups,
     domainStartMs,
@@ -771,6 +779,13 @@ export function TimeSeriesChart(props: {
         )}
       </div>
       {resolvedLegendItems.length > 0 && <Legend items={resolvedLegendItems} />}
+      {/* The second legend stands off by 12px, clearly more than the 4px
+          between a wrapped legend's rows — so the two read as separate
+          vocabularies, not as more rows of the first. */}
+      {secondaryLegendItems !== undefined &&
+        secondaryLegendItems.length > 0 && (
+          <Legend items={secondaryLegendItems} marginClassName="mt-3" />
+        )}
     </StaleOverlay>
   );
 }
