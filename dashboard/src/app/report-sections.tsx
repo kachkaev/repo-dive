@@ -432,7 +432,7 @@ export function ReportSections({
   // carries thousands of all-zero rows — enough to pass a length check yet
   // draw an empty chart. Like the manifest check above, require a commit that
   // actually resolved something.
-  const hasResolvedData = dependencies.some((row) => row.resolved > 0);
+  const hasResolvedDependencies = dependencies.some((row) => row.resolved > 0);
   return (
     <RevealSequentially>
       {(data.languages.length > 0 || data.survival.length > 0) && (
@@ -588,7 +588,7 @@ export function ReportSections({
         </Section>
       )}
 
-      {hasResolvedData && (
+      {hasResolvedDependencies && (
         <Section
           title="Dependencies over time"
           subtitle="resolved packages in the lockfile at each commit, split by package manager"
