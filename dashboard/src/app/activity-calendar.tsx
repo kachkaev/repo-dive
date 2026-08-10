@@ -696,6 +696,10 @@ export function CommitCalendar({
           <TooltipContent
             anchor={hovered.target}
             arrow={false}
+            // Up-and-left of the cell (right edge on the cell), keeping the
+            // cells ahead in reading order visible; Base UI's collision
+            // handling shifts it back into view near the calendar's start.
+            align="end"
             className="tabular-nums"
           >
             <div className="mb-1 font-medium text-(--text-secondary)">
