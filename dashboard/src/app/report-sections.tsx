@@ -618,8 +618,8 @@ export function ReportSections({
 
       {suppressionsChart.points.length > 0 && (
         <Section
-          title="Fighting the linter"
-          subtitle="suppression comments in the tree over time (block disables counted as one each)"
+          title="Loose ends"
+          subtitle="eslint disables, TypeScript directives and TODO-style comments in the tree at each commit; block disables count as one each"
         >
           <TimeSeriesChart mode="line" {...suppressionsChart} />
         </Section>
