@@ -90,6 +90,57 @@ type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
 };
 
 /**
+ * How much history the commit calendar shows at once, in calendar years (one
+ * strip each). Five is still a glance rather than a scroll — it both caps the
+ * default range for an old repo and bounds the multi-year options on offer.
+ */
+const maxCalendarYears = 5;
+
+/**
+ * How much history the repo holds, in the two units the calendar's controls
+ * care about: whether it goes back a year at all, and how many calendar years
+ * — i.e. strips — it spans.
+ */
+type CalendarHistory = { underAYear: boolean; years: number };
+
+const calendarHistoryOf = (
+  firstCommitDate: string | undefined,
+  generatedAt: string,
+): CalendarHistory => {
+  if (firstCommitDate === undefined) {
+    return { underAYear: true, years: 1 };
+  }
+  // ISO dates compare as strings, so "a year before the report" needs no date
+  // math beyond swapping the year in.
+  const aYearBefore = `${Number(generatedAt.slice(0, 4)) - 1}${generatedAt.slice(4, 10)}`;
+  return {
+    underAYear: firstCommitDate.slice(0, 10) > aYearBefore,
+    years:
+      Number(generatedAt.slice(0, 4)) - Number(firstCommitDate.slice(0, 4)) + 1,
+  };
+};
+
+/**
+ * The range the calendar opens on. The old fixed "last 12 months" default was
+ * one thin strip whatever the repo — for anything but a young one it hid most
+ * of the history behind a dropdown nobody touches. So: show everything when
+ * everything fits, fall back to the newest {@link maxCalendarYears} years when
+ * it doesn't, and keep the rolling twelve months only for a repo too young to
+ * fill even one calendar year, where whole-year strips would be mostly empty.
+ */
+const defaultCalendarRangeOf = (history: CalendarHistory): CalendarRange => {
+  // A repo spanning a single calendar year is a year old at most, so this is
+  // the same branch twice over — but it also keeps the default off "all years",
+  // which such a repo does not offer (it would duplicate "This year").
+  const tooYoungForYearStrips = history.underAYear || history.years <= 1;
+  return tooYoungForYearStrips
+    ? "last-12-months"
+    : history.years <= maxCalendarYears
+      ? "all-years"
+      : `last-${maxCalendarYears}-years`;
+};
+
+/**
  * Reveals its children one per paint: the first child renders right away,
  * everything after it hides behind a skeleton placeholder until the effect
  * below replaces it with the next level of the recursion — which repeats the
@@ -153,12 +204,18 @@ export function ReportSections({
   maxContributorsInCharts: number;
 }) {
   const dependencies = data.dependencies;
+  const calendarHistory = calendarHistoryOf(
+    data.repo.firstCommitDate,
+    data.generatedAt,
+  );
+
   const [directDependenciesPercent, setDirectDependenciesPercent] =
     useState(false);
   const [dependenciesPercent, setDependenciesPercent] = useState(false);
   const [commitsPercent, setCommitsPercent] = useState(false);
-  const [calendarRange, setCalendarRange] =
-    useState<CalendarRange>("last-12-months");
+  const [calendarRange, setCalendarRange] = useState<CalendarRange>(
+    defaultCalendarRangeOf(calendarHistory),
+  );
   // Lifted out of CommitCalendar so it survives the remount on range change.
   const [calendarKindFilter, setCalendarKindFilter] =
     useState<CalendarKindFilter>("all");
@@ -212,20 +269,39 @@ export function ReportSections({
     )
     .slice(0, maxContributorsInCharts * 2);
 
-  // Fixed ranges first, then one entry per year of history, newest first.
+  // Fixed ranges first, then one entry per year of history, newest first. A
+  // range only earns its row once the repo outlives it: on a three-year-old
+  // repo "Last 3 years" and "Last 5 years" would both draw exactly what the
+  // whole history draws, and inside a single calendar year "All …" and that
+  // year's own entry would both draw what "This year" draws. The whole-history
+  // option names its own span ("All 7 years") rather than saying "All years":
+  // how much history the repo holds is the one thing the reader cannot infer
+  // from the label, and it decides whether the option is worth a click.
   const calendarRangeItems: Array<{ value: CalendarRange; label: string }> = [
     { value: "last-12-months", label: "Last 12 months" },
     { value: "this-year", label: "This year" },
-    { value: "last-3-years", label: "Last 3 years" },
-    { value: "all-years", label: "All years" },
-    ...(data.repo.firstCommitDate
-      ? Array.from(
+    ...(calendarHistory.years > 3
+      ? [{ value: "last-3-years" as const, label: "Last 3 years" }]
+      : []),
+    ...(calendarHistory.years > maxCalendarYears
+      ? [
           {
-            length:
-              Number(data.generatedAt.slice(0, 4)) -
-              Number(data.repo.firstCommitDate.slice(0, 4)) +
-              1,
+            value: `last-${maxCalendarYears}-years` as const,
+            label: `Last ${maxCalendarYears} years`,
           },
+        ]
+      : []),
+    ...(calendarHistory.years > 1
+      ? [
+          {
+            value: "all-years" as const,
+            label: `All ${calendarHistory.years} years`,
+          },
+        ]
+      : []),
+    ...(calendarHistory.years > 1
+      ? Array.from(
+          { length: calendarHistory.years },
           (_, index) => Number(data.generatedAt.slice(0, 4)) - index,
         ).map((year) => ({
           value: `year-${year}` as const,
@@ -360,81 +436,6 @@ export function ReportSections({
         />
       )}
 
-      {hasManifestData && (
-        <Section
-          title="Direct dependencies over time"
-          subtitle="dependencies, devDependencies and optionalDependencies declared across all package.json files at each commit"
-          controls={
-            <PercentControl
-              label="Direct dependencies value display"
-              value={directDependenciesPercent}
-              onChange={setDirectDependenciesPercent}
-            />
-          }
-          footer={
-            <DataTable
-              caption="View data"
-              header={[
-                "date",
-                ...(hasManifestCounts ? ["package.json files"] : []),
-                "dependencies",
-                "devDependencies",
-                "optionalDependencies",
-              ]}
-              rows={dependencies.map((row) => [
-                formatDate(row.date),
-                ...(hasManifestCounts ? [row.manifestCount ?? 0] : []),
-                row.directProd,
-                row.directDev,
-                row.directOptional,
-              ])}
-            />
-          }
-        >
-          <TimeSeriesChart
-            mode="area"
-            percentMode={directDependenciesPercent}
-            {...directDependenciesChart}
-            domainStartMs={repoStartMs}
-            zeroLabel="No package.json"
-          />
-        </Section>
-      )}
-
-      {dependenciesChart.points.length > 0 && (
-        <Section
-          title="Dependencies over time"
-          subtitle="resolved packages in the lockfile at each commit, split by package manager"
-          controls={
-            dependenciesChart.seriesKeys.length > 1 ? (
-              <PercentControl
-                label="Dependencies value display"
-                value={dependenciesPercent}
-                onChange={setDependenciesPercent}
-              />
-            ) : undefined
-          }
-          footer={
-            <DataTable
-              caption="View data"
-              header={["date", "resolved"]}
-              rows={dependencies.map((row) => [
-                formatDate(row.date),
-                row.resolved,
-              ])}
-            />
-          }
-        >
-          <TimeSeriesChart
-            mode="area"
-            percentMode={dependenciesPercent}
-            {...dependenciesChart}
-            domainStartMs={repoStartMs}
-            zeroLabel="No lockfile"
-          />
-        </Section>
-      )}
-
       {data.repo.firstCommitDate !== undefined && data.commits.length > 0 && (
         <Section
           title="Commit calendar"
@@ -539,6 +540,81 @@ export function ReportSections({
           positiveSecondaryHatch={kindColors.ai}
         />
       </Section>
+
+      {hasManifestData && (
+        <Section
+          title="Direct dependencies over time"
+          subtitle="dependencies, devDependencies and optionalDependencies declared across all package.json files at each commit"
+          controls={
+            <PercentControl
+              label="Direct dependencies value display"
+              value={directDependenciesPercent}
+              onChange={setDirectDependenciesPercent}
+            />
+          }
+          footer={
+            <DataTable
+              caption="View data"
+              header={[
+                "date",
+                ...(hasManifestCounts ? ["package.json files"] : []),
+                "dependencies",
+                "devDependencies",
+                "optionalDependencies",
+              ]}
+              rows={dependencies.map((row) => [
+                formatDate(row.date),
+                ...(hasManifestCounts ? [row.manifestCount ?? 0] : []),
+                row.directProd,
+                row.directDev,
+                row.directOptional,
+              ])}
+            />
+          }
+        >
+          <TimeSeriesChart
+            mode="area"
+            percentMode={directDependenciesPercent}
+            {...directDependenciesChart}
+            domainStartMs={repoStartMs}
+            zeroLabel="No package.json"
+          />
+        </Section>
+      )}
+
+      {dependenciesChart.points.length > 0 && (
+        <Section
+          title="Dependencies over time"
+          subtitle="resolved packages in the lockfile at each commit, split by package manager"
+          controls={
+            dependenciesChart.seriesKeys.length > 1 ? (
+              <PercentControl
+                label="Dependencies value display"
+                value={dependenciesPercent}
+                onChange={setDependenciesPercent}
+              />
+            ) : undefined
+          }
+          footer={
+            <DataTable
+              caption="View data"
+              header={["date", "resolved"]}
+              rows={dependencies.map((row) => [
+                formatDate(row.date),
+                row.resolved,
+              ])}
+            />
+          }
+        >
+          <TimeSeriesChart
+            mode="area"
+            percentMode={dependenciesPercent}
+            {...dependenciesChart}
+            domainStartMs={repoStartMs}
+            zeroLabel="No lockfile"
+          />
+        </Section>
+      )}
 
       {suppressionsChart.points.length > 0 && (
         <Section
