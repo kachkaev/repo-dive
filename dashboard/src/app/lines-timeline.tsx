@@ -231,9 +231,9 @@ type LinesDimension = "all" | "language" | "contributor";
 
 /** Split options in display order, which is also the fallback order. */
 const linesDimensions: readonly LinesDimension[] = [
-  "all",
   "language",
   "contributor",
+  "all",
 ];
 
 /**
@@ -267,7 +267,16 @@ export function LinesTimeline({
 }) {
   const [preferredDimension, setDimension] =
     useState<LinesDimension>("language");
-  const [shadeByYear, setShadeByYear] = useState(false);
+  // Age shading is the default only when it has at least two year bands to
+  // tell apart: with all surviving lines written in one calendar year, every
+  // band is the newest and the shaded variant renders identically to the flat
+  // one. Counted from the same cohort years the year scale below buckets.
+  const shadedYearCount = new Set(
+    data.survival.flatMap((row) =>
+      Object.keys(row.byCohort).map((cohortMonth) => cohortMonth.slice(0, 4)),
+    ),
+  ).size;
+  const [shadeByYear, setShadeByYear] = useState(shadedYearCount >= 2);
   const [percentMode, setPercentMode] = useState(false);
 
   // Every variant is drawn either from the dense per-commit rows ("flat") or
@@ -416,6 +425,19 @@ export function LinesTimeline({
 
   const supportsPercent = chart.seriesKeys.length > 1;
 
+  // In the split variants the primary legend names the groups, so the year
+  // shades would be left unexplained — a second legend row names them, drawn
+  // in the same base color as the all-lines stack (the concrete hues differ
+  // per group, but the light-to-dark direction is what the row conveys). The
+  // all-lines variant needs none: its only legend already is the years.
+  const yearLegendItems =
+    deferredShaded && deferredDimension !== "all"
+      ? survivalYearScale.buckets.map((bucket) => ({
+          label: bucket,
+          color: survivalYearScale.colorOf(cohortBaseColor, bucket),
+        }))
+      : undefined;
+
   // One domain on both axes across every variant, so the toggles change what
   // the stack is made of and nothing else. The variants are drawn from two
   // sources — per-commit language counts and blame at sampled commits — whose
@@ -470,12 +492,6 @@ export function LinesTimeline({
             onChange={setDimension}
             options={[
               {
-                value: "all",
-                label: "all lines",
-                disabled: !canDraw("all"),
-                title: canDraw("all") ? undefined : "No lines collected yet",
-              },
-              {
                 value: "language",
                 label: "by language",
                 disabled: !canDraw("language"),
@@ -491,6 +507,12 @@ export function LinesTimeline({
                   ? undefined
                   : "No survival samples collected yet",
               },
+              {
+                value: "all",
+                label: "all lines",
+                disabled: !canDraw("all"),
+                title: canDraw("all") ? undefined : "No lines collected yet",
+              },
             ]}
           />
           <SegmentedControl
@@ -501,20 +523,20 @@ export function LinesTimeline({
             }}
             options={[
               {
-                value: "none",
-                label: "no shading",
-                disabled: !flatAvailable[dimension],
-                title: flatAvailable[dimension]
-                  ? undefined
-                  : "This split only exists in the blame samples, which are always dated",
-              },
-              {
                 value: "shade",
                 label: "shade by year written",
                 disabled: !shadedAvailable[dimension],
                 title: shadedAvailable[dimension]
                   ? undefined
                   : "No per-year survival data collected yet",
+              },
+              {
+                value: "none",
+                label: "no shading",
+                disabled: !flatAvailable[dimension],
+                title: flatAvailable[dimension]
+                  ? undefined
+                  : "This split only exists in the blame samples, which are always dated",
               },
             ]}
           />
@@ -549,6 +571,7 @@ export function LinesTimeline({
         domainStartMs={domainStartMs}
         domainEndMs={domainEndMs}
         domainPeak={domainPeak}
+        secondaryLegendItems={yearLegendItems}
         {...chart}
       />
     </Section>
