@@ -278,14 +278,20 @@ function HoverTooltip({
   formatValue: (value: number) => string;
   zeroLabel: string | undefined;
 }) {
+  // The card sits left of the dashed line so it never covers the hovered
+  // point; only when the line is too close to the chart's start to fit the
+  // card's estimated width does it flip to the right side.
+  const cardWidth = supportsPercent ? 220 : 180;
+  const crosshairX = margin.left + xScale(crosshairMs);
+  const leftOfLine = crosshairX - 10 - cardWidth;
   return (
     <div
       className="pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm"
       style={{
-        left: Math.min(
-          Math.max(0, margin.left + xScale(crosshairMs) + 10),
-          Math.max(0, width - (supportsPercent ? 220 : 180)),
-        ),
+        left:
+          leftOfLine >= 0
+            ? leftOfLine
+            : Math.min(crosshairX + 10, Math.max(0, width - cardWidth)),
       }}
     >
       <div

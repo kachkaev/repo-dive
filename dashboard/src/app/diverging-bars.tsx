@@ -81,6 +81,15 @@ export function DivergingBars({
     Math.min(18, (innerWidth / Math.max(1, points.length)) * 0.7),
   );
   const hovered = hoverIndex === undefined ? undefined : points[hoverIndex];
+  // Hover card position: left of the hovered bar so it never covers it; only
+  // when the bar is too close to the chart's start to fit the card's estimated
+  // width does it flip to the right side.
+  const hoverBarX =
+    hoverIndex === undefined ? 0 : margin.left + xScale(dates[hoverIndex] ?? 0);
+  const cardLeft =
+    hoverBarX - 10 - 170 >= 0
+      ? hoverBarX - 10 - 170
+      : Math.min(hoverBarX + 10, Math.max(0, width - 170));
 
   return (
     <div>
@@ -213,12 +222,7 @@ export function DivergingBars({
         {hovered !== undefined && hoverIndex !== undefined && (
           <div
             className="pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm"
-            style={{
-              left: Math.min(
-                Math.max(0, margin.left + xScale(dates[hoverIndex] ?? 0) + 10),
-                Math.max(0, width - 170),
-              ),
-            }}
+            style={{ left: cardLeft }}
           >
             <div className="mb-1 font-medium tabular-nums text-(--text-secondary)">
               {formatMonth(hovered.month)}
