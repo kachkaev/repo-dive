@@ -1,5 +1,35 @@
 # repo-dive
 
+## 0.13.0
+
+### Minor Changes
+
+- [#147](https://github.com/kachkaev/repo-dive/pull/147) [`18b466e`](https://github.com/kachkaev/repo-dive/commit/18b466e9e61edc06a8a4b9589cd608cf67c1ff6a) - Lead the report with the commit charts and open the commit calendar on more history.
+
+  Commit calendar, commits per month and churn per month now follow the lines-of-code chart, with the two dependency charts after them.
+  The calendar opens on the repo's whole history when that spans five calendar years or fewer, on the last five years beyond that, and on the rolling twelve months only for a repo under a year old.
+  Its range dropdown now names the span it covers ("All 7 years") and drops the ranges the repo is too young to fill.
+
+- [#152](https://github.com/kachkaev/repo-dive/pull/152) [`86c5178`](https://github.com/kachkaev/repo-dive/commit/86c51784b25a27d34328e1f279d8cc3a21ae6a47) - Default the lines-of-code chart to age shading and name the year shades in a second legend.
+
+  The split control now reads "by language, by contributor, all lines" and the shading control leads with "shade by year written", the default whenever the surviving lines span at least two calendar years — with a single year band, shading would render identically to no shading.
+  In the by-language and by-contributor splits, a second legend below the group legend names the year bands in the base blue, so the shades no longer go unexplained; it stands well off from the group legend so the two never read as one list.
+  Wrapped legends across the dashboard now balance their rows instead of stranding the last item (usually "Other") alone on the final row.
+
+### Patch Changes
+
+- [#151](https://github.com/kachkaev/repo-dive/pull/151) [`35d44d0`](https://github.com/kachkaev/repo-dive/commit/35d44d0de9ea62c686c6d2ea0ba756c39b7b7212) - Hide the "Dependencies over time" chart when no commit ever resolved a lockfile.
+  A repo outside the npm ecosystem (e.g. a Python project) carries a dependency row for every scanned commit, all zeros — the report now drops the empty chart instead of drawing a blank axis, matching how the direct-dependencies chart already behaves.
+
+- [#148](https://github.com/kachkaev/repo-dive/pull/148) [`fee233b`](https://github.com/kachkaev/repo-dive/commit/fee233bdfed77d3a9633e6bfff48b4b8e2aa5c65) - Keep the chart hover card from covering the hovered data point.
+  The card now sits left of the dashed crosshair line, flipping to the right side only when the cursor is too close to the chart's start to fit it.
+  The commit calendar's day tooltip similarly moves up-and-left of the hovered cell, so the days ahead of it stay visible.
+
+- [#147](https://github.com/kachkaev/repo-dive/pull/147) [`18b466e`](https://github.com/kachkaev/repo-dive/commit/18b466e9e61edc06a8a4b9589cd608cf67c1ff6a) - Rename the report's "Fighting the linter" section to "Loose ends".
+
+  Its third series counts TODO/FIXME/HACK/XXX comments, which are not linter suppressions, so neither the old title nor its "suppression comments" subtitle covered what the chart plots.
+  The subtitle now names all three families instead.
+
 ## 0.12.0
 
 ### Minor Changes
