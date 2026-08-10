@@ -779,12 +779,12 @@ export function TimeSeriesChart(props: {
         )}
       </div>
       {resolvedLegendItems.length > 0 && <Legend items={resolvedLegendItems} />}
-      {/* The second legend stands off by the card's own padding (p-4), clearly
-          more than the 4px between a wrapped legend's rows — so the two read
-          as separate vocabularies, not as more rows of the first. */}
+      {/* The second legend stands off by 12px, clearly more than the 4px
+          between a wrapped legend's rows — so the two read as separate
+          vocabularies, not as more rows of the first. */}
       {secondaryLegendItems !== undefined &&
         secondaryLegendItems.length > 0 && (
-          <Legend items={secondaryLegendItems} marginClassName="mt-4" />
+          <Legend items={secondaryLegendItems} marginClassName="mt-3" />
         )}
     </StaleOverlay>
   );
