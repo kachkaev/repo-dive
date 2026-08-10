@@ -280,19 +280,20 @@ function HoverTooltip({
 }) {
   // The card sits left of the dashed line so it never covers the hovered
   // point; only when the line is too close to the chart's start to fit the
-  // card's estimated width does it flip to the right side.
+  // card's estimated width does it flip to the right side. The estimate only
+  // picks the side — the left placement anchors the card's right edge (via
+  // `right`), so the gap to the line stays 10px whatever the card's true width.
   const cardWidth = supportsPercent ? 220 : 180;
   const crosshairX = margin.left + xScale(crosshairMs);
-  const leftOfLine = crosshairX - 10 - cardWidth;
+  const fitsLeftOfLine = crosshairX - 10 - cardWidth >= 0;
   return (
     <div
       className="pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm"
-      style={{
-        left:
-          leftOfLine >= 0
-            ? leftOfLine
-            : Math.min(crosshairX + 10, Math.max(0, width - cardWidth)),
-      }}
+      style={
+        fitsLeftOfLine
+          ? { right: width - crosshairX + 10 }
+          : { left: Math.min(crosshairX + 10, Math.max(0, width - cardWidth)) }
+      }
     >
       <div
         className={
