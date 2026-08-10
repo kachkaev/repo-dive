@@ -427,6 +427,12 @@ export function ReportSections({
   const hasManifestCounts = dependencies.some(
     (row) => row.manifestCount !== undefined,
   );
+  // The collector emits a row for every scanned commit even when it holds no
+  // lockfile, so a repo outside the npm ecosystem (e.g. a Python project)
+  // carries thousands of all-zero rows — enough to pass a length check yet
+  // draw an empty chart. Like the manifest check above, require a commit that
+  // actually resolved something.
+  const hasResolvedData = dependencies.some((row) => row.resolved > 0);
   return (
     <RevealSequentially>
       {(data.languages.length > 0 || data.survival.length > 0) && (
@@ -582,7 +588,7 @@ export function ReportSections({
         </Section>
       )}
 
-      {dependenciesChart.points.length > 0 && (
+      {hasResolvedData && (
         <Section
           title="Dependencies over time"
           subtitle="resolved packages in the lockfile at each commit, split by package manager"
