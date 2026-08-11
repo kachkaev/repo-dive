@@ -147,8 +147,12 @@ export type LegendEntry = {
 };
 
 /**
- * A legend/tooltip swatch: base color, plus the same 45° hatch the marks use
+ * A legend/tooltip swatch: base color, plus the same hatch the marks use
  * (2px lines at a 6px pitch — 2/3 base fill, 1/3 helper color).
+ *
+ * `135deg` is the CSS spelling of the charts' `rotate(45)` SVG patterns: CSS
+ * angles run clockwise from "to top" and the bands sit perpendicular to that
+ * axis, so 135deg — not 45deg — is what leans bottom-left to top-right.
  */
 export function Swatch({
   color,
@@ -165,7 +169,7 @@ export function Swatch({
       style={{
         backgroundColor: color,
         backgroundImage: hatch
-          ? `repeating-linear-gradient(45deg, transparent 0 4px, ${hatch} 4px 6px)`
+          ? `repeating-linear-gradient(135deg, transparent 0 4px, ${hatch} 4px 6px)`
           : undefined,
       }}
     />
