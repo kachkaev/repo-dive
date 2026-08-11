@@ -142,22 +142,169 @@ export const listCommits = (
     Effect.map(parseGitLog),
   );
 
+type ChainEntry = {
+  readonly hash: string;
+  readonly parentHashes: readonly string[];
+  readonly committerDate: string;
+};
+
+const chainLogFormat = ["%H", "%P", "%cI"].join("%x1f");
+
 /**
- * Shas on HEAD's first-parent chain, i.e. the states the repository actually
- * passed through. See {@link describesTreeState} for why snapshot collectors
- * are restricted to them.
+ * The first-parent chain of `tip` (HEAD when omitted), newest first. HEAD is
+ * left implicit rather than passed: an explicit rev makes git fail an empty
+ * repository with "unknown revision" instead of the "does not have any commits
+ * yet" that {@link succeedIfNoCommitsYet} recovers from.
  */
-export const listFirstParentShas = (
+const listFirstParentChain = (
+  repoRoot: string,
+  tip?: string,
+): Effect.Effect<
+  ChainEntry[],
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
+  runGit([
+    "-C",
+    repoRoot,
+    "log",
+    "--first-parent",
+    `--format=${chainLogFormat}`,
+    ...(tip === undefined ? [] : [tip]),
+  ]).pipe(
+    succeedIfNoCommitsYet,
+    Effect.map((stdout) =>
+      stdout
+        .split("\n")
+        .filter(Boolean)
+        .map((line): ChainEntry => {
+          const [hash = "", parents = "", committerDate = ""] =
+            line.split(fieldSeparator);
+          return {
+            hash,
+            parentHashes: parents.split(" ").filter(Boolean),
+            committerDate,
+          };
+        }),
+    ),
+  );
+
+/** No common ancestor means the two commits come from unrelated histories. */
+const haveUnrelatedHistories = (
+  repoRoot: string,
+  left: string,
+  right: string,
+): Effect.Effect<
+  boolean,
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
+  // Exit code 1 is `merge-base`'s "no common ancestor", not a failure
+  runGit(["-C", repoRoot, "merge-base", left, right], {
+    okExitCodes: [1],
+  }).pipe(Effect.map((stdout) => stdout.trim() === ""));
+
+/**
+ * The first-parent chain that continues `chain` backwards in time across a
+ * founding graft, or `[]` when there is none.
+ *
+ * A repository migration (monorepo assembly, host move, history rewrite)
+ * leaves a recognizable signature: a fresh root commit followed immediately by
+ * merges that absorb the project's previous histories. Both conditions below
+ * are required, so ordinary absorptions stay excluded:
+ *
+ * - the merge sits in the founding window — the unbroken run of merges
+ *   directly above the root, before the first ordinary commit. A foreign
+ *   history vendored later in the repository's life does not qualify.
+ * - the absorbed history ends before the root begins, so it occupies the
+ *   stretch of timeline where the current chain has nothing to say. A side
+ *   history that overlaps the chain (e.g. a plugin repository absorbed while
+ *   mainline development continued) does not qualify.
+ *
+ * When several absorbed histories qualify (effect's monorepo assembly merged
+ * eight), the timeline can only continue into one of them: the one reaching
+ * back furthest wins.
+ */
+const findFoundingGraftChain = (
+  repoRoot: string,
+  chain: readonly ChainEntry[],
+  alreadyOnMainline: ReadonlySet<string>,
+): Effect.Effect<
+  ChainEntry[],
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
+  Effect.gen(function* () {
+    const root = chain.at(-1);
+    if (root === undefined) {
+      return [];
+    }
+    const rootDate = Date.parse(root.committerDate);
+
+    const candidateTips: string[] = [];
+    for (let index = chain.length - 2; index >= 0; index -= 1) {
+      const entry = chain[index];
+      if (entry === undefined || entry.parentHashes.length < 2) {
+        break;
+      }
+      candidateTips.push(...entry.parentHashes.slice(1));
+    }
+
+    let best: ChainEntry[] = [];
+    let bestRootDate = Number.POSITIVE_INFINITY;
+    for (const tip of candidateTips) {
+      if (alreadyOnMainline.has(tip)) {
+        continue;
+      }
+      if (!(yield* haveUnrelatedHistories(repoRoot, root.hash, tip))) {
+        continue;
+      }
+      const candidate = yield* listFirstParentChain(repoRoot, tip);
+      const tipDate = Date.parse(candidate.at(0)?.committerDate ?? "");
+      const candidateRootDate = Date.parse(
+        candidate.at(-1)?.committerDate ?? "",
+      );
+      if (
+        Number.isNaN(tipDate) ||
+        Number.isNaN(candidateRootDate) ||
+        tipDate >= rootDate
+      ) {
+        continue;
+      }
+      if (candidateRootDate < bestRootDate) {
+        best = candidate;
+        bestRootDate = candidateRootDate;
+      }
+    }
+    return best;
+  });
+
+/**
+ * Shas on the mainline — the states the repository actually passed through.
+ * That is HEAD's first-parent chain, extended backwards across founding grafts
+ * (see {@link findFoundingGraftChain}): when a migration absorbed the
+ * project's previous history behind a fresh root, the absorbed mainline is the
+ * continuation of the timeline. See {@link describesTreeState} for why
+ * snapshot collectors are restricted to the mainline.
+ */
+export const listMainlineShas = (
   repoRoot: string,
 ): Effect.Effect<
   Set<string>,
   CommandError,
   ChildProcessSpawner.ChildProcessSpawner
 > =>
-  runGit(["-C", repoRoot, "log", "--first-parent", "--format=%H"]).pipe(
-    succeedIfNoCommitsYet,
-    Effect.map((stdout) => new Set(stdout.split("\n").filter(Boolean))),
-  );
+  Effect.gen(function* () {
+    const shas = new Set<string>();
+    let chain = yield* listFirstParentChain(repoRoot);
+    while (chain.length > 0) {
+      for (const entry of chain) {
+        shas.add(entry.hash);
+      }
+      chain = yield* findFoundingGraftChain(repoRoot, chain, shas);
+    }
+    return shas;
+  });
 
 export type RepoSummary = {
   readonly commitCount: number;
@@ -381,12 +528,12 @@ export const runScan = ({
     const cacheKeyOf = (collector: Collector): string =>
       cacheKeys.get(collector.name) ?? collectorCacheKey(collector, config);
 
-    const firstParentShas = yield* listFirstParentShas(repoRoot);
+    const mainlineShas = yield* listMainlineShas(repoRoot);
 
     const plans = collectors.map((collector) => {
       const policy = sampleOverride ?? collector.defaultSampling;
       const candidates = describesTreeState(collector)
-        ? selected.filter((commit) => firstParentShas.has(commit.hash))
+        ? selected.filter((commit) => mainlineShas.has(commit.hash))
         : selected;
       return {
         collector,

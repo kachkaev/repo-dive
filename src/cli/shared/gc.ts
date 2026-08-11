@@ -18,7 +18,7 @@ import {
 } from "./collectors.ts";
 import { loadConfig } from "./config.ts";
 import { runGit } from "./git.ts";
-import { listFirstParentShas, resolveRepoRoot } from "./scan.ts";
+import { listMainlineShas, resolveRepoRoot } from "./scan.ts";
 
 const readdirIfExists = (dirPath: string) =>
   Effect.tryPromise(async () => {
@@ -76,7 +76,7 @@ const buildPlan = (
         .split("\n")
         .filter(Boolean),
     );
-    const firstParentShas = yield* listFirstParentShas(repoRoot);
+    const mainlineShas = yield* listMainlineShas(repoRoot);
 
     const currentCacheKeys = new Map(
       builtInCollectors.map((collector) => [
@@ -111,7 +111,7 @@ const buildPlan = (
         );
 
         if (
-          !firstParentShas.has(sha) &&
+          !mainlineShas.has(sha) &&
           snapshotCollectorNames.has(collectorName)
         ) {
           offMainlineOutputs.push({ sha, collectorName });

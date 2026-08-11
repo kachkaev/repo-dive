@@ -19,7 +19,7 @@ import {
 import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import { languageOfExtension } from "./languages.ts";
 import { readRemoteUrl } from "./remote.ts";
-import { listCommits, listFirstParentShas, resolveRepoRoot } from "./scan.ts";
+import { listCommits, listMainlineShas, resolveRepoRoot } from "./scan.ts";
 
 class NoCollectedCommitsError extends Data.TaggedError(
   "NoCollectedCommitsError",
@@ -667,7 +667,7 @@ export const runIndex = ({
     );
 
     const gitCommits = yield* listCommits(repoRoot);
-    const firstParentShas = yield* listFirstParentShas(repoRoot);
+    const mainlineShas = yield* listMainlineShas(repoRoot);
     const remoteUrl = yield* readRemoteUrl(repoRoot);
     const catalogShas = new Set(
       yield* Effect.tryPromise(async () => {
@@ -704,7 +704,7 @@ export const runIndex = ({
       (commit) =>
         Effect.tryPromise(async () => {
           const commitDir = path.join(commitsPath, commit.hash);
-          const onMainline = firstParentShas.has(commit.hash);
+          const onMainline = mainlineShas.has(commit.hash);
           const factsByCollector = new Map<string, readonly Fact[]>();
           let unknownCollectorDirs = 0;
           let offMainlineSnapshots = 0;
