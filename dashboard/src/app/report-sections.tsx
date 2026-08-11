@@ -35,6 +35,7 @@ import {
   kindColors,
   type KindFilter,
   KindFilterControl,
+  kindOrder,
 } from "./shared/contributor-kinds.tsx";
 import { formatCount, formatDate } from "./shared/format.ts";
 import { DataTable, Section, SectionSkeleton } from "./shared/primitives.tsx";
@@ -78,15 +79,38 @@ const commitKindColorOf = (kind: keyof typeof commitKindSeries): string =>
   kind === "humanAi" ? kindColors.human : kindColors[kind];
 
 /**
- * A month's commit counts by kind plus its churn — everything the two monthly
- * charts need, summed from the per-commit rows rather than shipped alongside
- * them.
+ * Which commit series a kind filter keeps. Humans stay split by AI assistance
+ * — narrowing to humans is about whose commits are counted, not about hiding
+ * the assisted share of them.
  */
-type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
+const commitKindsOfFilter: Record<
+  KindFilter,
+  ReadonlyArray<keyof typeof commitKindSeries>
+> = {
+  all: commitKindOrder,
+  human: ["human", "humanAi"],
+  ai: ["ai"],
+  bot: ["bot"],
+};
+
+/** A month's lines added and deleted, plus the AI-assisted share of the added. */
+type ChurnTotals = {
   added: number;
   deleted: number;
   /** Lines added by commits carrying an AI co-author trailer. */
   aiAdded: number;
+};
+
+const emptyChurn = (): ChurnTotals => ({ added: 0, deleted: 0, aiAdded: 0 });
+
+/**
+ * A month's commit counts by kind plus its churn — everything the two monthly
+ * charts need, summed from the per-commit rows rather than shipped alongside
+ * them. Churn is kept per author kind rather than as one total so the churn
+ * chart's kind filter can subset it without a second pass over the commits.
+ */
+type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
+  churn: Record<ContributorKind, ChurnTotals>;
 };
 
 /**
@@ -221,6 +245,11 @@ export function ReportSections({
     useState<CalendarKindFilter>("all");
   const [contributorKindFilter, setContributorKindFilter] =
     useState<KindFilter>("all");
+  // The two monthly charts filter independently: reading "who commits" and
+  // reading "who moves lines" are separate questions, and both sections carry
+  // their own control anyway.
+  const [commitsKindFilter, setCommitsKindFilter] = useState<KindFilter>("all");
+  const [churnKindFilter, setChurnKindFilter] = useState<KindFilter>("all");
 
   // The range select and kind filter respond to a click instantly; the
   // calendar itself — laid out from scratch on each switch, and remounted on a
@@ -329,9 +358,7 @@ export function ReportSections({
       humanAi: 0,
       ai: 0,
       bot: 0,
-      added: 0,
-      deleted: 0,
-      aiAdded: 0,
+      churn: { human: emptyChurn(), ai: emptyChurn(), bot: emptyChurn() },
     };
     const kind = commit.kind ?? "human";
     if (kind === "human") {
@@ -339,10 +366,11 @@ export function ReportSections({
     } else {
       bucket[kind] += 1;
     }
-    bucket.added += commit.added;
-    bucket.deleted += commit.deleted;
+    const churn = bucket.churn[kind];
+    churn.added += commit.added;
+    churn.deleted += commit.deleted;
     if (commit.ai) {
-      bucket.aiAdded += commit.added;
+      churn.aiAdded += commit.added;
     }
     monthlyBuckets.set(month, bucket);
   }
@@ -350,8 +378,11 @@ export function ReportSections({
     ([left], [right]) => left.localeCompare(right),
   );
   // Keep only kinds that ever occur, so a bot-free repo gets no empty series.
-  const commitKindKeys = commitKindOrder.filter((kind) =>
+  const presentCommitKindKeys = commitKindOrder.filter((kind) =>
     monthlyRows.some(([, bucket]) => bucket[kind] > 0),
+  );
+  const commitKindKeys = presentCommitKindKeys.filter((kind) =>
+    commitKindsOfFilter[commitsKindFilter].includes(kind),
   );
   const commitsChart = {
     points: monthlyRows.map(([month, bucket]) => ({
@@ -374,6 +405,27 @@ export function ReportSections({
       ...(kind === "humanAi" ? { hatch: kindColors.ai } : {}),
     })),
   };
+  const commitsSupportPercent = commitsChart.seriesKeys.length > 1;
+
+  // Churn keeps every month and drops the filtered-out kinds' lines, so the
+  // bars rescale to whatever the selected kind actually moved.
+  const churnKinds: readonly ContributorKind[] =
+    churnKindFilter === "all" ? kindOrder : [churnKindFilter];
+  const churnPoints = monthlyRows.map(([month, bucket]) => {
+    const totals = emptyChurn();
+    for (const kind of churnKinds) {
+      const kindChurn = bucket.churn[kind];
+      totals.added += kindChurn.added;
+      totals.deleted += kindChurn.deleted;
+      totals.aiAdded += kindChurn.aiAdded;
+    }
+    return {
+      month,
+      positive: totals.added,
+      negative: totals.deleted,
+      positiveSecondary: totals.aiAdded,
+    };
+  });
 
   const suppressionRows = decimate(data.directives, 400);
   const suppressionsChart = {
@@ -512,19 +564,36 @@ export function ReportSections({
         title="Commits per month"
         subtitle="months bucketed by the author's date, split by author kind; hatched = human commits with at least one AI co-author trailer"
         controls={
-          commitsChart.seriesKeys.length > 1 ? (
-            <PercentControl
-              label="Commits per month value display"
-              value={commitsPercent}
-              onChange={setCommitsPercent}
+          <>
+            <KindFilterControl
+              label="Filter commits by author kind"
+              value={commitsKindFilter}
+              onChange={setCommitsKindFilter}
+              presentKinds={commitKinds}
             />
-          ) : undefined
+            {/* Shown whenever the unfiltered chart stacks more than one series,
+                and merely disabled while a single-kind view leaves one — a
+                control vanishing from the row on filter change would reflow the
+                remaining ones away from the cursor. */}
+            {presentCommitKindKeys.length > 1 && (
+              <PercentControl
+                label="Commits per month value display"
+                value={commitsPercent}
+                onChange={setCommitsPercent}
+                disabled={!commitsSupportPercent}
+                disabledTitle="A single series is always 100%"
+              />
+            )}
+          </>
         }
       >
         <TimeSeriesChart
           mode="bar"
           pointUnit="month"
-          percentMode={commitsPercent}
+          // The remembered preference is ignored, not applied invisibly, while
+          // the filter leaves one series — the control reads "absolute counts"
+          // there, and the bars must agree with it.
+          percentMode={commitsPercent && commitsSupportPercent}
           {...commitsChart}
         />
       </Section>
@@ -532,14 +601,17 @@ export function ReportSections({
       <Section
         title="Churn per month"
         subtitle="lines added and deleted, months bucketed by the author's date so they line up with the survival cohorts; hatched = lines added by AI-assisted commits"
+        controls={
+          <KindFilterControl
+            label="Filter churn by author kind"
+            value={churnKindFilter}
+            onChange={setChurnKindFilter}
+            presentKinds={commitKinds}
+          />
+        }
       >
         <DivergingBars
-          points={monthlyRows.map(([month, bucket]) => ({
-            month,
-            positive: bucket.added,
-            negative: bucket.deleted,
-            positiveSecondary: bucket.aiAdded,
-          }))}
+          points={churnPoints}
           positiveLabel="added"
           negativeLabel="deleted"
           positiveSecondaryLabel="added · AI-assisted"
