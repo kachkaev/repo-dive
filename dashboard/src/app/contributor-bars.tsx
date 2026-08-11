@@ -29,11 +29,15 @@ export type ContributorBarsItem = {
 };
 
 /**
- * The same 45° hatch the charts and legend swatches use (2px lines at a 6px
+ * The same hatch the charts and legend swatches use (2px lines at a 6px
  * pitch). Throughout the dashboard it reads as "another kind was involved".
+ *
+ * `135deg` is the CSS spelling of the charts' `rotate(45)` SVG patterns: CSS
+ * angles run clockwise from "to top" and the bands sit perpendicular to that
+ * axis, so 135deg — not 45deg — is what leans bottom-left to top-right.
  */
 const hatchOf = (color: string): string =>
-  `repeating-linear-gradient(45deg, transparent 0 4px, ${color} 4px 6px)`;
+  `repeating-linear-gradient(135deg, transparent 0 4px, ${color} 4px 6px)`;
 
 /**
  * Shared by the header and every row so the number columns line up. The bar
