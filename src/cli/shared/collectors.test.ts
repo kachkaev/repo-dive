@@ -8,6 +8,7 @@ function config(maxInCharts: number): ResolvedConfig {
   return {
     maxInCharts,
     weekStartsOn: "monday",
+    chartAnnotations: {},
     catalogPath: "/repo/.repo-dive",
     catalogRelativePath: ".repo-dive",
     checkIgnoreFiles: true,

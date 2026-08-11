@@ -76,12 +76,38 @@ export type ContributorsConfig = {
 /** First day of the week in calendar-shaped charts. */
 export type WeekStart = "monday" | "sunday";
 
+/**
+ * Stable identifiers of the dashboard's chart sections, in page order — the
+ * keys {@link ChartsConfig.annotations} accepts.
+ */
+export const chartIds = [
+  "lines-of-code",
+  "commit-calendar",
+  "commits-per-month",
+  "churn-per-month",
+  "direct-dependencies",
+  "dependencies",
+  "loose-ends",
+  "most-suppressed-eslint-rules",
+  "contributors",
+] as const;
+
+export type ChartId = (typeof chartIds)[number];
+
 export type ChartsConfig = {
   /**
    * Which day calendar-shaped dashboard charts (e.g. the commit calendar)
    * start the week on. Defaults to `"monday"`.
    */
   readonly weekStartsOn?: WeekStart;
+  /**
+   * Per-chart notes rendered in a callout between the chart's heading and the
+   * chart itself — for explaining oddities the data alone cannot, like a
+   * history migration that makes a timeline sparse. Keyed by {@link ChartId};
+   * values are Markdown limited to paragraphs, `-` lists, `**bold**`,
+   * `_italic_`, `` `code` `` and `[links](https://…)`.
+   */
+  readonly annotations?: Partial<Record<ChartId, string>>;
 };
 
 export type CatalogConfig = {

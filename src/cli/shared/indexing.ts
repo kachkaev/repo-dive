@@ -563,7 +563,13 @@ const buildDashboardData = (
     generatedAt: new Date().toISOString(),
     config: {
       contributors: { maxInCharts: config.maxInCharts },
-      charts: { weekStartsOn: config.weekStartsOn },
+      charts: {
+        weekStartsOn: config.weekStartsOn,
+        // Left out entirely when empty, so unannotated dashboards ship no key
+        ...(Object.keys(config.chartAnnotations).length > 0
+          ? { annotations: config.chartAnnotations }
+          : {}),
+      },
     },
     repo: {
       // The remote is the name people know the repo by; the checkout directory

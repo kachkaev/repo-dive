@@ -1,7 +1,8 @@
-import { LoaderCircleIcon } from "lucide-react";
+import { InfoIcon, LoaderCircleIcon } from "lucide-react";
 import { type ReactNode, useDeferredValue } from "react";
 
 import { formatDate, formatDayOfWeek } from "./format.ts";
+import { Markdown } from "./markdown.tsx";
 
 /** The longest weekday name — what the slot below is sized against. */
 const widestDayName = "Wednesday";
@@ -36,6 +37,7 @@ export function DateStamp({ isoDate }: { isoDate: string }) {
 export function Section({
   title,
   subtitle,
+  annotation,
   controls,
   footer,
   skeleton,
@@ -48,6 +50,13 @@ export function Section({
    * switch would shift the controls away from the cursor.
    */
   subtitle?: string | undefined;
+  /**
+   * Markdown note from the analyzed repo's config, rendered as a callout
+   * between the heading and the controls. Shown in `skeleton` mode too — like
+   * the title and subtitle it is a plain prop, so landing it early means the
+   * real section never shifts the layout.
+   */
+  annotation?: string | undefined;
   /** Optional controls, laid out in a wrapping row above the chart card. */
   controls?: ReactNode;
   /**
@@ -73,6 +82,17 @@ export function Section({
       <h2 className="text-base font-semibold">{title}</h2>
       {subtitle ? (
         <p className="mt-0.5 text-sm text-(--text-secondary)">{subtitle}</p>
+      ) : undefined}
+      {annotation ? (
+        <aside className="mt-2 flex max-w-prose gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm text-(--text-secondary)">
+          <InfoIcon
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+          />
+          <div>
+            <Markdown source={annotation} />
+          </div>
+        </aside>
       ) : undefined}
       {controlsRow ? (
         <div className="mt-2 flex flex-wrap items-center gap-2">
