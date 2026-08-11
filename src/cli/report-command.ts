@@ -1,7 +1,7 @@
 import { Option } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
-import { runReport } from "./shared/report.ts";
+import { runReport } from "./report-command/report.ts";
 
 export const reportCommand = Command.make("report", {
   repoPath: Flag.string("repo").pipe(

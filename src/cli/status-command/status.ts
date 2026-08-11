@@ -8,21 +8,21 @@ import {
   findLegacyCatalog,
   isCollected,
   legacyCatalogHint,
-} from "./catalog.ts";
+} from "../shared/catalog.ts";
 import {
   builtInCollectors,
   collectorCacheKey,
   describesTreeState,
-} from "./collectors.ts";
-import { loadConfig } from "./config.ts";
-import { warnAboutIgnoreFiles } from "./ignore-files.ts";
-import { sampleCommits, samplingLabel } from "./sampling.ts";
+} from "../shared/collectors.ts";
+import { loadConfig } from "../shared/config.ts";
+import { warnAboutIgnoreFiles } from "../shared/ignore-files.ts";
+import { sampleCommits, samplingLabel } from "../shared/sampling.ts";
 import {
   listCommits,
   listLineages,
   resolveRepoRoot,
   sampleTreeCommits,
-} from "./scan.ts";
+} from "../shared/scan.ts";
 
 const exists = (filePath: string) =>
   Effect.promise(() =>

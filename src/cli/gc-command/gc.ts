@@ -9,16 +9,16 @@ import {
   type BlobCacheNamespace,
   listBlobCacheNamespaces,
   pruneBlobCacheNamespaces,
-} from "./blob-cache.ts";
-import { readCollectorCacheKey } from "./catalog.ts";
+} from "../shared/blob-cache.ts";
+import { readCollectorCacheKey } from "../shared/catalog.ts";
 import {
   builtInCollectors,
   collectorCacheKey,
   describesTreeState,
-} from "./collectors.ts";
-import { loadConfig } from "./config.ts";
-import { runGit } from "./git.ts";
-import { listMainlineShas, resolveRepoRoot } from "./scan.ts";
+} from "../shared/collectors.ts";
+import { loadConfig } from "../shared/config.ts";
+import { runGit } from "../shared/git.ts";
+import { listMainlineShas, resolveRepoRoot } from "../shared/scan.ts";
 
 const readdirIfExists = (dirPath: string) =>
   Effect.tryPromise(async () => {

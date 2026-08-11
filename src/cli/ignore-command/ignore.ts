@@ -3,13 +3,13 @@ import path from "node:path";
 import { Console, Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
-import { loadConfig } from "./config.ts";
+import { loadConfig } from "../shared/config.ts";
 import {
   addIgnoreEntry,
   checkIgnoreFiles,
   ignoreEntryFor,
-} from "./ignore-files.ts";
-import { resolveRepoRoot } from "./scan.ts";
+} from "../shared/ignore-files.ts";
+import { resolveRepoRoot } from "../shared/scan.ts";
 
 /**
  * Lists the catalog in every ignore file at the repository root that needs it,

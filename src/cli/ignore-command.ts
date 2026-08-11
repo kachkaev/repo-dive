@@ -1,6 +1,6 @@
 import { Command, Flag } from "effect/unstable/cli";
 
-import { runIgnore } from "./shared/ignore.ts";
+import { runIgnore } from "./ignore-command/ignore.ts";
 
 export const ignoreCommand = Command.make("ignore", {
   repoPath: Flag.string("repo").pipe(
