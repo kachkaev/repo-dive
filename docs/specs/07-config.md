@@ -104,6 +104,25 @@ One of `"monday"` (the default) or `"sunday"`.
 The value is not specific to any single chart — future calendar-shaped charts are expected to honor it too.
 It flows into `dashboard.json` under `config.charts.weekStartsOn`, so the dashboard renders without re-reading the config file.
 
+### `charts.annotations`
+
+Per-chart notes for oddities the data alone cannot explain — a history migration that makes a timeline sparse, a vendored dump that spikes a series, a rename that splits a contributor.
+An object keyed by the chart section's stable id, with a Markdown string per chart:
+
+```ts
+charts: {
+  annotations: {
+    "lines-of-code":
+      "Before the December 2023 monorepo assembly this timeline follows the original `effect` repository — see [the migration](https://github.com/Effect-TS/effect).",
+  },
+},
+```
+
+Known ids, in page order: `lines-of-code`, `commit-calendar`, `commits-per-month`, `churn-per-month`, `direct-dependencies`, `dependencies`, `loose-ends`, `most-suppressed-eslint-rules`, `contributors` — an unknown id fails `index` with the list, so a typo cannot silently drop a note.
+The dashboard renders each note in a callout between the chart's heading and the chart itself.
+Markdown is deliberately limited to what a note needs — paragraphs, `-` lists, `**bold**`, `_italic_`, `` `code` `` and `[links](https://…)` — and is rendered as React elements, never injected as HTML.
+Like the rest of `charts`, annotations flow into `dashboard.json` (`config.charts.annotations`, omitted when empty) at `index` time.
+
 ## `catalog`
 
 ### `catalog.dir`

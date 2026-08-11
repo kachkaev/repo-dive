@@ -305,6 +305,7 @@ export function ReportSections({
   maxContributorsInCharts: number;
 }) {
   const dependencies = data.dependencies;
+  const annotations = data.config?.charts?.annotations;
   const calendarHistory = calendarHistoryOf(
     data.repo.firstCommitDate,
     data.generatedAt,
@@ -576,6 +577,7 @@ export function ReportSections({
         <Section
           title="Commit calendar"
           subtitle="commits per day; days bucketed by the committer's local date, i.e. when each commit landed"
+          annotation={annotations?.["commit-calendar"]}
           controls={
             <>
               <KindFilterControl
@@ -641,6 +643,7 @@ export function ReportSections({
       <Section
         title="Commits per month"
         subtitle="months bucketed by the author's date, split by author kind; hatched = human commits with at least one AI co-author trailer"
+        annotation={annotations?.["commits-per-month"]}
         controls={
           <>
             <KindFilterControl
@@ -679,6 +682,7 @@ export function ReportSections({
       <Section
         title="Churn per month"
         subtitle="lines added and deleted, months bucketed by the author's date so they line up with the survival cohorts; hatched = lines added by AI-assisted commits"
+        annotation={annotations?.["churn-per-month"]}
         controls={
           <KindFilterControl
             label="Filter churn by author kind"
@@ -701,6 +705,7 @@ export function ReportSections({
         <Section
           title="Direct dependencies over time"
           subtitle="dependencies, devDependencies and optionalDependencies declared across all package.json files at each commit"
+          annotation={annotations?.["direct-dependencies"]}
           controls={
             <PercentControl
               label="Direct dependencies value display"
@@ -742,6 +747,7 @@ export function ReportSections({
         <Section
           title="Dependencies over time"
           subtitle="resolved packages in the lockfile at each commit, split by package manager"
+          annotation={annotations?.dependencies}
           controls={
             dependenciesChart.seriesKeys.length > 1 ? (
               <PercentControl
@@ -773,7 +779,11 @@ export function ReportSections({
       )}
 
       {looseEndsChart.points.length > 0 && (
-        <Section title="Loose ends" subtitle={looseEndsSubtitle}>
+        <Section
+          title="Loose ends"
+          subtitle={looseEndsSubtitle}
+          annotation={annotations?.["loose-ends"]}
+        >
           <TimeSeriesChart mode="line" {...looseEndsChart} />
         </Section>
       )}
@@ -782,6 +792,7 @@ export function ReportSections({
         <Section
           title="Most-suppressed eslint rules"
           subtitle="at the latest commit; (all) = blanket disables without a rule list"
+          annotation={annotations?.["most-suppressed-eslint-rules"]}
         >
           <BarList
             items={data.topRules.map((row) => ({
@@ -797,6 +808,7 @@ export function ReportSections({
       <Section
         title="Contributors"
         subtitle="whole history; per contributor: commits authored above, commits co-authored for others below — hatching marks cross-kind collaboration"
+        annotation={annotations?.contributors}
         controls={
           <KindFilterControl
             label="Filter contributors by kind"

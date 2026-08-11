@@ -130,6 +130,23 @@ type ContributorRow = {
   assisted?: CrossKindCounts;
 };
 
+/**
+ * Stable ids of the chart sections that accept annotations, mirroring
+ * `chartIds` in the
+ * CLI's public config surface (this file redeclares the dashboard.json shape
+ * rather than importing it, like the rest of {@link DashboardData}).
+ */
+type ChartAnnotationId =
+  | "lines-of-code"
+  | "commit-calendar"
+  | "commits-per-month"
+  | "churn-per-month"
+  | "direct-dependencies"
+  | "dependencies"
+  | "loose-ends"
+  | "most-suppressed-eslint-rules"
+  | "contributors";
+
 export type DashboardData = {
   generatedAt: string;
   /** Optional: absent in dashboard.json written before configurable caps landed. */
@@ -142,6 +159,12 @@ export type DashboardData = {
     charts?: {
       /** Which day calendar-shaped charts start the week on. */
       weekStartsOn: "monday" | "sunday";
+      /**
+       * Optional per-chart Markdown notes from the analyzed repo's config,
+       * rendered in a callout between the chart's heading and the chart.
+       * Keyed by the chart section's stable id.
+       */
+      annotations?: Partial<Record<ChartAnnotationId, string>>;
     };
   };
   repo: {
