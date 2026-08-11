@@ -9,6 +9,7 @@ import { Effect } from "effect";
 
 import {
   listCommits,
+  listLineages,
   listMainlineShas,
   parseGitLog,
   summarizeCommits,
@@ -226,7 +227,7 @@ it.effect(
 );
 
 it.effect(
-  "listMainlineShas extends across a founding graft into the history reaching back furthest",
+  "listLineages turns every history absorbed by a founding graft into a lineage",
   () => {
     const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-fp-"));
 
@@ -291,21 +292,45 @@ it.effect(
       );
 
       const all = yield* listCommits(repoPath);
+      const lineages = yield* listLineages(repoPath);
       const mainline = yield* listMainlineShas(repoPath);
 
       expect(all.length).toBe(8);
-      // The old mainline continues the timeline; the plugin history stays a
-      // side branch (its states never followed the old repo's, they ran in
-      // parallel to it in another repository). The assembly commits — the
-      // skeleton root and the founding merges — hold half-assembled
-      // workspaces, so they drop off the mainline too and the timeline steps
-      // from the absorbed tip straight to the first post-assembly commit.
+      // Both absorbed histories become lineages — before the migration they
+      // were the project's parallel parts, so composed timelines sum them.
+      // The assembly commits — the skeleton root and the founding merges —
+      // hold half-assembled workspaces, so they belong to no lineage and the
+      // composed timeline steps from the absorbed tips straight to the first
+      // post-assembly commit.
       expect([...mainline].toSorted()).toStrictEqual(
-        [later, old1, old2].toSorted(),
+        [later, old1, old2, plugin1, plugin2].toSorted(),
       );
-      for (const sha of [skeleton, mergeOld, mergePlugin, plugin1, plugin2]) {
+      for (const sha of [skeleton, mergeOld, mergePlugin]) {
         expect(mainline.has(sha)).toBe(false);
       }
+
+      const laterMs = Date.parse("2024-02-01T00:00:00Z");
+      expect(
+        lineages
+          .map((lineage) => ({
+            shas: [...lineage.shas].toSorted(),
+            endsAtMs: lineage.endsAtMs,
+          }))
+          .toSorted((left, right) =>
+            (left.shas[0] ?? "") < (right.shas[0] ?? "") ? -1 : 1,
+          ),
+      ).toStrictEqual(
+        [
+          // HEAD's own lineage never stops contributing…
+          { shas: [later], endsAtMs: Number.POSITIVE_INFINITY },
+          // …while each absorbed one ends the instant the assembly completes,
+          // i.e. at the first post-assembly commit.
+          { shas: [old1, old2].toSorted(), endsAtMs: laterMs },
+          { shas: [plugin1, plugin2].toSorted(), endsAtMs: laterMs },
+        ].toSorted((left, right) =>
+          (left.shas[0] ?? "") < (right.shas[0] ?? "") ? -1 : 1,
+        ),
+      );
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {

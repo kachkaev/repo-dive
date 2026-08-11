@@ -533,6 +533,85 @@ test.concurrent(
   },
 );
 
+test.concurrent(
+  "index sums founding-graft lineages into the tree timelines",
+  async () => {
+    const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-lineage-"));
+
+    function commitAt(isoDate: string, name: string) {
+      const environment = {
+        ...commitEnvironment,
+        GIT_AUTHOR_DATE: isoDate,
+        GIT_COMMITTER_DATE: isoDate,
+      };
+      writeFileSync(path.join(repoPath, name), `${name}\n`);
+      runGitAs(repoPath, environment, "add", ".");
+      runGitAs(repoPath, environment, "commit", "-m", name);
+    }
+    function mergeAt(isoDate: string, branch: string) {
+      runGitAs(
+        repoPath,
+        {
+          ...commitEnvironment,
+          GIT_AUTHOR_DATE: isoDate,
+          GIT_COMMITTER_DATE: isoDate,
+        },
+        "merge",
+        "--no-ff",
+        "--allow-unrelated-histories",
+        branch,
+      );
+    }
+
+    try {
+      // Two pre-migration repositories evolving in parallel…
+      runGit(repoPath, "init", "-b", "old");
+      commitAt("2020-01-01T00:00:00Z", "old-a.txt");
+      commitAt("2020-06-01T00:00:00Z", "old-b.txt");
+      runGit(repoPath, "checkout", "--orphan", "plugin");
+      runGit(repoPath, "rm", "-rf", ".");
+      commitAt("2022-01-01T00:00:00Z", "plugin-a.txt");
+      // …assembled effect-style: a fresh skeleton root immediately followed
+      // by merges of the absorbed histories, then ordinary development.
+      runGit(repoPath, "checkout", "--orphan", "main");
+      runGit(repoPath, "rm", "-rf", ".");
+      commitAt("2024-01-01T00:00:00Z", "workspace.txt");
+      mergeAt("2024-01-01T00:01:00Z", "old");
+      mergeAt("2024-01-01T00:02:00Z", "plugin");
+      commitAt("2024-02-01T00:00:00Z", "post-assembly.txt");
+
+      const scanRun = await runCli(
+        "scan",
+        "--repo",
+        repoPath,
+        "--collectors",
+        "file-types",
+      );
+      expect(scanRun.status, scanRun.stderr).toBe(0);
+      const indexRun = await runCli("index", "--repo", repoPath);
+      expect(indexRun.status, indexRun.stderr).toBe(0);
+
+      const dashboard: unknown = JSON.parse(
+        readFileSync(
+          path.join(repoPath, ".repo-dive", "index", "dashboard.json"),
+          "utf8",
+        ),
+      );
+      const totals = arrayAt(dashboard, "fileTypes").map((row) =>
+        numberAt(row, "totalFiles"),
+      );
+      // 1 then 2 files in the old repo; the plugin snapshot adds its file to
+      // the carried-forward old repo (3); the assembly commits are skipped,
+      // and the first post-assembly snapshot holds everything by itself
+      // (workspace + old-a + old-b + plugin-a + post-assembly = 5) — no
+      // crash-to-zero and no double counting at the boundary.
+      expect(totals).toStrictEqual([1, 2, 3, 5]);
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  },
+);
+
 test.concurrent("query runs read-only SQL against the cube", async () => {
   const repoPath = createFixtureRepo();
 

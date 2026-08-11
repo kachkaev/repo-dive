@@ -17,7 +17,12 @@ import {
 import { loadConfig } from "./config.ts";
 import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import { sampleCommits, samplingLabel } from "./sampling.ts";
-import { listCommits, listMainlineShas, resolveRepoRoot } from "./scan.ts";
+import {
+  listCommits,
+  listLineages,
+  resolveRepoRoot,
+  sampleTreeCommits,
+} from "./scan.ts";
 
 const exists = (filePath: string) =>
   Effect.promise(() =>
@@ -35,7 +40,7 @@ export const runStatus = ({
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(repoPath);
     const commits = yield* listCommits(repoRoot);
-    const mainlineShas = yield* listMainlineShas(repoRoot);
+    const lineages = yield* listLineages(repoRoot);
     const config = yield* loadConfig(repoRoot);
     const catalogPath = config.catalogPath;
 
@@ -64,26 +69,28 @@ export const runStatus = ({
       // Count against what the collector is actually meant to cover: a monthly
       // collector on a busy repo is complete at a handful of commits, and
       // reporting it as `1/45` reads as barely started. Snapshot collectors
-      // are only ever scanned on the mainline, so counting them against
-      // off-mainline commits too would keep them short of their target
-      // however often `scan` is run.
-      const target = sampleCommits(
-        describesTreeState(collector)
-          ? commits.filter((commit) => mainlineShas.has(commit.hash))
-          : commits,
-        collector.defaultSampling,
-      );
+      // are only ever scanned on the lineages — sampled per lineage, exactly
+      // the way `scan` plans them — so counting them against off-mainline
+      // commits (or pooling parallel lineages into one sample) would keep
+      // them short of their target however often `scan` is run.
+      const targetShas = describesTreeState(collector)
+        ? sampleTreeCommits(lineages, commits, collector.defaultSampling)
+        : new Set(
+            sampleCommits(commits, collector.defaultSampling).map(
+              (commit) => commit.hash,
+            ),
+          );
       const cacheKey = collectorCacheKey(collector, config);
       const collectedFlags = yield* Effect.forEach(
-        target,
-        (commit) => isCollected(catalog, commit.hash, collector, cacheKey),
+        [...targetShas],
+        (sha) => isCollected(catalog, sha, collector, cacheKey),
         { concurrency: 16 },
       );
       const collected = collectedFlags.filter(Boolean).length;
       lines.push(
         collector.defaultSampling === "all"
-          ? `  ${collector.name}: ${collected}/${target.length} commits collected`
-          : `  ${collector.name}: ${collected}/${target.length} commits collected` +
+          ? `  ${collector.name}: ${collected}/${targetShas.size} commits collected`
+          : `  ${collector.name}: ${collected}/${targetShas.size} commits collected` +
               ` (${samplingLabel(collector.defaultSampling)} sample of ${commits.length})`,
       );
     }

@@ -12,6 +12,10 @@ import {
   type Fact,
 } from "./collectors.ts";
 import {
+  composeLineageSeries,
+  type LineageSnapshot,
+} from "./compose-lineage-series.ts";
+import {
   loadConfig,
   normalizeContributorName,
   type ResolvedConfig,
@@ -19,7 +23,7 @@ import {
 import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import { languageOfExtension } from "./languages.ts";
 import { readRemoteUrl } from "./remote.ts";
-import { listCommits, listMainlineShas, resolveRepoRoot } from "./scan.ts";
+import { listCommits, listLineages, resolveRepoRoot } from "./scan.ts";
 
 class NoCollectedCommitsError extends Data.TaggedError(
   "NoCollectedCommitsError",
@@ -189,7 +193,40 @@ const buildDashboardData = (
   config: ResolvedConfig,
   /** Browsable URL of `origin`, when the repo has one (see `remote.ts`). */
   remoteUrl: string | undefined,
+  /**
+   * Which lineage a snapshot commit belongs to (index + contribution window
+   * end), `undefined` off the lineages. Tree-state series are composed as the
+   * sum of parallel lineages — see `compose-lineage-series.ts`.
+   */
+  lineageOf: (sha: string) => { index: number; endsAtMs: number } | undefined,
 ) => {
+  /**
+   * Rows of one tree-state series: eligible snapshots tagged with their
+   * lineage, summed across the lineages alive at each instant. For a repo
+   * with a single lineage (no founding graft) this is exactly the plain
+   * filter-and-map it replaces.
+   */
+  const composeSeries = <Row extends { sha: string; date: string }>(
+    eligible: (commit: CommitFacts) => boolean,
+    toRow: (commit: CommitFacts) => Row,
+  ): Row[] =>
+    composeLineageSeries(
+      commits.flatMap((commit): Array<LineageSnapshot<Row>> => {
+        if (!eligible(commit)) {
+          return [];
+        }
+        const lineage = lineageOf(commit.sha);
+        return lineage === undefined
+          ? []
+          : [
+              {
+                row: toRow(commit),
+                lineage: lineage.index,
+                lineageEndsAtMs: lineage.endsAtMs,
+              },
+            ];
+      }),
+    );
   /** The raw `"Name <email>"` trailers on a commit, in the order git listed them. */
   const coAuthorsOf = (commit: CommitFacts): string[] =>
     [...commit.factsByCollector.values()]
@@ -233,26 +270,28 @@ const buildDashboardData = (
   // the dashboard already loads in full for the commit calendar. Shipping both
   // meant two aggregations to keep in step for no data the second one added.
 
-  const languages = commits
-    .filter((commit) => hasMetric(commit, "languages.lines"))
-    .map((commit) => ({
+  const languages = composeSeries(
+    (commit) => hasMetric(commit, "languages.lines"),
+    (commit) => ({
       sha: commit.sha.slice(0, 10),
       date: commit.committedAt,
       byLanguage: groupMetric(commit, "languages.lines", "language"),
-    }));
+    }),
+  );
 
-  const fileTypes = commits
-    .filter((commit) => hasMetric(commit, "files.count"))
-    .map((commit) => ({
+  const fileTypes = composeSeries(
+    (commit) => hasMetric(commit, "files.count"),
+    (commit) => ({
       sha: commit.sha.slice(0, 10),
       date: commit.committedAt,
       totalFiles: sumMetric(commit, "files.count"),
       totalBytes: sumMetric(commit, "files.bytes"),
-    }));
+    }),
+  );
 
-  const directives = commits
-    .filter((commit) => hasMetric(commit, "directives.ts"))
-    .map((commit) => {
+  const directives = composeSeries(
+    (commit) => hasMetric(commit, "directives.ts"),
+    (commit) => {
       const byType = groupMetric(commit, "directives.eslint", "type");
       const ts = groupMetric(commit, "directives.ts", "type");
       return {
@@ -270,21 +309,20 @@ const buildDashboardData = (
         tsNocheck: ts["nocheck"] ?? 0,
         todos: sumMetric(commit, "todos.count"),
       };
-    });
+    },
+  );
 
-  const dependencies = commits
-    .filter(
-      (commit) =>
-        // A commit the collector scanned but found neither a lockfile nor a
-        // package.json in carries only `dependencies.scanned`; it still belongs
-        // on the chart as a zero, so "collected, no dependencies" stays distinct
-        // from an unscanned gap. A repo can also declare dependencies in a
-        // package.json before any lockfile exists, so manifests count too.
-        hasMetric(commit, "dependencies.resolved") ||
-        hasMetric(commit, "dependencies.manifest") ||
-        hasMetric(commit, "dependencies.scanned"),
-    )
-    .map((commit) => {
+  const dependencies = composeSeries(
+    (commit) =>
+      // A commit the collector scanned but found neither a lockfile nor a
+      // package.json in carries only `dependencies.scanned`; it still belongs
+      // on the chart as a zero, so "collected, no dependencies" stays distinct
+      // from an unscanned gap. A repo can also declare dependencies in a
+      // package.json before any lockfile exists, so manifests count too.
+      hasMetric(commit, "dependencies.resolved") ||
+      hasMetric(commit, "dependencies.manifest") ||
+      hasMetric(commit, "dependencies.scanned"),
+    (commit) => {
       const byKind = groupMetric(commit, "dependencies.direct", "kind");
       return {
         sha: commit.sha.slice(0, 10),
@@ -300,7 +338,8 @@ const buildDashboardData = (
           "packageManager",
         ),
       };
-    });
+    },
+  );
 
   const latestWithDirectives = commits.findLast((commit) =>
     hasMetric(commit, "directives.eslint"),
@@ -386,9 +425,9 @@ const buildDashboardData = (
     );
   };
 
-  const survival = commits
-    .filter((commit) => hasMetric(commit, "survival.lines"))
-    .map((commit) => {
+  const survival = composeSeries(
+    (commit) => hasMetric(commit, "survival.lines"),
+    (commit) => {
       // Living lines cross-tabulated by contributor (and by extension) and the
       // year each line was authored — the dashboard splits each contributor's
       // or language's area into year bands.
@@ -428,7 +467,8 @@ const buildDashboardData = (
         ),
         byLanguageYear,
       };
-    });
+    },
+  );
 
   // One bucket per person, whether they authored commits, only ever helped
   // with someone else's, or both — humans, bots and AI agents all measured the
@@ -667,7 +707,14 @@ export const runIndex = ({
     );
 
     const gitCommits = yield* listCommits(repoRoot);
-    const mainlineShas = yield* listMainlineShas(repoRoot);
+    const lineages = yield* listLineages(repoRoot);
+    /** sha → its lineage's index and contribution window end. */
+    const lineageBySha = new Map<string, { index: number; endsAtMs: number }>();
+    for (const [index, lineage] of lineages.entries()) {
+      for (const sha of lineage.shas) {
+        lineageBySha.set(sha, { index, endsAtMs: lineage.endsAtMs });
+      }
+    }
     const remoteUrl = yield* readRemoteUrl(repoRoot);
     const catalogShas = new Set(
       yield* Effect.tryPromise(async () => {
@@ -704,7 +751,7 @@ export const runIndex = ({
       (commit) =>
         Effect.tryPromise(async () => {
           const commitDir = path.join(commitsPath, commit.hash);
-          const onMainline = mainlineShas.has(commit.hash);
+          const onMainline = lineageBySha.has(commit.hash);
           const factsByCollector = new Map<string, readonly Fact[]>();
           let unknownCollectorDirs = 0;
           let offMainlineSnapshots = 0;
@@ -765,6 +812,7 @@ export const runIndex = ({
       commitFacts,
       config,
       remoteUrl,
+      (sha) => lineageBySha.get(sha),
     );
     const dashboardPath = path.join(indexDir, "dashboard.json");
     yield* Effect.tryPromise(() =>
@@ -783,7 +831,7 @@ export const runIndex = ({
           : []),
         ...(offMainlineSnapshots > 0
           ? [
-              `Skipped ${offMainlineSnapshots} tree snapshots taken off HEAD's first-parent chain.`,
+              `Skipped ${offMainlineSnapshots} tree snapshots taken off the lineages.`,
             ]
           : []),
       ].join("\n"),
