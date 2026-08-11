@@ -20,7 +20,7 @@ export default {
         "Commits from every repository absorbed by the December 2023 monorepo assembly are counted wherever they sit in the graph. The project's 2021–2023 core work happened in repositories whose histories were discarded before the assembly, so it appears neither here nor in the timelines below.",
       "direct-dependencies": `${monorepoAssembly} The core packages' repositories were not carried over, so their manifests are missing from the pre-2024 counts.`,
       dependencies: `${monorepoAssembly} Lockfiles of the repositories that were not carried over — including the core packages' — are invisible here.`,
-      "loose-ends": `${monorepoAssembly} Readings before late 2023 undercount the wider project: its core code lived in repositories that were not carried over, so their loose ends are missing.`,
+      "loose-ends": `${monorepoAssembly} Readings before late 2023 understate the wider project: its core code lived in repositories that were not carried over, so their loose ends are missing.`,
     },
   },
 };
