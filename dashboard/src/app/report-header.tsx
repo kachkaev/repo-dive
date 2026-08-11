@@ -164,6 +164,9 @@ const tooltipUnderline =
  * there is nowhere to link, the trigger is a focusable span (so the tooltip
  * still opens from the keyboard) with a `help` cursor and no underline — both
  * a pointer and an underline would promise a click that does nothing.
+ *
+ * `whitespace-nowrap` keeps `YYYY-MM-DD` whole: its hyphens are break
+ * opportunities, and a date split across two lines stops reading as a date.
  */
 function AnnotatedDate({
   isoDate,
@@ -180,13 +183,13 @@ function AnnotatedDate({
         delay={200}
         render={
           href === undefined ? (
-            <span tabIndex={0} className="cursor-help" />
+            <span tabIndex={0} className="cursor-help whitespace-nowrap" />
           ) : (
             <a
               href={href}
               target="_blank"
               rel="noreferrer"
-              className={`${tooltipUnderline} cursor-pointer hover:text-(--series-1)`}
+              className={`${tooltipUnderline} cursor-pointer whitespace-nowrap hover:text-(--series-1)`}
             />
           )
         }
@@ -290,21 +293,29 @@ export function ReportHeader({
         />
         {repo.firstCommitDate ? (
           <>
-            {" · coverage: "}
-            <CommitDate
-              isoDate={repo.firstCommitDate}
-              sha={repo.firstCommitSha}
-              remote={remote}
-            />
-            {" — "}
-            <CommitDate
-              isoDate={repo.lastCommitDate ?? repo.firstCommitDate}
-              sha={repo.lastCommitSha}
-              remote={remote}
-            />
+            {/* A narrow screen wraps this line, and the only tolerable place to
+                break it is between the two clauses: the separator is glued to
+                the generation date by a non-breaking space, and the coverage
+                clause travels as one `inline-block` so "coverage:" never ends
+                up stranded on the line above its dates. */}
+            {" · "}
+            <span className="inline-block">
+              {"coverage: "}
+              <CommitDate
+                isoDate={repo.firstCommitDate}
+                sha={repo.firstCommitSha}
+                remote={remote}
+              />
+              {" — "}
+              <CommitDate
+                isoDate={repo.lastCommitDate ?? repo.firstCommitDate}
+                sha={repo.lastCommitSha}
+                remote={remote}
+              />
+            </span>
           </>
         ) : (
-          " · no history"
+          " · no history"
         )}
       </p>
     </header>
