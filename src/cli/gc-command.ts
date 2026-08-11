@@ -1,7 +1,7 @@
 import { Option } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
-import { runGc } from "./gc-command/gc.ts";
+import { runGc } from "./gc-command/run-gc.ts";
 
 export const gcCommand = Command.make("gc", {
   repoPath: Flag.string("repo").pipe(

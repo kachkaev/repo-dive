@@ -1,6 +1,6 @@
 import { Command, Flag } from "effect/unstable/cli";
 
-import { runStatus } from "./status-command/status.ts";
+import { runStatus } from "./status-command/run-status.ts";
 
 export const statusCommand = Command.make("status", {
   repoPath: Flag.string("repo").pipe(
