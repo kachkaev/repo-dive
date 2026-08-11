@@ -296,12 +296,16 @@ it.effect(
       expect(all.length).toBe(8);
       // The old mainline continues the timeline; the plugin history stays a
       // side branch (its states never followed the old repo's, they ran in
-      // parallel to it in another repository).
+      // parallel to it in another repository). The assembly commits — the
+      // skeleton root and the founding merges — hold half-assembled
+      // workspaces, so they drop off the mainline too and the timeline steps
+      // from the absorbed tip straight to the first post-assembly commit.
       expect([...mainline].toSorted()).toStrictEqual(
-        [skeleton, mergeOld, mergePlugin, later, old1, old2].toSorted(),
+        [later, old1, old2].toSorted(),
       );
-      expect(mainline.has(plugin1)).toBe(false);
-      expect(mainline.has(plugin2)).toBe(false);
+      for (const sha of [skeleton, mergeOld, mergePlugin, plugin1, plugin2]) {
+        expect(mainline.has(sha)).toBe(false);
+      }
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {

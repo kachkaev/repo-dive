@@ -86,6 +86,10 @@ A repository migration (monorepo assembly, host move, history rewrite) cuts the 
 The migration leaves a recognizable signature — a root followed by an unbroken run of merges absorbing histories that end before the root begins — and the mainline follows it: when such a **founding graft** exists, the absorbed history reaching back furthest continues the chain (recursively, in case that history was itself founded by a migration).
 Both conditions are load-bearing: a foreign history vendored later in the repository's life sits above an ordinary commit rather than in the founding window, and a sibling repository absorbed while mainline development continued overlaps the timeline instead of preceding it — neither continues the chain, however old its commits are.
 
+The assembly commits themselves — the fresh root and the founding merge run — leave the mainline when a continuation is found.
+Their trees are half-assembled workspaces nobody ever ran (effect's skeleton is a near-empty tree that the next eight merges fill one repository at a time), so sampling them would draw a crash-to-zero spike at the graft boundary; instead the timeline steps from the absorbed tip straight to the first post-assembly commit.
+Following a single absorbed history is still an approximation — the other absorbed repositories also existed before the migration, and summing every absorbed lineage would meet the post-assembly total exactly — see [additive lineage composition](06-open-questions.md#scope) among the open questions.
+
 ## Author date vs committer date
 
 Git gives every commit two timestamps, and under a rebase or squash-merge workflow they are genuinely different facts: the **author** date is when the work was written, the **committer** date is when it became part of the history.
