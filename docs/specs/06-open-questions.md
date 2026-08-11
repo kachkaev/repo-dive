@@ -52,6 +52,8 @@ Note this is an npm-specific rule — PyPI ([PEP 503](https://peps.python.org/pe
 
 - ~~Branch handling: first-parent history only vs everything reachable~~ — answered by strategy rather than globally: `log` collectors see every commit reachable from HEAD, while `tree` and `worktree` collectors are restricted to HEAD's first-parent chain, since only those trees are states the repository passed through (see [collectors](04-collectors.md#sampling)).
   Still open: whether anything should walk branches other than HEAD's.
+- ~~Additive lineage composition~~ — implemented for founding grafts: every absorbed history is a lineage contributing to the summed tree timelines from its own root until the assembly that absorbed it completes (see [collectors](04-collectors.md#sampling)).
+  Still open, in rising order of ambition: whether mid-life unrelated-histories grafts (a repository absorbed while mainline development continued) should also compose — their windows overlap the mainline, so the no-double-counting argument needs more care; and cross-repo lineage — effect's 2021–2023 code lived in `@effect/io`/`@effect/data`, whose histories were discarded before the monorepo assembly, so no walk of this repository can recover them; only scanning declared predecessor repositories could.
 - Shallow clones and partial clones: detect and warn, or attempt to unshallow?
 - Monorepos: per-directory scoping (`--path`) as a first-class filter?
 - Other VCSs: git-only for now and for the foreseeable future, but a very distant Mercurial/Jujutsu/Pijul future shouldn't be structurally impossible — the catalog manifest records the VCS, and git-specific code stays behind the collector/runner seam rather than leaking into the cube model.

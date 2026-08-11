@@ -4,7 +4,12 @@ import { pathToFileURL } from "node:url";
 
 import { Effect } from "effect";
 
-import type { ContributorKind, WeekStart } from "../../config.ts";
+import {
+  type ChartId,
+  chartIds,
+  type ContributorKind,
+  type WeekStart,
+} from "../../config.ts";
 
 /** "12345+alice@users.noreply.github.com" → "alice"; other emails unchanged. */
 export const prettifyAuthorEmail = (email: string): string => {
@@ -124,6 +129,8 @@ export type ResolvedConfig = {
   readonly maxInCharts: number;
   /** Which day calendar-shaped dashboard charts start the week on. */
   readonly weekStartsOn: WeekStart;
+  /** Markdown notes rendered in a callout above the chart they are keyed by. */
+  readonly chartAnnotations: Readonly<Partial<Record<ChartId, string>>>;
   /** Absolute path of the catalog folder for this repository. */
   readonly catalogPath: string;
   /**
@@ -324,6 +331,33 @@ const parseWeekStartsOn = (value: unknown): WeekStart => {
   throw configError('`charts.weekStartsOn` must be "monday" or "sunday".');
 };
 
+const parseChartAnnotations = (
+  value: unknown,
+): Partial<Record<ChartId, string>> => {
+  if (value === undefined) {
+    return {};
+  }
+  if (!isPlainObject(value)) {
+    throw configError("`charts.annotations` must be an object.");
+  }
+  const annotations: Partial<Record<ChartId, string>> = {};
+  for (const [key, markdown] of Object.entries(value)) {
+    const chartId = chartIds.find((id) => id === key);
+    if (chartId === undefined) {
+      throw configError(
+        `\`charts.annotations\` has an unknown chart id ${JSON.stringify(key)}; known ids: ${chartIds.join(", ")}.`,
+      );
+    }
+    if (typeof markdown !== "string" || markdown.trim() === "") {
+      throw configError(
+        `\`charts.annotations.${chartId}\` must be a non-empty string.`,
+      );
+    }
+    annotations[chartId] = markdown.trim();
+  }
+  return annotations;
+};
+
 /**
  * Resolves `catalog.dir` against the repository root. `gc` deletes whole
  * subtrees under the result, so the two placements that would take the
@@ -406,6 +440,9 @@ export const resolveConfig = (
   const weekStartsOn = parseWeekStartsOn(
     charts === undefined ? undefined : prop(charts, "weekStartsOn"),
   );
+  const chartAnnotations = parseChartAnnotations(
+    charts === undefined ? undefined : prop(charts, "annotations"),
+  );
   const catalog = prop(raw, "catalog");
   if (catalog !== undefined && !isPlainObject(catalog)) {
     throw configError("`catalog` must be an object.");
@@ -422,6 +459,7 @@ export const resolveConfig = (
       bareResolveContributor(aliasMap, email, name),
     maxInCharts,
     weekStartsOn,
+    chartAnnotations,
     catalogPath,
     catalogRelativePath: relativeCatalogPath(repoRoot, catalogPath),
     checkIgnoreFiles: parseCheckIgnoreFiles(

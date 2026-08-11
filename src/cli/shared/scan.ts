@@ -142,22 +142,282 @@ export const listCommits = (
     Effect.map(parseGitLog),
   );
 
+type ChainEntry = {
+  readonly hash: string;
+  readonly parentHashes: readonly string[];
+  readonly committerDate: string;
+};
+
+const chainLogFormat = ["%H", "%P", "%cI"].join("%x1f");
+
 /**
- * Shas on HEAD's first-parent chain, i.e. the states the repository actually
- * passed through. See {@link describesTreeState} for why snapshot collectors
- * are restricted to them.
+ * The first-parent chain of `tip` (HEAD when omitted), newest first. HEAD is
+ * left implicit rather than passed: an explicit rev makes git fail an empty
+ * repository with "unknown revision" instead of the "does not have any commits
+ * yet" that {@link succeedIfNoCommitsYet} recovers from.
  */
-export const listFirstParentShas = (
+const listFirstParentChain = (
+  repoRoot: string,
+  tip?: string,
+): Effect.Effect<
+  ChainEntry[],
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
+  runGit([
+    "-C",
+    repoRoot,
+    "log",
+    "--first-parent",
+    `--format=${chainLogFormat}`,
+    ...(tip === undefined ? [] : [tip]),
+  ]).pipe(
+    succeedIfNoCommitsYet,
+    Effect.map((stdout) =>
+      stdout
+        .split("\n")
+        .filter(Boolean)
+        .map((line): ChainEntry => {
+          const [hash = "", parents = "", committerDate = ""] =
+            line.split(fieldSeparator);
+          return {
+            hash,
+            parentHashes: parents.split(" ").filter(Boolean),
+            committerDate,
+          };
+        }),
+    ),
+  );
+
+/** No common ancestor means the two commits come from unrelated histories. */
+const haveUnrelatedHistories = (
+  repoRoot: string,
+  left: string,
+  right: string,
+): Effect.Effect<
+  boolean,
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
+  // Exit code 1 is `merge-base`'s "no common ancestor", not a failure
+  runGit(["-C", repoRoot, "merge-base", left, right], {
+    okExitCodes: [1],
+  }).pipe(Effect.map((stdout) => stdout.trim() === ""));
+
+type FoundingGraft = {
+  /** The absorbed histories' first-parent chains, empty when none qualified. */
+  readonly absorbed: ChainEntry[][];
+  /**
+   * The assembly itself: the fresh root plus the founding merge run above it.
+   * These commits hold half-assembled workspaces nobody ever ran (effect's
+   * skeleton is a near-empty tree that the next eight merges fill in one repo
+   * at a time), so when the graft is recognized the caller drops them from the
+   * lineage and the composed timeline steps from the absorbed tips straight to
+   * the first post-assembly commit.
+   */
+  readonly assemblyShas: readonly string[];
+};
+
+/**
+ * The first-parent chains that continue `chain` backwards in time across a
+ * founding graft, or no chains when there is none.
+ *
+ * A repository migration (monorepo assembly, host move, history rewrite)
+ * leaves a recognizable signature: a fresh root commit followed immediately by
+ * merges that absorb the project's previous histories. Both conditions below
+ * are required, so ordinary absorptions stay excluded:
+ *
+ * - the merge sits in the founding window — the unbroken run of merges
+ *   directly above the root, before the first ordinary commit. A foreign
+ *   history vendored later in the repository's life does not qualify.
+ * - the absorbed history ends before the root begins, so it occupies the
+ *   stretch of timeline where the current chain has nothing to say. A side
+ *   history that overlaps the chain (e.g. a plugin repository absorbed while
+ *   mainline development continued) does not qualify.
+ *
+ * Every qualifying absorbed history is returned (effect's monorepo assembly
+ * merged eight): before the migration they were the project's parallel parts,
+ * so composed timelines sum all of them until the assembly replaces them.
+ */
+const findFoundingGraft = (
+  repoRoot: string,
+  chain: readonly ChainEntry[],
+  alreadyClaimed: ReadonlySet<string>,
+): Effect.Effect<
+  FoundingGraft,
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
+  Effect.gen(function* () {
+    const root = chain.at(-1);
+    if (root === undefined) {
+      return { absorbed: [], assemblyShas: [] };
+    }
+    const rootDate = Date.parse(root.committerDate);
+
+    const candidateTips: string[] = [];
+    const assemblyShas: string[] = [root.hash];
+    for (let index = chain.length - 2; index >= 0; index -= 1) {
+      const entry = chain[index];
+      if (entry === undefined || entry.parentHashes.length < 2) {
+        break;
+      }
+      candidateTips.push(...entry.parentHashes.slice(1));
+      assemblyShas.push(entry.hash);
+    }
+
+    const absorbed: ChainEntry[][] = [];
+    for (const tip of candidateTips) {
+      if (alreadyClaimed.has(tip)) {
+        continue;
+      }
+      if (!(yield* haveUnrelatedHistories(repoRoot, root.hash, tip))) {
+        continue;
+      }
+      const candidate = yield* listFirstParentChain(repoRoot, tip);
+      const tipDate = Date.parse(candidate.at(0)?.committerDate ?? "");
+      const candidateRootDate = Date.parse(
+        candidate.at(-1)?.committerDate ?? "",
+      );
+      if (
+        Number.isNaN(tipDate) ||
+        Number.isNaN(candidateRootDate) ||
+        tipDate >= rootDate
+      ) {
+        continue;
+      }
+      absorbed.push(candidate);
+    }
+    return { absorbed, assemblyShas };
+  });
+
+/**
+ * One stretch of the project's history whose tree states are worth
+ * snapshotting: a first-parent chain (minus any assembly run at its old end)
+ * together with the instant its contribution to composed timelines ends.
+ */
+export type Lineage = {
+  /** Snapshot-worthy shas: the lineage's first-parent chain minus assembly. */
+  readonly shas: ReadonlySet<string>;
+  /**
+   * When the lineage stops contributing to composed timelines, as epoch
+   * milliseconds: the committer date of the first post-assembly commit of the
+   * graft that absorbed it — from that instant the absorbing lineage's trees
+   * contain this one's content. `Infinity` for the lineage holding HEAD.
+   */
+  readonly endsAtMs: number;
+};
+
+/**
+ * The lineages whose tree states describe the project over time — the states
+ * the repository (or, before a migration, its absorbed predecessors) actually
+ * passed through. The first lineage is HEAD's own first-parent chain; each
+ * founding graft on any lineage (see {@link findFoundingGraft}) contributes
+ * the absorbed histories as further lineages, recursively, each ending where
+ * the assembly that absorbed it completes. Ordinary side branches and
+ * histories grafted mid-life stay excluded — their trees were never the
+ * repository's state. See {@link describesTreeState} for what consumes this.
+ */
+export const listLineages = (
+  repoRoot: string,
+): Effect.Effect<
+  Lineage[],
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
+  Effect.gen(function* () {
+    const lineages: Lineage[] = [];
+    /** Every sha assigned to a lineage (or queued): overlap and cycle guard. */
+    const claimed = new Set<string>();
+    const initial = yield* listFirstParentChain(repoRoot);
+    const queue: Array<{ chain: ChainEntry[]; endsAtMs: number }> =
+      initial.length > 0
+        ? [{ chain: initial, endsAtMs: Number.POSITIVE_INFINITY }]
+        : [];
+
+    while (queue.length > 0) {
+      const pending = queue.shift();
+      if (pending === undefined) {
+        break;
+      }
+      const { chain, endsAtMs } = pending;
+      for (const entry of chain) {
+        claimed.add(entry.hash);
+      }
+
+      const graft = yield* findFoundingGraft(repoRoot, chain, claimed);
+      const shas = new Set(chain.map((entry) => entry.hash));
+      let absorbedEndsAtMs = endsAtMs;
+      if (
+        graft.absorbed.length > 0 &&
+        // A degenerate chain that is nothing but assembly (HEAD is still a
+        // founding merge) keeps its commits: better a mid-assembly snapshot
+        // than none of the current era at all.
+        graft.assemblyShas.length < chain.length
+      ) {
+        for (const sha of graft.assemblyShas) {
+          shas.delete(sha);
+        }
+        const firstPostAssembly = chain.at(-1 - graft.assemblyShas.length);
+        if (firstPostAssembly !== undefined) {
+          absorbedEndsAtMs = Date.parse(firstPostAssembly.committerDate);
+        }
+      }
+
+      lineages.push({ shas, endsAtMs });
+      for (const absorbedChain of graft.absorbed) {
+        queue.push({ chain: absorbedChain, endsAtMs: absorbedEndsAtMs });
+      }
+    }
+    return lineages;
+  });
+
+/**
+ * Every sha on any lineage — what `scan` samples tree snapshots from, `gc`
+ * refuses to reclaim and `index` admits into the cube.
+ */
+export const listMainlineShas = (
   repoRoot: string,
 ): Effect.Effect<
   Set<string>,
   CommandError,
   ChildProcessSpawner.ChildProcessSpawner
 > =>
-  runGit(["-C", repoRoot, "log", "--first-parent", "--format=%H"]).pipe(
-    succeedIfNoCommitsYet,
-    Effect.map((stdout) => new Set(stdout.split("\n").filter(Boolean))),
+  listLineages(repoRoot).pipe(
+    Effect.map((lineages) => {
+      const shas = new Set<string>();
+      for (const lineage of lineages) {
+        for (const sha of lineage.shas) {
+          shas.add(sha);
+        }
+      }
+      return shas;
+    }),
   );
+
+/**
+ * The commits a tree-state collector should cover: `policy` applied to each
+ * lineage separately, so a monthly policy keeps one snapshot per month of
+ * *each* parallel pre-migration history rather than one per month overall.
+ * Shared by `scan` (planning) and `status` (progress targets), which must
+ * count the same way.
+ */
+export const sampleTreeCommits = (
+  lineages: readonly Lineage[],
+  commits: readonly CommitMeta[],
+  policy: SamplingPolicy,
+): Set<string> => {
+  const shas = new Set<string>();
+  for (const lineage of lineages) {
+    const candidates = commits.filter((commit) =>
+      lineage.shas.has(commit.hash),
+    );
+    for (const commit of sampleCommits(candidates, policy)) {
+      shas.add(commit.hash);
+    }
+  }
+  return shas;
+};
 
 export type RepoSummary = {
   readonly commitCount: number;
@@ -381,19 +641,18 @@ export const runScan = ({
     const cacheKeyOf = (collector: Collector): string =>
       cacheKeys.get(collector.name) ?? collectorCacheKey(collector, config);
 
-    const firstParentShas = yield* listFirstParentShas(repoRoot);
+    const lineages = yield* listLineages(repoRoot);
 
     const plans = collectors.map((collector) => {
       const policy = sampleOverride ?? collector.defaultSampling;
-      const candidates = describesTreeState(collector)
-        ? selected.filter((commit) => firstParentShas.has(commit.hash))
-        : selected;
       return {
         collector,
         policy,
-        shas: new Set(
-          sampleCommits(candidates, policy).map((commit) => commit.hash),
-        ),
+        shas: describesTreeState(collector)
+          ? sampleTreeCommits(lineages, selected, policy)
+          : new Set(
+              sampleCommits(selected, policy).map((commit) => commit.hash),
+            ),
       };
     });
 

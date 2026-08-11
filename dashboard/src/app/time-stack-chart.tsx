@@ -721,7 +721,12 @@ export function TimeSeriesChart(props: {
             )}
             <AxisLeft
               scale={yScale}
-              numTicks={4}
+              // Every series here counts something whole, and formatCount
+              // rounds — so a fractional step labels two grid lines the same
+              // ("0 · 0 · 1 · 1"). Asking for fewer ticks than the peak keeps
+              // the step at a whole number on a chart that never leaves single
+              // digits, e.g. a tree holding a single TODO comment (or none).
+              numTicks={showPercent ? 4 : Math.min(4, Math.ceil(yMax))}
               hideTicks
               stroke="var(--grid-line)"
               tickFormat={(value) =>

@@ -78,9 +78,23 @@ A policy therefore asks for one snapshot per week or month of the repository's o
 
 Which commits a collector was actually run on stays visible in the cube (facts carry the collector that produced them), so charts can interpolate honestly rather than pretending to be continuous.
 
-`tree` and `worktree` collectors sample the **first-parent chain only**.
-Their output describes the state of the tree, and only first-parent commits are states the repository actually passed through: a commit on a merged side branch — or one that arrived with a foreign history absorbed by an unrelated-histories merge — carries a tree that was never HEAD, so sampling it puts a cliff into the timeline.
+`tree` and `worktree` collectors sample the **lineages only**: HEAD's first-parent chain, plus — recursively — the first-parent chain of every history absorbed by a **founding graft**.
+Their output describes the state of the tree, and only lineage commits are states the project actually passed through: a commit on a merged side branch — or one that arrived with a foreign history absorbed mid-life by an unrelated-histories merge — carries a tree that was never HEAD, so sampling it puts a cliff into the timeline.
 `log` collectors see every commit, since a commit's own authorship and diff are facts wherever it sits in the graph.
+
+A repository migration (monorepo assembly, host move, history rewrite) cuts the plain first-parent chain short: effect's monorepo starts at a fresh "workspace skeleton" root from December 2023 whose next commits merge in the histories of the eight repositories it absorbed, so first-parent-only snapshots would begin four years after the project did.
+The migration leaves a recognizable signature — a root followed by an unbroken run of merges absorbing histories that end before the root begins — a **founding graft**, and every history it absorbed becomes a **lineage**: before the migration those repositories were the project's parallel parts, so state-over-time charts draw the **stepwise sum of the lineages alive at each instant**, each absorbed lineage contributing from its own first commit until the assembly that absorbed it completes.
+The handoff is seamless by construction — the first post-assembly tree _is_ the union of the absorbed tips — and a repository without founding grafts has exactly one lineage, where the sum degenerates to the plain series.
+Both qualification conditions are load-bearing: a foreign history vendored later in the repository's life sits above an ordinary commit rather than in the founding window, and a history absorbed while mainline development continued overlaps the timeline it would join — neither becomes a lineage, however old its commits are.
+
+The assembly commits themselves — the fresh root and the founding merge run — belong to no lineage.
+Their trees are half-assembled workspaces nobody ever ran (effect's skeleton is a near-empty tree that the next eight merges fill one repository at a time), so sampling them would draw a crash-to-zero spike at the graft boundary; instead the composed timeline steps from the absorbed tips straight to the first post-assembly commit.
+Sampling policies apply **per lineage** — a monthly policy keeps one snapshot per month of each parallel pre-migration history, not one per month overall — and composition happens when `index` builds the dashboard data; the cube keeps per-commit facts for every lineage commit.
+What composition cannot do is conjure history the repository never absorbed: effect's 2021–2023 code lived in `@effect/io`/`@effect/data`, whose histories were discarded before the monorepo assembly, and only a cross-repo scan could recover that (see [open questions](06-open-questions.md#scope)).
+
+The assembly commits themselves — the fresh root and the founding merge run — leave the mainline when a continuation is found.
+Their trees are half-assembled workspaces nobody ever ran (effect's skeleton is a near-empty tree that the next eight merges fill one repository at a time), so sampling them would draw a crash-to-zero spike at the graft boundary; instead the timeline steps from the absorbed tip straight to the first post-assembly commit.
+Following a single absorbed history is still an approximation — the other absorbed repositories also existed before the migration, and summing every absorbed lineage would meet the post-assembly total exactly — see [additive lineage composition](06-open-questions.md#scope) among the open questions.
 
 ## Author date vs committer date
 

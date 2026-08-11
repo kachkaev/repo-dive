@@ -89,10 +89,11 @@ export type Collector = {
 /**
  * Whether a collector describes the *state of the tree* at a commit rather than
  * facts about the commit itself. Such snapshots are only meaningful on the
- * first-parent chain: a commit that lives on a side branch — or that arrived
- * with a foreign history absorbed by an unrelated-histories merge — carries a
- * tree that was never the repository's state, so charting it puts a cliff into
- * every timeline.
+ * mainline (the first-parent chain, extended backwards across founding
+ * grafts — see `listMainlineShas`): a commit that lives on a side branch — or
+ * that arrived with a foreign history absorbed mid-life by an
+ * unrelated-histories merge — carries a tree that was never the repository's
+ * state, so charting it puts a cliff into every timeline.
  */
 export const describesTreeState = (collector: Collector): boolean =>
   collector.strategy !== "log";

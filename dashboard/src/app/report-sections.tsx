@@ -35,6 +35,7 @@ import {
   kindColors,
   type KindFilter,
   KindFilterControl,
+  kindOrder,
 } from "./shared/contributor-kinds.tsx";
 import { formatCount, formatDate } from "./shared/format.ts";
 import { DataTable, Section, SectionSkeleton } from "./shared/primitives.tsx";
@@ -63,6 +64,60 @@ function decimate<T>(rows: readonly T[], maxPoints: number): T[] {
   return result;
 }
 
+/** "a", "a and b", "a, b and c" — the subtitles' own style, no Oxford comma. */
+const joinTerms = (terms: readonly string[]): string =>
+  terms.length < 2
+    ? (terms[0] ?? "")
+    : `${terms.slice(0, -1).join(", ")} and ${terms.at(-1)}`;
+
+/**
+ * The "Loose ends" series, in reading order: how each is summed out of a
+ * directives row, how the subtitle names it, and whether it can exist at all in
+ * a tree outside the JS/TS ecosystem.
+ *
+ * A Python or Go repo has no eslint disables and no `@ts-*` directives to have,
+ * so lines for them would not read as "nothing suppressed here" but as a
+ * finding about something the repo could never have carried — the same reason
+ * the dependency charts wait for a lockfile rather than drawing a flat zero.
+ * They therefore earn their line only once some commit has actually held one.
+ * TODO-style comments are scanned in every source file whatever the language,
+ * so that line always draws: none found says something true about the repo
+ * rather than about its stack.
+ */
+const looseEndsSeries: Array<{
+  key: string;
+  /** How the subtitle names the series, spelled out for the reader. */
+  term: string;
+  /** A clause the subtitle only needs while this series is drawn. */
+  note?: string;
+  color: string;
+  valueOf: (row: DashboardData["directives"][number]) => number;
+  ecosystemSpecific: boolean;
+}> = [
+  {
+    key: "eslint disables",
+    term: "eslint disables",
+    note: "block disables count as one each",
+    color: "var(--series-6)",
+    valueOf: (row) => row.eslintNextLine + row.eslintLine + row.eslintBlocks,
+    ecosystemSpecific: true,
+  },
+  {
+    key: "ts directives",
+    term: "TypeScript directives",
+    color: "var(--series-3)",
+    valueOf: (row) => row.tsIgnore + row.tsExpectError + row.tsNocheck,
+    ecosystemSpecific: true,
+  },
+  {
+    key: "todo comments",
+    term: "TODO-style comments",
+    color: "var(--series-1)",
+    valueOf: (row) => row.todos,
+    ecosystemSpecific: false,
+  },
+];
+
 /** The commits-per-month series: author kind, with humans split by AI assistance. */
 const commitKindSeries = {
   human: "Human",
@@ -78,23 +133,68 @@ const commitKindColorOf = (kind: keyof typeof commitKindSeries): string =>
   kind === "humanAi" ? kindColors.human : kindColors[kind];
 
 /**
- * A month's commit counts by kind plus its churn — everything the two monthly
- * charts need, summed from the per-commit rows rather than shipped alongside
- * them.
+ * Which commit series a kind filter keeps. Humans stay split by AI assistance
+ * — narrowing to humans is about whose commits are counted, not about hiding
+ * the assisted share of them.
  */
-type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
+const commitKindsOfFilter: Record<
+  KindFilter,
+  ReadonlyArray<keyof typeof commitKindSeries>
+> = {
+  all: commitKindOrder,
+  human: ["human", "humanAi"],
+  ai: ["ai"],
+  bot: ["bot"],
+};
+
+/** A month's lines added and deleted, plus the AI-assisted share of the added. */
+type ChurnTotals = {
   added: number;
   deleted: number;
   /** Lines added by commits carrying an AI co-author trailer. */
   aiAdded: number;
 };
 
+const emptyChurn = (): ChurnTotals => ({ added: 0, deleted: 0, aiAdded: 0 });
+
 /**
- * How much history the commit calendar shows at once, in calendar years (one
- * strip each). Five is still a glance rather than a scroll — it both caps the
- * default range for an old repo and bounds the multi-year options on offer.
+ * A month's commit counts by kind plus its churn — everything the two monthly
+ * charts need, summed from the per-commit rows rather than shipped alongside
+ * them. Churn is kept per author kind rather than as one total so the churn
+ * chart's kind filter can subset it without a second pass over the commits.
  */
-const maxCalendarYears = 5;
+type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
+  churn: Record<ContributorKind, ChurnTotals>;
+};
+
+/**
+ * The calendar's multi-year unit, in calendar years (one strip each). Every
+ * multi-year range on offer is a multiple of it — "Last 5 years", "Last 10
+ * years", … — and the shortest of them is what an old repo's calendar opens
+ * on: five strips are still a glance rather than a scroll.
+ */
+const calendarYearStep = 5;
+
+/**
+ * The longest history the calendar still opens in full, in calendar years.
+ * A little past {@link calendarYearStep}: trading a glance for the whole story
+ * is worth a strip or two of extra scrolling, not more.
+ */
+const maxDefaultCalendarYears = 7;
+
+/**
+ * The multi-year ranges a repo spanning this many calendar years offers: 5,
+ * 10, 15, … A range earns its row once a calendar year falls outside it — up
+ * to that point it draws strip for strip what the whole history draws, and
+ * two options drawing the same thing is one option too many.
+ */
+const multiYearSpansOf = (years: number): number[] => {
+  const spans: number[] = [];
+  for (let span = calendarYearStep; years > span; span += calendarYearStep) {
+    spans.push(span);
+  }
+  return spans;
+};
 
 /**
  * How much history the repo holds, in the two units the calendar's controls
@@ -124,9 +224,10 @@ const calendarHistoryOf = (
  * The range the calendar opens on. The old fixed "last 12 months" default was
  * one thin strip whatever the repo — for anything but a young one it hid most
  * of the history behind a dropdown nobody touches. So: show everything when
- * everything fits, fall back to the newest {@link maxCalendarYears} years when
- * it doesn't, and keep the rolling twelve months only for a repo too young to
- * fill even one calendar year, where whole-year strips would be mostly empty.
+ * everything still fits ({@link maxDefaultCalendarYears}), fall back to the
+ * newest {@link calendarYearStep} years when it doesn't, and keep the rolling
+ * twelve months only for a repo too young to fill even one calendar year,
+ * where whole-year strips would be mostly empty.
  */
 const defaultCalendarRangeOf = (history: CalendarHistory): CalendarRange => {
   // A repo spanning a single calendar year is a year old at most, so this is
@@ -135,9 +236,9 @@ const defaultCalendarRangeOf = (history: CalendarHistory): CalendarRange => {
   const tooYoungForYearStrips = history.underAYear || history.years <= 1;
   return tooYoungForYearStrips
     ? "last-12-months"
-    : history.years <= maxCalendarYears
+    : history.years <= maxDefaultCalendarYears
       ? "all-years"
-      : `last-${maxCalendarYears}-years`;
+      : `last-${calendarYearStep}-years`;
 };
 
 /**
@@ -204,6 +305,7 @@ export function ReportSections({
   maxContributorsInCharts: number;
 }) {
   const dependencies = data.dependencies;
+  const annotations = data.config?.charts?.annotations;
   const calendarHistory = calendarHistoryOf(
     data.repo.firstCommitDate,
     data.generatedAt,
@@ -221,6 +323,11 @@ export function ReportSections({
     useState<CalendarKindFilter>("all");
   const [contributorKindFilter, setContributorKindFilter] =
     useState<KindFilter>("all");
+  // The two monthly charts filter independently: reading "who commits" and
+  // reading "who moves lines" are separate questions, and both sections carry
+  // their own control anyway.
+  const [commitsKindFilter, setCommitsKindFilter] = useState<KindFilter>("all");
+  const [churnKindFilter, setChurnKindFilter] = useState<KindFilter>("all");
 
   // The range select and kind filter respond to a click instantly; the
   // calendar itself — laid out from scratch on each switch, and remounted on a
@@ -270,9 +377,8 @@ export function ReportSections({
     .slice(0, maxContributorsInCharts * 2);
 
   // Fixed ranges first, then one entry per year of history, newest first. A
-  // range only earns its row once the repo outlives it: on a three-year-old
-  // repo "Last 3 years" and "Last 5 years" would both draw exactly what the
-  // whole history draws, and inside a single calendar year "All …" and that
+  // range only earns its row once the repo outlives it (multiYearSpansOf for
+  // the multi-year ones), and inside a single calendar year "All …" and that
   // year's own entry would both draw what "This year" draws. The whole-history
   // option names its own span ("All 7 years") rather than saying "All years":
   // how much history the repo holds is the one thing the reader cannot infer
@@ -280,17 +386,10 @@ export function ReportSections({
   const calendarRangeItems: Array<{ value: CalendarRange; label: string }> = [
     { value: "last-12-months", label: "Last 12 months" },
     { value: "this-year", label: "This year" },
-    ...(calendarHistory.years > 3
-      ? [{ value: "last-3-years" as const, label: "Last 3 years" }]
-      : []),
-    ...(calendarHistory.years > maxCalendarYears
-      ? [
-          {
-            value: `last-${maxCalendarYears}-years` as const,
-            label: `Last ${maxCalendarYears} years`,
-          },
-        ]
-      : []),
+    ...multiYearSpansOf(calendarHistory.years).map((span) => ({
+      value: `last-${span}-years` as const,
+      label: `Last ${span} years`,
+    })),
     ...(calendarHistory.years > 1
       ? [
           {
@@ -329,9 +428,7 @@ export function ReportSections({
       humanAi: 0,
       ai: 0,
       bot: 0,
-      added: 0,
-      deleted: 0,
-      aiAdded: 0,
+      churn: { human: emptyChurn(), ai: emptyChurn(), bot: emptyChurn() },
     };
     const kind = commit.kind ?? "human";
     if (kind === "human") {
@@ -339,10 +436,11 @@ export function ReportSections({
     } else {
       bucket[kind] += 1;
     }
-    bucket.added += commit.added;
-    bucket.deleted += commit.deleted;
+    const churn = bucket.churn[kind];
+    churn.added += commit.added;
+    churn.deleted += commit.deleted;
     if (commit.ai) {
-      bucket.aiAdded += commit.added;
+      churn.aiAdded += commit.added;
     }
     monthlyBuckets.set(month, bucket);
   }
@@ -350,8 +448,11 @@ export function ReportSections({
     ([left], [right]) => left.localeCompare(right),
   );
   // Keep only kinds that ever occur, so a bot-free repo gets no empty series.
-  const commitKindKeys = commitKindOrder.filter((kind) =>
+  const presentCommitKindKeys = commitKindOrder.filter((kind) =>
     monthlyRows.some(([, bucket]) => bucket[kind] > 0),
+  );
+  const commitKindKeys = presentCommitKindKeys.filter((kind) =>
+    commitKindsOfFilter[commitsKindFilter].includes(kind),
   );
   const commitsChart = {
     points: monthlyRows.map(([month, bucket]) => ({
@@ -374,21 +475,51 @@ export function ReportSections({
       ...(kind === "humanAi" ? { hatch: kindColors.ai } : {}),
     })),
   };
+  const commitsSupportPercent = commitsChart.seriesKeys.length > 1;
 
-  const suppressionRows = decimate(data.directives, 400);
-  const suppressionsChart = {
-    points: suppressionRows.map((row) => ({
+  // Churn keeps every month and drops the filtered-out kinds' lines, so the
+  // bars rescale to whatever the selected kind actually moved.
+  const churnKinds: readonly ContributorKind[] =
+    churnKindFilter === "all" ? kindOrder : [churnKindFilter];
+  const churnPoints = monthlyRows.map(([month, bucket]) => {
+    const totals = emptyChurn();
+    for (const kind of churnKinds) {
+      const kindChurn = bucket.churn[kind];
+      totals.added += kindChurn.added;
+      totals.deleted += kindChurn.deleted;
+      totals.aiAdded += kindChurn.aiAdded;
+    }
+    return {
+      month,
+      positive: totals.added,
+      negative: totals.deleted,
+      positiveSecondary: totals.aiAdded,
+    };
+  });
+
+  // Tested against every row rather than the decimated ones below: a single
+  // commit somewhere in the history is enough to make the series real, and
+  // decimation could well be what drops it.
+  const drawnLooseEnds = looseEndsSeries.filter(
+    (series) =>
+      !series.ecosystemSpecific ||
+      data.directives.some((row) => series.valueOf(row) > 0),
+  );
+  const looseEndsRows = decimate(data.directives, 400);
+  const looseEndsChart = {
+    points: looseEndsRows.map((row) => ({
       dateMs: new Date(row.date).getTime(),
-      values: {
-        "eslint disables":
-          row.eslintNextLine + row.eslintLine + row.eslintBlocks,
-        "ts directives": row.tsIgnore + row.tsExpectError + row.tsNocheck,
-        "todo comments": row.todos,
-      },
+      values: Object.fromEntries(
+        drawnLooseEnds.map((series) => [series.key, series.valueOf(row)]),
+      ),
     })),
-    seriesKeys: ["eslint disables", "ts directives", "todo comments"],
-    colors: ["var(--series-6)", "var(--series-3)", "var(--series-1)"],
+    seriesKeys: drawnLooseEnds.map((series) => series.key),
+    colors: drawnLooseEnds.map((series) => series.color),
   };
+  const looseEndsSubtitle = [
+    `${joinTerms(drawnLooseEnds.map((series) => series.term))} in the tree at each commit`,
+    ...drawnLooseEnds.flatMap((series) => series.note ?? []),
+  ].join("; ");
 
   const dependenciesChart = shapeStacked(
     decimate(dependencies, 400).map((row) => ({
@@ -446,6 +577,7 @@ export function ReportSections({
         <Section
           title="Commit calendar"
           subtitle="commits per day; days bucketed by the committer's local date, i.e. when each commit landed"
+          annotation={annotations?.["commit-calendar"]}
           controls={
             <>
               <KindFilterControl
@@ -511,20 +643,38 @@ export function ReportSections({
       <Section
         title="Commits per month"
         subtitle="months bucketed by the author's date, split by author kind; hatched = human commits with at least one AI co-author trailer"
+        annotation={annotations?.["commits-per-month"]}
         controls={
-          commitsChart.seriesKeys.length > 1 ? (
-            <PercentControl
-              label="Commits per month value display"
-              value={commitsPercent}
-              onChange={setCommitsPercent}
+          <>
+            <KindFilterControl
+              label="Filter commits by author kind"
+              value={commitsKindFilter}
+              onChange={setCommitsKindFilter}
+              presentKinds={commitKinds}
             />
-          ) : undefined
+            {/* Shown whenever the unfiltered chart stacks more than one series,
+                and merely disabled while a single-kind view leaves one — a
+                control vanishing from the row on filter change would reflow the
+                remaining ones away from the cursor. */}
+            {presentCommitKindKeys.length > 1 && (
+              <PercentControl
+                label="Commits per month value display"
+                value={commitsPercent}
+                onChange={setCommitsPercent}
+                disabled={!commitsSupportPercent}
+                disabledTitle="A single series is always 100%"
+              />
+            )}
+          </>
         }
       >
         <TimeSeriesChart
           mode="bar"
           pointUnit="month"
-          percentMode={commitsPercent}
+          // The remembered preference is ignored, not applied invisibly, while
+          // the filter leaves one series — the control reads "absolute counts"
+          // there, and the bars must agree with it.
+          percentMode={commitsPercent && commitsSupportPercent}
           {...commitsChart}
         />
       </Section>
@@ -532,14 +682,18 @@ export function ReportSections({
       <Section
         title="Churn per month"
         subtitle="lines added and deleted, months bucketed by the author's date so they line up with the survival cohorts; hatched = lines added by AI-assisted commits"
+        annotation={annotations?.["churn-per-month"]}
+        controls={
+          <KindFilterControl
+            label="Filter churn by author kind"
+            value={churnKindFilter}
+            onChange={setChurnKindFilter}
+            presentKinds={commitKinds}
+          />
+        }
       >
         <DivergingBars
-          points={monthlyRows.map(([month, bucket]) => ({
-            month,
-            positive: bucket.added,
-            negative: bucket.deleted,
-            positiveSecondary: bucket.aiAdded,
-          }))}
+          points={churnPoints}
           positiveLabel="added"
           negativeLabel="deleted"
           positiveSecondaryLabel="added · AI-assisted"
@@ -551,6 +705,7 @@ export function ReportSections({
         <Section
           title="Direct dependencies over time"
           subtitle="dependencies, devDependencies and optionalDependencies declared across all package.json files at each commit"
+          annotation={annotations?.["direct-dependencies"]}
           controls={
             <PercentControl
               label="Direct dependencies value display"
@@ -592,6 +747,7 @@ export function ReportSections({
         <Section
           title="Dependencies over time"
           subtitle="resolved packages in the lockfile at each commit, split by package manager"
+          annotation={annotations?.dependencies}
           controls={
             dependenciesChart.seriesKeys.length > 1 ? (
               <PercentControl
@@ -622,12 +778,13 @@ export function ReportSections({
         </Section>
       )}
 
-      {suppressionsChart.points.length > 0 && (
+      {looseEndsChart.points.length > 0 && (
         <Section
           title="Loose ends"
-          subtitle="eslint disables, TypeScript directives and TODO-style comments in the tree at each commit; block disables count as one each"
+          subtitle={looseEndsSubtitle}
+          annotation={annotations?.["loose-ends"]}
         >
-          <TimeSeriesChart mode="line" {...suppressionsChart} />
+          <TimeSeriesChart mode="line" {...looseEndsChart} />
         </Section>
       )}
 
@@ -635,6 +792,7 @@ export function ReportSections({
         <Section
           title="Most-suppressed eslint rules"
           subtitle="at the latest commit; (all) = blanket disables without a rule list"
+          annotation={annotations?.["most-suppressed-eslint-rules"]}
         >
           <BarList
             items={data.topRules.map((row) => ({
@@ -650,6 +808,7 @@ export function ReportSections({
       <Section
         title="Contributors"
         subtitle="whole history; per contributor: commits authored above, commits co-authored for others below — hatching marks cross-kind collaboration"
+        annotation={annotations?.contributors}
         controls={
           <KindFilterControl
             label="Filter contributors by kind"
