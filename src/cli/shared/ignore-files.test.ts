@@ -18,7 +18,6 @@ import {
   checkIgnoreFiles,
   warnAboutIgnoreFiles,
 } from "./ignore-files.ts";
-import { coversPath } from "./ignore-files/coverage.ts";
 
 function makeRepoRoot() {
   return mkdtempSync(path.join(os.tmpdir(), "repo-dive-ignore-"));
@@ -145,7 +144,16 @@ it.effect("addIgnoreEntry writes a line the file then covers", () => {
       });
       const written = readFileSync(path.join(repoRoot, name), "utf8");
       expect(written, name).toBe(after);
-      expect(coversPath(written, ".repo-dive"), name).toBe(true);
+    }
+
+    // Every file written above now covers the catalog, so a fresh check finds
+    // nothing left to add.
+    const statuses = yield* check(repoRoot);
+    expect(statuses.map(({ name }) => name)).toStrictEqual(
+      cases.map(({ name }) => name).toSorted(),
+    );
+    for (const status of statuses) {
+      expect(status.outcome, status.name).toBe("listed");
     }
   }).pipe(Effect.ensuring(cleanup(repoRoot)));
 });

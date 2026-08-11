@@ -5,13 +5,13 @@ import path from "node:path";
 import { Console, Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
-import { loadConfig } from "./config.ts";
+import { loadConfig } from "../shared/config.ts";
 import {
   DashboardUnavailableError,
   openInBrowser,
   resolveAssetsDir,
-} from "./dashboard-server.ts";
-import { resolveRepoRoot } from "./scan.ts";
+} from "../shared/dashboard-server.ts";
+import { resolveRepoRoot } from "../shared/scan.ts";
 
 /**
  * Builds a single self-contained report.html: the dashboard bundle with CSS,

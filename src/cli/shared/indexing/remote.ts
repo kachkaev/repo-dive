@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
-import { type CommandError, runGit } from "./git.ts";
+import { type CommandError, runGit } from "../git.ts";
 
 /**
  * Turns whatever `remote.origin.url` holds into a URL a browser can open, or

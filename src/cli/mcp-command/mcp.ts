@@ -4,9 +4,9 @@ import { McpProtocol, McpServer, Tool, Toolkit } from "effect/unstable/ai";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
 import packageJson from "../../../package.json" with { type: "json" };
-import { loadConfig } from "./config.ts";
-import { query, QueryError } from "./query.ts";
-import { resolveRepoRoot } from "./scan.ts";
+import { loadConfig } from "../shared/config.ts";
+import { query, QueryError } from "../shared/query.ts";
+import { resolveRepoRoot } from "../shared/scan.ts";
 
 const queryTool = Tool.make("query", {
   description:

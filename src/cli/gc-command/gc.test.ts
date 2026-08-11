@@ -11,10 +11,10 @@ import {
   getBlobCache,
   listBlobCacheNamespaces,
   pruneBlobCacheNamespaces,
-} from "./blob-cache.ts";
-import { openCatalog, writeCollectorOutput } from "./catalog.ts";
-import { builtInCollectors, collectorCacheKey } from "./collectors.ts";
-import { loadConfig } from "./config.ts";
+} from "../shared/blob-cache.ts";
+import { openCatalog, writeCollectorOutput } from "../shared/catalog.ts";
+import { builtInCollectors, collectorCacheKey } from "../shared/collectors.ts";
+import { loadConfig } from "../shared/config.ts";
 import { runGc } from "./gc.ts";
 
 const commitEnvironment = {

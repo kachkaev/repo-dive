@@ -30,7 +30,7 @@ import {
   samplingLabel,
   type SamplingPolicy,
 } from "./sampling.ts";
-import { withTemporaryWorktree } from "./worktree.ts";
+import { withTemporaryWorktree } from "./scan/worktree.ts";
 
 export type CommitMeta = {
   readonly hash: string;

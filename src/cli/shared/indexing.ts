@@ -12,17 +12,17 @@ import {
   type Fact,
 } from "./collectors.ts";
 import {
-  composeLineageSeries,
-  type LineageSnapshot,
-} from "./compose-lineage-series.ts";
-import {
   loadConfig,
   normalizeContributorName,
   type ResolvedConfig,
 } from "./config.ts";
 import { warnAboutIgnoreFiles } from "./ignore-files.ts";
+import {
+  composeLineageSeries,
+  type LineageSnapshot,
+} from "./indexing/compose-lineage-series.ts";
+import { readRemoteUrl } from "./indexing/remote.ts";
 import { languageOfExtension } from "./languages.ts";
-import { readRemoteUrl } from "./remote.ts";
 import { listCommits, listLineages, resolveRepoRoot } from "./scan.ts";
 
 class NoCollectedCommitsError extends Data.TaggedError(
