@@ -204,9 +204,23 @@ const haveUnrelatedHistories = (
     okExitCodes: [1],
   }).pipe(Effect.map((stdout) => stdout.trim() === ""));
 
+type FoundingGraft = {
+  /** The continuation chain, empty when no founding graft was recognized. */
+  readonly continuation: ChainEntry[];
+  /**
+   * The assembly itself: the fresh root plus the founding merge run above it.
+   * These commits hold half-assembled workspaces nobody ever ran (effect's
+   * skeleton is a near-empty tree that the next eight merges fill in one repo
+   * at a time), so when a continuation is found the caller drops them from the
+   * mainline and the timeline steps from the absorbed tip straight to the
+   * first post-assembly commit.
+   */
+  readonly assemblyShas: readonly string[];
+};
+
 /**
  * The first-parent chain that continues `chain` backwards in time across a
- * founding graft, or `[]` when there is none.
+ * founding graft, or an empty continuation when there is none.
  *
  * A repository migration (monorepo assembly, host move, history rewrite)
  * leaves a recognizable signature: a fresh root commit followed immediately by
@@ -230,24 +244,26 @@ const findFoundingGraftChain = (
   chain: readonly ChainEntry[],
   alreadyOnMainline: ReadonlySet<string>,
 ): Effect.Effect<
-  ChainEntry[],
+  FoundingGraft,
   CommandError,
   ChildProcessSpawner.ChildProcessSpawner
 > =>
   Effect.gen(function* () {
     const root = chain.at(-1);
     if (root === undefined) {
-      return [];
+      return { continuation: [], assemblyShas: [] };
     }
     const rootDate = Date.parse(root.committerDate);
 
     const candidateTips: string[] = [];
+    const assemblyShas: string[] = [root.hash];
     for (let index = chain.length - 2; index >= 0; index -= 1) {
       const entry = chain[index];
       if (entry === undefined || entry.parentHashes.length < 2) {
         break;
       }
       candidateTips.push(...entry.parentHashes.slice(1));
+      assemblyShas.push(entry.hash);
     }
 
     let best: ChainEntry[] = [];
@@ -276,7 +292,7 @@ const findFoundingGraftChain = (
         bestRootDate = candidateRootDate;
       }
     }
-    return best;
+    return { continuation: best, assemblyShas };
   });
 
 /**
@@ -301,7 +317,19 @@ export const listMainlineShas = (
       for (const entry of chain) {
         shas.add(entry.hash);
       }
-      chain = yield* findFoundingGraftChain(repoRoot, chain, shas);
+      const graft = yield* findFoundingGraftChain(repoRoot, chain, shas);
+      if (
+        graft.continuation.length > 0 &&
+        // A degenerate chain that is nothing but assembly (HEAD is still a
+        // founding merge) keeps its commits: better a mid-assembly snapshot
+        // than none of the current era at all.
+        graft.assemblyShas.length < chain.length
+      ) {
+        for (const sha of graft.assemblyShas) {
+          shas.delete(sha);
+        }
+      }
+      chain = graft.continuation;
     }
     return shas;
   });
