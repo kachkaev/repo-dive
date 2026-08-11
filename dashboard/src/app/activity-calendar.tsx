@@ -30,8 +30,7 @@ export type CalendarCommit = {
 export type CalendarRange =
   | "last-12-months"
   | "this-year"
-  | "last-3-years"
-  | "last-5-years"
+  | `last-${number}-years`
   | "all-years"
   | `year-${number}`;
 
@@ -554,16 +553,6 @@ export function CommitCalendar({
       strips.push({ title: `${anchorYear}`, months: monthsOfYear(anchorYear) });
       break;
     }
-    case "last-3-years":
-    case "last-5-years": {
-      const count = range === "last-3-years" ? 3 : 5;
-      for (let year = anchorYear; year > anchorYear - count; year -= 1) {
-        if (year >= firstYear) {
-          strips.push({ title: `${year}`, months: monthsOfYear(year) });
-        }
-      }
-      break;
-    }
     case "all-years": {
       for (let year = anchorYear; year >= firstYear; year -= 1) {
         strips.push({ title: `${year}`, months: monthsOfYear(year) });
@@ -571,6 +560,21 @@ export function CommitCalendar({
       break;
     }
     default: {
+      // "last-<n>-years" for any n the range select offers (5, 10, 15, …);
+      // anything else is a single "year-<n>" entry.
+      const lastYears = /^last-(\d+)-years$/.exec(range)?.[1];
+      if (lastYears !== undefined) {
+        for (
+          let year = anchorYear;
+          year > anchorYear - Number(lastYears);
+          year -= 1
+        ) {
+          if (year >= firstYear) {
+            strips.push({ title: `${year}`, months: monthsOfYear(year) });
+          }
+        }
+        break;
+      }
       const year = Number(range.slice("year-".length));
       strips.push({ title: `${year}`, months: monthsOfYear(year) });
     }
