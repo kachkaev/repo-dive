@@ -13,7 +13,7 @@ import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { withTemporaryWorktree } from "./worktree.ts";
+import { withTemporaryWorktree } from "./with-temporary-worktree.ts";
 
 function runGit(cwd: string, ...args: readonly string[]) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });

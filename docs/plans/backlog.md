@@ -23,7 +23,7 @@ The split is a soft one — several entries below still name two possible approa
 - **Effect v4 is beta**: `effect` and `@effect/platform-node` are pinned to `4.0.0-beta.x`, and the CLI is built on `effect/unstable/cli` — an import path that advertises its own instability.
   Both the beta line and that `unstable` namespace will move before v4 goes GA.
   Decide how much churn to absorb per beta bump versus holding on a known-good pin, and keep the CLI wiring thin enough that the `unstable` path can be swapped in one place.
-- **MCP protocol rough edges**: two things in `src/cli/mcp-command/mcp.ts` that strict clients may not tolerate.
+- **MCP protocol rough edges**: two things in `src/cli/mcp-command/build-mcp-layer.ts` that strict clients may not tolerate.
   The zero-argument `schema` tool is declared with `Schema.Struct({})`, which `effect/unstable/ai` advertises as `{"anyOf":[{"type":"object"},{"type":"array"}]}` rather than a plain `{"type":"object"}` — `query`, which has real parameters, serializes fine.
   And tool failures come back as `Effect.succeed({ error: message })`, so the client sees a successful result carrying an `error` field instead of an MCP error.
   Both work with the clients tried so far; neither is what the protocol expects.

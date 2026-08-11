@@ -15,7 +15,7 @@ import {
 import { openCatalog, writeCollectorOutput } from "../shared/catalog.ts";
 import { builtInCollectors, collectorCacheKey } from "../shared/collectors.ts";
 import { loadConfig } from "../shared/config.ts";
-import { runGc } from "./gc.ts";
+import { runGc } from "./run-gc.ts";
 
 const commitEnvironment = {
   GIT_AUTHOR_DATE: "2026-01-02T03:04:05Z",

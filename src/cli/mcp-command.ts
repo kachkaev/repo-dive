@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
-import { buildMcpLayer } from "./mcp-command/mcp.ts";
+import { buildMcpLayer } from "./mcp-command/build-mcp-layer.ts";
 
 export const mcpCommand = Command.make("mcp", {
   repoPath: Flag.string("repo").pipe(
