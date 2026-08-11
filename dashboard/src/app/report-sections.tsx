@@ -90,11 +90,33 @@ type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
 };
 
 /**
- * How much history the commit calendar shows at once, in calendar years (one
- * strip each). Five is still a glance rather than a scroll — it both caps the
- * default range for an old repo and bounds the multi-year options on offer.
+ * The calendar's multi-year unit, in calendar years (one strip each). Every
+ * multi-year range on offer is a multiple of it — "Last 5 years", "Last 10
+ * years", … — and the shortest of them is what an old repo's calendar opens
+ * on: five strips are still a glance rather than a scroll.
  */
-const maxCalendarYears = 5;
+const calendarYearStep = 5;
+
+/**
+ * The longest history the calendar still opens in full, in calendar years.
+ * A little past {@link calendarYearStep}: trading a glance for the whole story
+ * is worth a strip or two of extra scrolling, not more.
+ */
+const maxDefaultCalendarYears = 7;
+
+/**
+ * The multi-year ranges a repo spanning this many calendar years offers: 5,
+ * 10, 15, … A range earns its row once a calendar year falls outside it — up
+ * to that point it draws strip for strip what the whole history draws, and
+ * two options drawing the same thing is one option too many.
+ */
+const multiYearSpansOf = (years: number): number[] => {
+  const spans: number[] = [];
+  for (let span = calendarYearStep; years > span; span += calendarYearStep) {
+    spans.push(span);
+  }
+  return spans;
+};
 
 /**
  * How much history the repo holds, in the two units the calendar's controls
@@ -124,9 +146,10 @@ const calendarHistoryOf = (
  * The range the calendar opens on. The old fixed "last 12 months" default was
  * one thin strip whatever the repo — for anything but a young one it hid most
  * of the history behind a dropdown nobody touches. So: show everything when
- * everything fits, fall back to the newest {@link maxCalendarYears} years when
- * it doesn't, and keep the rolling twelve months only for a repo too young to
- * fill even one calendar year, where whole-year strips would be mostly empty.
+ * everything still fits ({@link maxDefaultCalendarYears}), fall back to the
+ * newest {@link calendarYearStep} years when it doesn't, and keep the rolling
+ * twelve months only for a repo too young to fill even one calendar year,
+ * where whole-year strips would be mostly empty.
  */
 const defaultCalendarRangeOf = (history: CalendarHistory): CalendarRange => {
   // A repo spanning a single calendar year is a year old at most, so this is
@@ -135,9 +158,9 @@ const defaultCalendarRangeOf = (history: CalendarHistory): CalendarRange => {
   const tooYoungForYearStrips = history.underAYear || history.years <= 1;
   return tooYoungForYearStrips
     ? "last-12-months"
-    : history.years <= maxCalendarYears
+    : history.years <= maxDefaultCalendarYears
       ? "all-years"
-      : `last-${maxCalendarYears}-years`;
+      : `last-${calendarYearStep}-years`;
 };
 
 /**
@@ -270,9 +293,8 @@ export function ReportSections({
     .slice(0, maxContributorsInCharts * 2);
 
   // Fixed ranges first, then one entry per year of history, newest first. A
-  // range only earns its row once the repo outlives it: on a three-year-old
-  // repo "Last 3 years" and "Last 5 years" would both draw exactly what the
-  // whole history draws, and inside a single calendar year "All …" and that
+  // range only earns its row once the repo outlives it (multiYearSpansOf for
+  // the multi-year ones), and inside a single calendar year "All …" and that
   // year's own entry would both draw what "This year" draws. The whole-history
   // option names its own span ("All 7 years") rather than saying "All years":
   // how much history the repo holds is the one thing the reader cannot infer
@@ -280,17 +302,10 @@ export function ReportSections({
   const calendarRangeItems: Array<{ value: CalendarRange; label: string }> = [
     { value: "last-12-months", label: "Last 12 months" },
     { value: "this-year", label: "This year" },
-    ...(calendarHistory.years > 3
-      ? [{ value: "last-3-years" as const, label: "Last 3 years" }]
-      : []),
-    ...(calendarHistory.years > maxCalendarYears
-      ? [
-          {
-            value: `last-${maxCalendarYears}-years` as const,
-            label: `Last ${maxCalendarYears} years`,
-          },
-        ]
-      : []),
+    ...multiYearSpansOf(calendarHistory.years).map((span) => ({
+      value: `last-${span}-years` as const,
+      label: `Last ${span} years`,
+    })),
     ...(calendarHistory.years > 1
       ? [
           {
