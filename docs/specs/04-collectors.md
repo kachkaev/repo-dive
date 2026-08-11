@@ -92,6 +92,10 @@ Their trees are half-assembled workspaces nobody ever ran (effect's skeleton is 
 Sampling policies apply **per lineage** — a monthly policy keeps one snapshot per month of each parallel pre-migration history, not one per month overall — and composition happens when `index` builds the dashboard data; the cube keeps per-commit facts for every lineage commit.
 What composition cannot do is conjure history the repository never absorbed: effect's 2021–2023 code lived in `@effect/io`/`@effect/data`, whose histories were discarded before the monorepo assembly, and only a cross-repo scan could recover that (see [open questions](06-open-questions.md#scope)).
 
+The assembly commits themselves — the fresh root and the founding merge run — leave the mainline when a continuation is found.
+Their trees are half-assembled workspaces nobody ever ran (effect's skeleton is a near-empty tree that the next eight merges fill one repository at a time), so sampling them would draw a crash-to-zero spike at the graft boundary; instead the timeline steps from the absorbed tip straight to the first post-assembly commit.
+Following a single absorbed history is still an approximation — the other absorbed repositories also existed before the migration, and summing every absorbed lineage would meet the post-assembly total exactly — see [additive lineage composition](06-open-questions.md#scope) among the open questions.
+
 ## Author date vs committer date
 
 Git gives every commit two timestamps, and under a rebase or squash-merge workflow they are genuinely different facts: the **author** date is when the work was written, the **committer** date is when it became part of the history.
