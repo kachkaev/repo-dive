@@ -64,6 +64,60 @@ function decimate<T>(rows: readonly T[], maxPoints: number): T[] {
   return result;
 }
 
+/** "a", "a and b", "a, b and c" — the subtitles' own style, no Oxford comma. */
+const joinTerms = (terms: readonly string[]): string =>
+  terms.length < 2
+    ? (terms[0] ?? "")
+    : `${terms.slice(0, -1).join(", ")} and ${terms.at(-1)}`;
+
+/**
+ * The "Loose ends" series, in reading order: how each is summed out of a
+ * directives row, how the subtitle names it, and whether it can exist at all in
+ * a tree outside the JS/TS ecosystem.
+ *
+ * A Python or Go repo has no eslint disables and no `@ts-*` directives to have,
+ * so lines for them would not read as "nothing suppressed here" but as a
+ * finding about something the repo could never have carried — the same reason
+ * the dependency charts wait for a lockfile rather than drawing a flat zero.
+ * They therefore earn their line only once some commit has actually held one.
+ * TODO-style comments are scanned in every source file whatever the language,
+ * so that line always draws: none found says something true about the repo
+ * rather than about its stack.
+ */
+const looseEndsSeries: Array<{
+  key: string;
+  /** How the subtitle names the series, spelled out for the reader. */
+  term: string;
+  /** A clause the subtitle only needs while this series is drawn. */
+  note?: string;
+  color: string;
+  valueOf: (row: DashboardData["directives"][number]) => number;
+  ecosystemSpecific: boolean;
+}> = [
+  {
+    key: "eslint disables",
+    term: "eslint disables",
+    note: "block disables count as one each",
+    color: "var(--series-6)",
+    valueOf: (row) => row.eslintNextLine + row.eslintLine + row.eslintBlocks,
+    ecosystemSpecific: true,
+  },
+  {
+    key: "ts directives",
+    term: "TypeScript directives",
+    color: "var(--series-3)",
+    valueOf: (row) => row.tsIgnore + row.tsExpectError + row.tsNocheck,
+    ecosystemSpecific: true,
+  },
+  {
+    key: "todo comments",
+    term: "TODO-style comments",
+    color: "var(--series-1)",
+    valueOf: (row) => row.todos,
+    ecosystemSpecific: false,
+  },
+];
+
 /** The commits-per-month series: author kind, with humans split by AI assistance. */
 const commitKindSeries = {
   human: "Human",
@@ -443,20 +497,29 @@ export function ReportSections({
     };
   });
 
-  const suppressionRows = decimate(data.directives, 400);
-  const suppressionsChart = {
-    points: suppressionRows.map((row) => ({
+  // Tested against every row rather than the decimated ones below: a single
+  // commit somewhere in the history is enough to make the series real, and
+  // decimation could well be what drops it.
+  const drawnLooseEnds = looseEndsSeries.filter(
+    (series) =>
+      !series.ecosystemSpecific ||
+      data.directives.some((row) => series.valueOf(row) > 0),
+  );
+  const looseEndsRows = decimate(data.directives, 400);
+  const looseEndsChart = {
+    points: looseEndsRows.map((row) => ({
       dateMs: new Date(row.date).getTime(),
-      values: {
-        "eslint disables":
-          row.eslintNextLine + row.eslintLine + row.eslintBlocks,
-        "ts directives": row.tsIgnore + row.tsExpectError + row.tsNocheck,
-        "todo comments": row.todos,
-      },
+      values: Object.fromEntries(
+        drawnLooseEnds.map((series) => [series.key, series.valueOf(row)]),
+      ),
     })),
-    seriesKeys: ["eslint disables", "ts directives", "todo comments"],
-    colors: ["var(--series-6)", "var(--series-3)", "var(--series-1)"],
+    seriesKeys: drawnLooseEnds.map((series) => series.key),
+    colors: drawnLooseEnds.map((series) => series.color),
   };
+  const looseEndsSubtitle = [
+    `${joinTerms(drawnLooseEnds.map((series) => series.term))} in the tree at each commit`,
+    ...drawnLooseEnds.flatMap((series) => series.note ?? []),
+  ].join("; ");
 
   const dependenciesChart = shapeStacked(
     decimate(dependencies, 400).map((row) => ({
@@ -715,13 +778,13 @@ export function ReportSections({
         </Section>
       )}
 
-      {suppressionsChart.points.length > 0 && (
+      {looseEndsChart.points.length > 0 && (
         <Section
           title="Loose ends"
-          subtitle="eslint disables, TypeScript directives and TODO-style comments in the tree at each commit; block disables count as one each"
+          subtitle={looseEndsSubtitle}
           annotation={annotations?.["loose-ends"]}
         >
-          <TimeSeriesChart mode="line" {...suppressionsChart} />
+          <TimeSeriesChart mode="line" {...looseEndsChart} />
         </Section>
       )}
 
