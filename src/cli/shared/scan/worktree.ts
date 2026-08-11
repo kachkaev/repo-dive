@@ -5,7 +5,7 @@ import path from "node:path";
 import { type Cause, Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/unstable/process";
 
-import { type CommandError, runGit } from "./git.ts";
+import { type CommandError, runGit } from "../git.ts";
 
 /**
  * Materializes a commit into a detached temporary worktree, runs `use` and

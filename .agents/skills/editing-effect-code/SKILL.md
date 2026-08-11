@@ -99,7 +99,7 @@ No `Date.now()` or `new Date()` inside effects:
 
 ## Resources and processes
 
-- Acquire/release with `Effect.acquireRelease` inside `Effect.scoped` (releases run in reverse order, even on interrupt) — see [`worktree.ts`](../../../src/cli/shared/worktree.ts).
+- Acquire/release with `Effect.acquireRelease` inside `Effect.scoped` (releases run in reverse order, even on interrupt) — see [`worktree.ts`](../../../src/cli/shared/scan/worktree.ts).
 - `Effect.scoped` wraps `ChildProcess.make` handles; drain stdout/stderr/exitCode concurrently with `Effect.all({...}, { concurrency: "unbounded" })` to avoid pipe deadlock.
 - Decode a byte stream to one string with `stream.pipe(Stream.decodeText(), Stream.mkString)`.
 - `Console.log`/`Console.error` are correct for user-facing CLI output (upstream's own CLI does the same); `Effect.log*` is for leveled diagnostics.
