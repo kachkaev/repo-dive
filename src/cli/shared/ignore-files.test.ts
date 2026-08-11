@@ -162,6 +162,7 @@ it.effect(
       const config: ResolvedConfig = {
         maxInCharts: 10,
         weekStartsOn: "monday",
+        chartAnnotations: {},
         catalogPath: path.join(repoRoot, ".repo-dive"),
         catalogRelativePath: ".repo-dive",
         checkIgnoreFiles: true,
