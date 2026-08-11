@@ -78,9 +78,13 @@ A policy therefore asks for one snapshot per week or month of the repository's o
 
 Which commits a collector was actually run on stays visible in the cube (facts carry the collector that produced them), so charts can interpolate honestly rather than pretending to be continuous.
 
-`tree` and `worktree` collectors sample the **first-parent chain only**.
-Their output describes the state of the tree, and only first-parent commits are states the repository actually passed through: a commit on a merged side branch — or one that arrived with a foreign history absorbed by an unrelated-histories merge — carries a tree that was never HEAD, so sampling it puts a cliff into the timeline.
+`tree` and `worktree` collectors sample the **mainline only**: HEAD's first-parent chain, extended backwards across **founding grafts**.
+Their output describes the state of the tree, and only mainline commits are states the repository actually passed through: a commit on a merged side branch — or one that arrived with a foreign history absorbed mid-life by an unrelated-histories merge — carries a tree that was never HEAD, so sampling it puts a cliff into the timeline.
 `log` collectors see every commit, since a commit's own authorship and diff are facts wherever it sits in the graph.
+
+A repository migration (monorepo assembly, host move, history rewrite) cuts the plain first-parent chain short: effect's monorepo starts at a fresh "workspace skeleton" root from December 2023 whose next commits merge in the histories of the eight repositories it absorbed, so first-parent-only snapshots would begin four years after the project did.
+The migration leaves a recognizable signature — a root followed by an unbroken run of merges absorbing histories that end before the root begins — and the mainline follows it: when such a **founding graft** exists, the absorbed history reaching back furthest continues the chain (recursively, in case that history was itself founded by a migration).
+Both conditions are load-bearing: a foreign history vendored later in the repository's life sits above an ordinary commit rather than in the founding window, and a sibling repository absorbed while mainline development continued overlaps the timeline instead of preceding it — neither continues the chain, however old its commits are.
 
 ## Author date vs committer date
 

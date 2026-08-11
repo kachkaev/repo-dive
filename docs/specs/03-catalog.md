@@ -86,6 +86,6 @@ See [collectors](04-collectors.md#content-caching) for how a collector opts into
   A catalog left by the tool's former name (`.repo-insighter/`) is detected in the same spot and reported with the `mv` that preserves it.
 - **Concurrency**: nothing guards against two concurrent `scan` runs interleaving writes today.
   A lock file in the catalog is the intended fix (mechanism TBD).
-- **Reclaiming space**: `gc` is the only thing that deletes from the catalog, and it deletes only what can be proven dead — commit folders git can no longer reach, tree snapshots stored off HEAD's first-parent chain, and outputs (plus the blob-cache entries beside them) whose `cacheKey` no longer matches any registered collector.
+- **Reclaiming space**: `gc` is the only thing that deletes from the catalog, and it deletes only what can be proven dead — commit folders git can no longer reach, tree snapshots stored off the mainline (HEAD's first-parent chain, extended across founding grafts — see [collectors](04-collectors.md#sampling)), and outputs (plus the blob-cache entries beside them) whose `cacheKey` no longer matches any registered collector.
   Everything it removes can be produced again by a re-`scan`, so a mistaken `gc` costs time rather than data.
   See [the CLI surface](02-cli.md) for the flags.
