@@ -257,6 +257,39 @@ test("resolveConfig rejects invalid charts config", () => {
   );
 });
 
+test("resolveConfig accepts charts.annotations and trims them", () => {
+  expect(resolveInRepo({}).chartAnnotations).toStrictEqual({});
+  expect(resolveInRepo({ charts: {} }).chartAnnotations).toStrictEqual({});
+  expect(
+    resolveInRepo({
+      charts: {
+        annotations: {
+          "lines-of-code": "  A note with a [link](https://example.com).  ",
+          "commit-calendar": "Another note.",
+        },
+      },
+    }).chartAnnotations,
+  ).toStrictEqual({
+    "lines-of-code": "A note with a [link](https://example.com).",
+    "commit-calendar": "Another note.",
+  });
+});
+
+test("resolveConfig rejects invalid charts.annotations", () => {
+  expect(() => resolveInRepo({ charts: { annotations: [] } })).toThrow(
+    /`charts.annotations` must be an object/,
+  );
+  expect(() =>
+    resolveInRepo({ charts: { annotations: { "no-such-chart": "Note." } } }),
+  ).toThrow(/unknown chart id "no-such-chart"; known ids: lines-of-code/);
+  expect(() =>
+    resolveInRepo({ charts: { annotations: { "loose-ends": "   " } } }),
+  ).toThrow(/`charts.annotations.loose-ends` must be a non-empty string/);
+  expect(() =>
+    resolveInRepo({ charts: { annotations: { dependencies: 42 } } }),
+  ).toThrow(/`charts.annotations.dependencies` must be a non-empty string/);
+});
+
 test("resolveConfig rejects an email shared across alias groups", () => {
   expect(() =>
     resolveInRepo({

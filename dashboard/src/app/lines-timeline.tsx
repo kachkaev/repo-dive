@@ -484,6 +484,7 @@ export function LinesTimeline({
     <Section
       title={linesTimelineHeading.title}
       subtitle={linesTimelineHeading.subtitle}
+      annotation={data.config?.charts?.annotations?.["lines-of-code"]}
       controls={
         <>
           <SegmentedControl

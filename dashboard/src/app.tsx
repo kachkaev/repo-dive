@@ -139,6 +139,7 @@ export function App({ data }: { data: DashboardData }) {
         <Section
           title={linesTimelineHeading.title}
           subtitle={linesTimelineHeading.subtitle}
+          annotation={data.config?.charts?.annotations?.["lines-of-code"]}
           skeleton
         >
           {undefined}

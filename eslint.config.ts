@@ -32,6 +32,13 @@ export default defineConfig([
   },
 
   {
+    files: ["examples/*/repo-dive.config.ts"],
+    rules: {
+      "import/no-default-export": "off", // repo-dive reads the config from the file's default export.
+    },
+  },
+
+  {
     files: ["scripts/**/*.ts"],
     rules: {
       "@typescript-eslint/consistent-type-assertions": "off", // `npm pack --json` and the size baseline we wrote ourselves cross a trusted local boundary; a cast beats hand-validating tool output.
