@@ -106,17 +106,13 @@ const maxDefaultCalendarYears = 7;
 
 /**
  * The multi-year ranges a repo spanning this many calendar years offers: 5,
- * 10, 15, … A range earns its row only once two calendar years fall outside
- * it. Trimming a single strip off the whole history is not worth its own
- * option — and that strip is the repo's first year, usually a partial one.
+ * 10, 15, … A range earns its row once a calendar year falls outside it — up
+ * to that point it draws strip for strip what the whole history draws, and
+ * two options drawing the same thing is one option too many.
  */
 const multiYearSpansOf = (years: number): number[] => {
   const spans: number[] = [];
-  for (
-    let span = calendarYearStep;
-    years > span + 1;
-    span += calendarYearStep
-  ) {
+  for (let span = calendarYearStep; years > span; span += calendarYearStep) {
     spans.push(span);
   }
   return spans;
