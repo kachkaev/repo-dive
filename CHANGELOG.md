@@ -1,5 +1,44 @@
 # repo-dive
 
+## 0.15.0
+
+### Minor Changes
+
+- [#163](https://github.com/kachkaev/repo-dive/pull/163) [`10e84d2`](https://github.com/kachkaev/repo-dive/commit/10e84d276421a5aed90c075fbb024fef8d4355ba) - Sum every history absorbed by a founding graft into the tree timelines.
+  A migration-assembled repository used to chart only one predecessor's states before the graft, so the commit calendar stayed busy through years the tree charts could barely see; now each absorbed history is a lineage contributing to the summed series from its own first commit until the assembly that absorbed it completes — effect's pre-2024 lines-of-code timeline now counts all eight absorbed repositories, meeting the post-assembly total exactly at the boundary.
+  Sampling policies apply per lineage, so a monthly collector keeps one snapshot per month of each parallel pre-migration history.
+  Re-run `scan` and `index` on an existing catalog to collect and compose the newly covered commits.
+
+- [#162](https://github.com/kachkaev/repo-dive/pull/162) [`c152a62`](https://github.com/kachkaev/repo-dive/commit/c152a629895a19705388ba5a737d1c0ded975302) - Add per-chart Markdown annotations via `charts.annotations` in the config.
+  Each note is keyed by a chart section's stable id (e.g. `"lines-of-code"`) and rendered in a callout between that chart's heading and the chart itself — for explaining oddities the data alone cannot, like a history migration that makes a timeline sparse.
+  Markdown is limited to paragraphs, `-` lists, bold, italics, inline code and links.
+  An unknown chart id fails `index` with the list of known ids, so a typo cannot silently drop a note.
+
+- [#160](https://github.com/kachkaev/repo-dive/pull/160) [`6809849`](https://github.com/kachkaev/repo-dive/commit/68098490d6992fb8aaf01b7681a4b45e701ff453) - Add the contributor-kind filter to the commits-per-month and churn-per-month charts.
+
+  The `all | humans | AI agents | bots` control the commit calendar and the contributor bars already carry now also sits above the two monthly charts, so a repo where bots do most of the committing can be read one kind at a time — each chart rescales to whatever the selected kind did.
+  Narrowing to humans keeps the AI-assisted split, and the percentage option stays in place but is disabled while a single-kind view leaves one series.
+
+### Patch Changes
+
+- [#158](https://github.com/kachkaev/repo-dive/pull/158) [`4d0eaf0`](https://github.com/kachkaev/repo-dive/commit/4d0eaf049cdac752e8e9d55e9342073294586589) - Offer the commit calendar's multi-year ranges in steps of five.
+
+  "Last 3 years" is gone and "Last 10 years", "Last 15 years" and so on now follow "Last 5 years", each appearing once the repo has a calendar year to hide outside it.
+  A repo spanning up to seven calendar years also opens on its whole history rather than the newest five.
+
+- [#164](https://github.com/kachkaev/repo-dive/pull/164) [`ce97b05`](https://github.com/kachkaev/repo-dive/commit/ce97b053879ada2aad341345f019007421de82c0) - Drop the "Loose ends" chart's eslint and TypeScript lines from repos that have neither.
+
+  Outside the JS/TS ecosystem those two families cannot exist, so a Python or Go repo drew them as flat zeros beside its TODO comments — a line inviting a reading of the tree it could never support.
+  Each now earns its place only once some commit has actually held one, and the subtitle names just the families on show, much as the dependency charts wait for a lockfile.
+  TODO-style comments are scanned in every source file whatever the language, so that line always draws.
+
+  A chart whose values never leave single digits also no longer repeats itself along the value axis (`0 · 0 · 1 · 1`).
+
+- [#161](https://github.com/kachkaev/repo-dive/pull/161) [`edb8dc8`](https://github.com/kachkaev/repo-dive/commit/edb8dc873ebbabb985018e8cd21e40de6b9d40dd) - Skip a migration's assembly commits when sampling tree snapshots.
+  When the mainline extends across a founding graft, the fresh root and the founding merge run hold half-assembled workspaces (effect's "workspace skeleton" is a near-empty tree that the next eight merges fill one repository at a time), which drew a crash-to-zero spike at the graft boundary.
+  Those commits now leave the mainline, so the timeline steps from the absorbed history's tip straight to the first post-assembly commit.
+  Re-run `scan` and `index` (or `gc`) on an existing catalog to drop the already collected assembly snapshots from the cube.
+
 ## 0.14.0
 
 ### Minor Changes
