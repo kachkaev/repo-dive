@@ -1,5 +1,25 @@
 # repo-dive
 
+## 0.14.0
+
+### Minor Changes
+
+- [#153](https://github.com/kachkaev/repo-dive/pull/153) [`09549a6`](https://github.com/kachkaev/repo-dive/commit/09549a62d30883c392d5ec810f391ab2e966cb13) - Extend tree snapshots backwards across founding history grafts.
+  Snapshot collectors (lines of code, dependencies, file types, loose ends, survival) used to stop at HEAD's first-parent root, so a repository assembled by a migration — effect's monorepo starts at a December 2023 "workspace skeleton" that merges in the absorbed histories — lost every earlier state and its timelines began years after the project did.
+  The scanned mainline now recognizes that founding-graft signature and continues into the absorbed history reaching back furthest, so those charts cover the project's previous life too.
+  Re-run `scan` and `index` on an existing catalog to backfill the newly covered commits.
+
+### Patch Changes
+
+- [#157](https://github.com/kachkaev/repo-dive/pull/157) [`6cab897`](https://github.com/kachkaev/repo-dive/commit/6cab8977860ff9fbef4c636cd13525b024e90d52) - Lean the legend and contributor-bar hatching the same way as the charts.
+
+  The diagonal hatching that marks AI-assisted work — and every other cross-kind collaboration — ran bottom-left to top-right in the charts but top-left to bottom-right in the legend swatches, tooltips and the contributor bars.
+  All of them now lean bottom-left to top-right.
+
+- [#156](https://github.com/kachkaev/repo-dive/pull/156) [`9c42adc`](https://github.com/kachkaev/repo-dive/commit/9c42adc15f22ad252fde2e24c8cf7459c5b4b3a4) - Wrap the dashboard's report header more gracefully on narrow screens.
+
+  The coverage clause now moves to the next line as a whole instead of leaving `coverage:` stranded above its dates, and a `YYYY-MM-DD` date is never split across two lines at its hyphens.
+
 ## 0.13.0
 
 ### Minor Changes
