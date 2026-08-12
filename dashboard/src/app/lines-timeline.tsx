@@ -1,4 +1,5 @@
 import type { DashboardData } from "../data.ts";
+import { survivalColorScalesOf } from "./shared/survival-colors.tsx";
 import { SurvivalTimeline } from "./survival-timeline.tsx";
 
 /**
@@ -40,6 +41,7 @@ export function LinesTimeline({
       }))}
       survivalRows={data.survival}
       maxContributorsInCharts={maxContributorsInCharts}
+      colorScales={survivalColorScalesOf(data)}
     />
   );
 }

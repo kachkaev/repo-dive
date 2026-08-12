@@ -1,17 +1,13 @@
 import { useDeferredValue, useState } from "react";
 
-import { kindColors } from "./shared/contributor-kinds.tsx";
 import { formatDate } from "./shared/format.ts";
 import { DataTable, Section } from "./shared/primitives.tsx";
 import {
   PercentControl,
   SegmentedControl,
 } from "./shared/segmented-control.tsx";
-import {
-  categoricalColors,
-  otherColor,
-  shapeStacked,
-} from "./shared/stacked-series.ts";
+import { otherColor, shapeStacked } from "./shared/stacked-series.ts";
+import type { SurvivalColorScales } from "./shared/survival-colors.tsx";
 import {
   type LegendItem,
   type SeriesGroup,
@@ -131,9 +127,8 @@ function shapeYearBands(
   }>,
   maxSeries: number,
   yearScale: YearScale,
-  /** Base color per kept group given its rank; defaults to the palette order. */
-  baseColorOf: (label: string, rank: number) => string = (_, rank) =>
-    categoricalColors[rank % categoricalColors.length] ?? otherColor,
+  /** Base color per kept group given its rank in this chart. */
+  baseColorOf: (label: string, rank: number) => string,
 ): StackedChart {
   const latest = rows.at(-1)?.byGroupYear ?? {};
   const ranked = Object.entries(latest)
@@ -185,35 +180,6 @@ function shapeYearBands(
     separateGroups: true,
   };
 }
-
-/**
- * Survival series that indexing folds non-human contributors into (must match
- * `kindGroupLabels` in src/cli/shared/indexing.ts), colored with the reserved
- * kind colors instead of palette slots.
- */
-const kindGroupSeriesColors: Record<string, string> = {
-  Bots: kindColors.bot,
-  "AI agents": kindColors.ai,
-};
-
-/**
- * Palette slots a person may take in a chart that also draws the folded Bots /
- * AI agents bands. `--series-3` is skipped because `--kind-bot` aliases it (see
- * styles.css) — otherwise a human and the Bots band render in the very same
- * amber within one stack, which is exactly what the reserved colors exist to
- * prevent. `--series-1` stays in: it *is* `--kind-human`.
- */
-const humanCategoricalColors = categoricalColors.filter(
-  (color) => color !== "var(--series-3)",
-);
-
-// Bots and AI agents arrive pre-folded into one series per kind (indexing
-// groups them), colored with the reserved kind colors; humans take palette
-// slots by rank as before.
-const contributorBaseColorOf = (label: string, rank: number): string =>
-  kindGroupSeriesColors[label] ??
-  humanCategoricalColors[rank % humanCategoricalColors.length] ??
-  otherColor;
 
 /** Newest year at full color, oldest palest — shared by the "all units" stack. */
 const cohortBaseColor = "var(--series-1)";
@@ -270,6 +236,7 @@ export function SurvivalTimeline({
   flatRows,
   survivalRows,
   maxContributorsInCharts,
+  colorScales,
 }: {
   title: string;
   subtitle: string;
@@ -280,6 +247,11 @@ export function SurvivalTimeline({
   flatRows: ReadonlyArray<{ date: string; values: Record<string, number> }>;
   survivalRows: readonly SurvivalTimelineRow[];
   maxContributorsInCharts: number;
+  /**
+   * The page-wide color scales (see {@link survivalColorScalesOf}), so a
+   * language or contributor keeps one color across every chart and variant.
+   */
+  colorScales: SurvivalColorScales;
 }) {
   const [preferredDimension, setDimension] =
     useState<SplitDimension>("language");
@@ -373,15 +345,9 @@ export function SurvivalTimeline({
   } else if (deferredDimension === "language") {
     if (deferredShaded) {
       // Blame-based counterpart to the per-commit stack: the same units over
-      // the same files, shaded by the year each was authored. Languages the
-      // flat variant also shows keep its colors so toggling doesn't recolor
-      // the stack; the two top-7 lists can still differ, since survival
-      // samples fewer commits, so an extra takes a palette slot past the flat
-      // chart's.
-      const flatKeys = shapeStacked(
-        [...flatRows],
-        maxLanguagesInCharts,
-      ).seriesKeys;
+      // the same files, shaded by the year each was authored. The shared scale
+      // keeps a language's color identical to the flat variant's — and to the
+      // other chart's — even where the rankings disagree.
       chart = shapeYearBands(
         survivalRows.map((row) => ({
           date: row.date,
@@ -389,16 +355,18 @@ export function SurvivalTimeline({
         })),
         maxLanguagesInCharts,
         survivalYearScale,
-        (label, rank) => {
-          const matched = flatKeys.indexOf(label);
-          const slot = matched === -1 ? flatKeys.length + rank : matched;
-          return (
-            categoricalColors[slot % categoricalColors.length] ?? otherColor
-          );
-        },
+        colorScales.languageColorOf,
       );
     } else {
-      chart = shapeStacked([...flatRows], maxLanguagesInCharts);
+      const flat = shapeStacked([...flatRows], maxLanguagesInCharts);
+      chart = {
+        ...flat,
+        colors: flat.seriesKeys.map((key, index) =>
+          key === "Other"
+            ? otherColor
+            : colorScales.languageColorOf(key, index),
+        ),
+      };
     }
   } else {
     if (deferredShaded) {
@@ -409,7 +377,7 @@ export function SurvivalTimeline({
         })),
         maxContributorsInCharts,
         survivalYearScale,
-        contributorBaseColorOf,
+        colorScales.contributorColorOf,
       );
     } else {
       const flat = shapeStacked(
@@ -422,7 +390,9 @@ export function SurvivalTimeline({
       chart = {
         ...flat,
         colors: flat.seriesKeys.map((key, index) =>
-          key === "Other" ? otherColor : contributorBaseColorOf(key, index),
+          key === "Other"
+            ? otherColor
+            : colorScales.contributorColorOf(key, index),
         ),
       };
     }
