@@ -79,7 +79,7 @@ Give them an alias group with a `displayName` to tell them apart on purpose; the
 Every contributor has a **kind**: `human` (the default), `bot` (automation like renovate, dependabot, github-actions) or `ai` (AI coding agents like Copilot, Claude, Cursor, …).
 When a group omits `kind` — or for contributors with no alias group at all — the kind is derived from the name and email; anything unrecognized is a human.
 A name whose last word is `bot`, separated by a space or a hyphen, also counts as a bot — `Release bot` and `deploy-bot` do, `Kate Talbot` does not.
-Agent products are recognized by the name they sign with, as whole words only, so `Patrick Devine` is not Devin and `Ali Haider` is not aider; Claude and Devin are ordinary given names, so those two additionally need the agent/model word agents append (`Claude Opus 4.5`, `Devin AI`).
+Agent products are recognized by the name they sign with, as whole words only, so `Sam Devine` is not Devin and `Kai Haider` is not aider; Claude and Devin are ordinary given names, so those two additionally need the agent/model word agents append (`Claude Opus 4.5`, `Devin AI`).
 On the email side only agent-specific mailboxes count (`noreply@anthropic.com`, `codex@openai.com`) — a bare vendor domain marks an employee, not an agent, so `alice@openai.com` stays human.
 Co-authors are classified the same way as authors, so an agent that only ever appears in trailers still gets its own row.
 

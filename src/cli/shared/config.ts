@@ -65,8 +65,8 @@ const botPattern = /\brenovate\b|\bdependabot\b|github-actions|\[bot\]/i;
 const botNameSuffixPattern = /[\s-]bot$/i;
 /**
  * Names AI coding agents sign with, matched against the display name as whole
- * words so a human name that merely contains one stays human — `Patrick
- * Devine` is not Devin, `Ali Haider` is not aider. `coderabbit` is anchored on
+ * words so a human name that merely contains one stays human — `Sam Devine`
+ * is not Devin, `Kai Haider` is not aider. `coderabbit` is anchored on
  * the left only because the agent signs as `coderabbitai`. Claude and Devin
  * are ordinary given names even as whole words, so those two only count with
  * the agent/model word agents append (`Claude Opus 4.5`, `Devin AI`).

@@ -170,13 +170,11 @@ test("deriveContributorKind classifies bots and AI agents", () => {
 
 test("deriveContributorKind keeps humans whose names contain an agent word", () => {
   // Agent tokens only count as whole words…
-  expect(deriveContributorKind("Patrick Devine <patrick@example.com>")).toBe(
-    "human",
-  );
+  expect(deriveContributorKind("Sam Devine <sam@example.com>")).toBe("human");
   expect(
-    deriveContributorKind("pdevine <12345+pdevine@users.noreply.github.com>"),
+    deriveContributorKind("devine <12345+devine@users.noreply.github.com>"),
   ).toBe("human");
-  expect(deriveContributorKind("Ali Haider <haider@example.com>")).toBe(
+  expect(deriveContributorKind("Kai Haider <haider@example.com>")).toBe(
     "human",
   );
   expect(deriveContributorKind("Open Air <hello@openair.example>")).toBe(
@@ -198,9 +196,9 @@ test("deriveContributorKind keeps humans whose names contain an agent word", () 
 });
 
 test("deriveContributorKind treats a vendor domain as an employer, not an agent", () => {
-  expect(
-    deriveContributorKind("Mihai Maruseac <mihaimaruseac@openai.com>"),
-  ).toBe("human");
+  expect(deriveContributorKind("Robin Ellis <robinellis@openai.com>")).toBe(
+    "human",
+  );
   expect(deriveContributorKind("Sam Human <sam@anthropic.com>")).toBe("human");
   expect(deriveContributorKind("Jane Doe <jane@cursor.com>")).toBe("human");
 });

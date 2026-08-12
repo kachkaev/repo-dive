@@ -43,17 +43,16 @@ interruptible
 jdrouet
 JVM
 Kachkaev
+Kai
 knip
 libsql
 LLM
 lockfiles
 loglevel
 maat
-Maruseac
 matplotlib
 MCP
 mergestat
-Mihai
 Millis
 mousemove
 msgpackr
@@ -64,7 +63,6 @@ numstat
 ollama
 onefetch
 oxc
-pdevine
 Picci
 Pijul
 pnp
