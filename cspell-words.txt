@@ -1,3 +1,4 @@
+Aimard
 ASF
 browsable
 burndown
@@ -8,11 +9,14 @@ cloc
 COCOMO
 codegen
 coderabbit
+coderabbitai
 cva
 Datasette
 DDL
 dedupe
+Devine
 dsl
+Dus
 EAV
 Effectful
 ENOENT
@@ -26,8 +30,10 @@ gitext
 gitinspector
 gitstats
 Gource
+GPT
 greppable
 Grimoire
+Haider
 hotspots
 hoverable
 incrementality
@@ -37,6 +43,7 @@ interruptible
 jdrouet
 JVM
 Kachkaev
+Kai
 knip
 libsql
 LLM

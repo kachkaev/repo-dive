@@ -150,6 +150,57 @@ test("deriveContributorKind classifies bots and AI agents", () => {
       "Copilot <198982749+Copilot@users.noreply.github.com>",
     ),
   ).toBe("ai");
+  expect(deriveContributorKind("Claude <noreply@anthropic.com>")).toBe("ai");
+  expect(deriveContributorKind("Claude Opus 4.5 <noreply@anthropic.com>")).toBe(
+    "ai",
+  );
+  expect(
+    deriveContributorKind(
+      "Devin AI <158243242+devin-ai-integration@users.noreply.github.com>",
+    ),
+  ).toBe("ai");
+  expect(deriveContributorKind("Cursor Agent <cursoragent@cursor.com>")).toBe(
+    "ai",
+  );
+  expect(deriveContributorKind("aider <aider@aider.chat>")).toBe("ai");
+  expect(deriveContributorKind("Codex <noreply@openai.com>")).toBe("ai");
+  expect(deriveContributorKind("GPT-5 Codex <codex@openai.com>")).toBe("ai");
+  expect(deriveContributorKind("Claude <claude@anthropic.com>")).toBe("ai");
+});
+
+test("deriveContributorKind keeps humans whose names contain an agent word", () => {
+  // Agent tokens only count as whole words…
+  expect(deriveContributorKind("Sam Devine <sam@example.com>")).toBe("human");
+  expect(
+    deriveContributorKind("devine <12345+devine@users.noreply.github.com>"),
+  ).toBe("human");
+  expect(deriveContributorKind("Kai Haider <haider@example.com>")).toBe(
+    "human",
+  );
+  expect(deriveContributorKind("Open Air <hello@openair.example>")).toBe(
+    "human",
+  );
+  // …and Claude / Devin are given names, human without agent evidence.
+  expect(deriveContributorKind("Claude Martin <claude@example.com>")).toBe(
+    "human",
+  );
+  expect(deriveContributorKind("Jean-Claude Dus <jcd@example.com>")).toBe(
+    "human",
+  );
+  expect(deriveContributorKind("Devin Smith <devin@example.com>")).toBe(
+    "human",
+  );
+  // The evidence word has to be a word of its own, not a name's first syllable.
+  expect(deriveContributorKind("Claude Aimard <ca@example.com>")).toBe("human");
+  expect(deriveContributorKind("Devin Aitken <da@example.com>")).toBe("human");
+});
+
+test("deriveContributorKind treats a vendor domain as an employer, not an agent", () => {
+  expect(deriveContributorKind("Robin Ellis <robinellis@openai.com>")).toBe(
+    "human",
+  );
+  expect(deriveContributorKind("Sam Human <sam@anthropic.com>")).toBe("human");
+  expect(deriveContributorKind("Jane Doe <jane@cursor.com>")).toBe("human");
 });
 
 test("deriveContributorKind treats a trailing bot word in the name as a bot", () => {
