@@ -185,6 +185,9 @@ Implemented, in `src/cli/shared/collectors/` (strategy, then default sampling wh
     Blob-cached.
     It scans exactly the file set `survival` blames, so the dashboard's "Lines by language" chart shows the same totals with age shading on and off; an earlier version shelled out to `tokei`, which counted lockfiles and generated data the blame view could never account for.
 1.  **survival** (`tree`, `monthly`) — living lines by extension, author and authoring-month cohort, via `git blame --line-porcelain` per file. The expensive one.
+1.  **file-survival** (`tree`, `monthly`) — living files by extension, creator and creation-month cohort, from one rename-following `git log --name-status` walk per sample.
+    A file belongs to the commit that created it until it is deleted: later edits never re-attribute it or move it to a newer cohort, and a rename keeps its origin.
+    Emits `survival.files` into the same metric namespace as `survival` — the file grain of the same question, collected separately so either collector can bump its version without invalidating the other's outputs.
 
 Planned next:
 

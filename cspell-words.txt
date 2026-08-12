@@ -79,6 +79,7 @@ tanuki
 tgz
 tokei
 toplevel
+topo
 Tornhill
 treemap
 tsc
