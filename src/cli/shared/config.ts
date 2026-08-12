@@ -63,21 +63,37 @@ const botPattern = /\brenovate\b|\bdependabot\b|github-actions|\[bot\]/i;
  * those letters, like `Kate Talbot`, stay human.
  */
 const botNameSuffixPattern = /[\s-]bot$/i;
-/** Known AI coding agents (mirrors the co-author heuristic in indexing.ts). */
-const aiPattern =
-  /claude|copilot|cursor|chatgpt|openai|gemini|aider|devin|coderabbit|codegen|sweep|windsurf/i;
+/**
+ * Names AI coding agents sign with, matched against the display name as whole
+ * words so a human name that merely contains one stays human — `Patrick
+ * Devine` is not Devin, `Ali Haider` is not aider. `coderabbit` is anchored on
+ * the left only because the agent signs as `coderabbitai`. Claude and Devin
+ * are ordinary given names even as whole words, so those two only count with
+ * the agent/model word agents append (`Claude Opus 4.5`, `Devin AI`).
+ */
+const aiNamePattern =
+  /\bcopilot\b|\bcursor\b|\bchatgpt\b|\bcodex\b|\bopenai\b|\bgemini\b|\baider\b|\bcoderabbit|\bcodegen\b|\bsweep\b|\bwindsurf\b|\bclaude[\s.-]?(?:ai|code|opus|sonnet|haiku|fable|mythos|\d)\b|\bdevin[\s.-]?ai\b/i;
+/**
+ * Mailboxes agents commit under — always agent-specific addresses, never a
+ * bare vendor domain: `alice@openai.com` is an employee, not an agent, which
+ * is why product names are never matched against the email side.
+ */
+const aiEmailPattern =
+  /(?:claude|noreply)@anthropic\.com|(?:chatgpt|codex|noreply)@openai\.com/i;
 
 /** `"Name <email>"` → `"Name"`; identities without an email part are used as-is. */
 const identityName = (identity: string): string =>
   identity.replace(/\s*<[^<>]*>\s*$/, "").trim();
 
 /** Classifies a `"Name <email>"` identity when the config leaves `kind` unset. */
-export const deriveContributorKind = (identity: string): ContributorKind =>
-  botPattern.test(identity) || botNameSuffixPattern.test(identityName(identity))
+export const deriveContributorKind = (identity: string): ContributorKind => {
+  const name = identityName(identity);
+  return botPattern.test(identity) || botNameSuffixPattern.test(name)
     ? "bot"
-    : aiPattern.test(identity)
+    : aiNamePattern.test(name) || aiEmailPattern.test(identity)
       ? "ai"
       : "human";
+};
 
 /**
  * Tidies an auto-derived name for display. The kind badge (🤖 / ✨) already
