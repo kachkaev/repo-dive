@@ -142,15 +142,21 @@ export const fileSurvivalCollector: Collector = {
   defaultSampling: "monthly",
   collect: ({ repoRoot, sha }) =>
     Effect.gen(function* () {
-      const fileList = yield* runGit([
-        "-C",
-        repoRoot,
-        "ls-tree",
-        "-r",
-        "--name-only",
-        sha,
-      ]);
-      const files = fileList.split("\n").filter(isScannableSourceFile);
+      // Blobs only: a submodule is a gitlink entry whose path can end in a
+      // source extension (ollama's `llm/llama.cpp`), yet it is not a file.
+      const fileList = yield* runGit(["-C", repoRoot, "ls-tree", "-r", sha]);
+      const files: string[] = [];
+      for (const line of fileList.split("\n")) {
+        const tabIndex = line.indexOf("\t");
+        if (tabIndex === -1) {
+          continue;
+        }
+        const [, type] = line.slice(0, tabIndex).split(/\s+/);
+        const filePath = line.slice(tabIndex + 1);
+        if (type === "blob" && isScannableSourceFile(filePath)) {
+          files.push(filePath);
+        }
+      }
 
       // One pass over the history reachable from the snapshot. `--topo-order`
       // keeps children ahead of parents, so of a delete-and-recreate pair the
