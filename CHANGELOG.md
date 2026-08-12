@@ -1,5 +1,13 @@
 # repo-dive
 
+## 0.15.1
+
+### Patch Changes
+
+- [#167](https://github.com/kachkaev/repo-dive/pull/167) [`188a1a9`](https://github.com/kachkaev/repo-dive/commit/188a1a99a14daa03633ca4503e455a6167accf30) - Stop classifying humans as AI agents when their name or employer merely contains an agent word.
+  Agent products are now recognized by the whole-word name they sign with (`Sam Devine` is no longer Devin, `Kai Haider` is not aider), Claude and Devin additionally need the agent/model word agents append (`Claude Opus 4.5`, `Devin AI`), and on the email side only agent-specific mailboxes count — `alice@openai.com` marks an employee, not an agent.
+  Existing catalogs pick the corrected kinds up on their next `index` run — kinds are derived at index time, so no re-scan is needed.
+
 ## 0.15.0
 
 ### Minor Changes
