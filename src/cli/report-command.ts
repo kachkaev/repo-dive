@@ -18,6 +18,7 @@ export const reportCommand = Command.make("report", {
     ),
   ),
   open: Flag.boolean("open").pipe(
+    Flag.withDefault(false),
     Flag.withDescription("Open the report in the default browser"),
   ),
 }).pipe(
