@@ -10,6 +10,7 @@ export const ignoreCommand = Command.make("ignore", {
     ),
   ),
   dryRun: Flag.boolean("dry-run").pipe(
+    Flag.withDefault(false),
     Flag.withDescription("Report what would be added without writing anything"),
   ),
 }).pipe(

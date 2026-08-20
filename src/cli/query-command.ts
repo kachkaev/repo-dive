@@ -10,6 +10,7 @@ export const queryCommand = Command.make("query", {
     ),
   ),
   json: Flag.boolean("json").pipe(
+    Flag.withDefault(false),
     Flag.withDescription("Print rows as JSON instead of a table"),
   ),
   sql: Argument.string("sql").pipe(

@@ -1,5 +1,5 @@
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Console, Data, Effect, Option, Runtime } from "effect";
+import { Console, Data, Effect, Runtime } from "effect";
 import { CliError, Command, Flag } from "effect/unstable/cli";
 
 import packageJson from "../package.json" with { type: "json" };
@@ -30,7 +30,7 @@ const cli = Command.make("repo-dive", {
     Flag.withDescription("Port to serve the dashboard on"),
   ),
   open: Flag.boolean("open").pipe(
-    Flag.optional,
+    Flag.withDefault(true),
     Flag.withDescription(
       "Open the dashboard in the default browser (default: --open; pass --no-open to disable)",
     ),
@@ -50,7 +50,7 @@ const cli = Command.make("repo-dive", {
       yield* runDashboard({
         repoPath: config.repoPath,
         port: config.port,
-        open: Option.getOrElse(config.open, () => true),
+        open: config.open,
       });
     }),
   ),
