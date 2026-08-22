@@ -33,6 +33,11 @@ type LanguagesRow = {
   sha: string;
   date: SnapshotDate;
   byLanguage: Record<string, number>;
+  /**
+   * Source files per language at the same commit, from the same scan.
+   * Optional: absent in dashboard.json written before file counts landed.
+   */
+  byLanguageFiles?: Record<string, number>;
 };
 
 type FileTypesRow = {
@@ -73,19 +78,24 @@ type DependenciesRow = {
   byPackageManager: Record<string, number>;
 };
 
+/**
+ * One survival snapshot — the same shape at two grains: `survival` rows count
+ * living lines, `fileSurvival` rows count living files (a file belongs to its
+ * creator and creation cohort until it is deleted).
+ */
 type SurvivalRow = {
   sha: string;
   date: SnapshotDate;
   byCohort: Record<string, number>;
   byContributor: Record<string, number>;
   /**
-   * Living lines per contributor, split by the year each line was authored.
+   * Living units per contributor, split by the year each was authored.
    * Optional: absent in dashboard.json written before per-year survival landed.
    */
   byContributorYear?: Record<string, Record<string, number>>;
   byLanguage: Record<string, number>;
   /**
-   * Living lines per language, split by the year each line was authored.
+   * Living units per language, split by the year each was authored.
    * Optional: absent in dashboard.json written before per-year survival by
    * language landed.
    */
@@ -138,6 +148,7 @@ type ContributorRow = {
  */
 type ChartAnnotationId =
   | "lines-of-code"
+  | "number-of-files"
   | "commit-calendar"
   | "commits-per-month"
   | "churn-per-month"
@@ -199,6 +210,11 @@ export type DashboardData = {
   dependencies: DependenciesRow[];
   topRules: Array<{ rule: string; count: number }>;
   survival: SurvivalRow[];
+  /**
+   * File-grain survival samples from the `file-survival` collector. Optional:
+   * absent in dashboard.json written before file survival landed.
+   */
+  fileSurvival?: SurvivalRow[];
   contributors: ContributorRow[];
 };
 

@@ -120,7 +120,7 @@ charts: {
 },
 ```
 
-Known ids, in page order: `lines-of-code`, `commit-calendar`, `commits-per-month`, `churn-per-month`, `direct-dependencies`, `dependencies`, `loose-ends`, `most-suppressed-eslint-rules`, `contributors` — an unknown id fails `index` with the list, so a typo cannot silently drop a note.
+Known ids, in page order: `lines-of-code`, `number-of-files`, `commit-calendar`, `commits-per-month`, `churn-per-month`, `direct-dependencies`, `dependencies`, `loose-ends`, `most-suppressed-eslint-rules`, `contributors` — an unknown id fails `index` with the list, so a typo cannot silently drop a note.
 The dashboard renders each note in a callout between the chart's heading and the chart itself.
 Markdown is deliberately limited to what a note needs — paragraphs, `-` lists, `**bold**`, `_italic_`, `` `code` `` and `[links](https://…)` — and is rendered as React elements, never injected as HTML.
 Like the rest of `charts`, annotations flow into `dashboard.json` (`config.charts.annotations`, omitted when empty) at `index` time.

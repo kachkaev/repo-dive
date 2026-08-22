@@ -28,6 +28,7 @@ gapless
 gilot
 gitext
 gitinspector
+gitlink
 gitstats
 Gource
 GPT
@@ -86,6 +87,7 @@ tanuki
 tgz
 tokei
 toplevel
+topo
 Tornhill
 treemap
 tsc

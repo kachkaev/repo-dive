@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { arrayAt, numberAt, stringAt } from "../../../shared/json.ts";
 import { runGit } from "../git.ts";
 import {
+  cohortMonthOf,
   type Collector,
   extensionOf,
   type Fact,
@@ -21,11 +22,6 @@ type SurvivalOutput = {
   readonly rows: readonly SurvivalRow[];
   readonly totalLines: number;
   readonly fileCount: number;
-};
-
-const monthOf = (unixSeconds: number): string => {
-  const date = new Date(unixSeconds * 1000);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 };
 
 type LineAttribution = {
@@ -51,7 +47,7 @@ export const parseBlamePorcelain = (stdout: string): LineAttribution[] => {
     } else if (line.startsWith("\t")) {
       attributions.push({
         authorEmail,
-        cohortMonth: monthOf(authorTime),
+        cohortMonth: cohortMonthOf(authorTime),
       });
     }
   }
