@@ -1,15 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "`minimumReleaseAge` is the floor that keeps Renovate from proposing a version pnpm would refuse to lock, so it must stay in sync with the same option in pnpm-workspace.yaml. Rules below may raise it, never lower it.",
-  "extends": [
-    "config:recommended",
-    ":dependencyDashboardApproval",
-    ":disableDigestUpdates",
-    ":maintainLockFilesWeekly",
-    ":semanticCommitsDisabled",
-    "helpers:pinGitHubActionDigestsToSemver"
-  ],
-  "minimumReleaseAge": "8 hours",
+  "extends": ["github>kachkaev/reusable-stuff:renovate-preset"],
   "packageRules": [
     {
       "description": "Group packages released in lockstep from the Effect monorepo. Renovate's own `group:monorepos` preset matches on `matchSourceUrls`, which does not work here: `monorepo.json` lists `Effect-TS/effect-smol`, while the published packages point at `Effect-TS/effect`. Matching on package names instead keeps the group working no matter where the sources move.",
@@ -29,42 +20,6 @@
         "@types/react-dom",
         "@types/react-is"
       ]
-    },
-    {
-      "autoApprove": true,
-      "automerge": true,
-      "dependencyDashboardApproval": false,
-      "enabled": true,
-      "minimumReleaseAge": "2 days",
-      "matchManagers": ["npm"],
-      "matchPackageNames": ["/^pnpm$/"],
-      "schedule": ["every weekend"]
-    },
-    {
-      "autoApprove": true,
-      "automerge": true,
-      "dependencyDashboardApproval": false,
-      "enabled": true,
-      "matchUpdateTypes": ["patch"],
-      "matchCurrentValue": "!/^0\\./",
-      "matchManagers": ["npm"],
-      "minimumReleaseAge": "2 days",
-      "schedule": ["every weekend"]
-    },
-    {
-      "autoApprove": true,
-      "automerge": true,
-      "dependencyDashboardApproval": false,
-      "enabled": true,
-      "matchDepTypes": ["devDependencies"],
-      "matchManagers": ["npm"],
-      "minimumReleaseAge": "2 days",
-      "schedule": ["every weekend"]
     }
-  ],
-  "postUpdateOptions": ["pnpmDedupe"],
-  "prConcurrentLimit": 5,
-  "prHourlyLimit": 1,
-  "rangeStrategy": "pin",
-  "timezone": "Etc/UTC"
+  ]
 }
