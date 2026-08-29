@@ -3,7 +3,8 @@ allowBuilds:
   msgpackr-extract: true # Required by effect -> msgpackr on pnpm 11+, including CI installs.
 # Wait 8 hours after a version is published before installing it, so a compromised release has time to
 # be spotted and unpublished; pnpm's own default of 1 day delays every update more than we'd like. Keep
-# in sync with the `minimumReleaseAge` floor in .github/renovate.json, so Renovate never proposes a
-# version pnpm would then refuse to lock.
+# in sync with the `minimumReleaseAge` floor in the shared Renovate preset
+# (github>kachkaev/reusable-stuff:renovate-preset), so Renovate never proposes a version pnpm would
+# then refuse to lock.
 minimumReleaseAge: 480
 nodeLinker: isolated
