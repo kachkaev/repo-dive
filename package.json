@@ -104,7 +104,7 @@
     "@visx/group": "4.0.0",
     "@visx/scale": "4.0.0",
     "@visx/shape": "4.0.0",
-    "@vitejs/plugin-react": "6.1.0",
+    "@vitejs/plugin-react": "6.1.1",
     "babel-plugin-react-compiler": "1.0.0",
     "class-variance-authority": "0.7.1",
     "cspell": "10.1.1",
