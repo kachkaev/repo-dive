@@ -576,7 +576,7 @@ export const loadConfig = (
       return resolveConfig({}, repoRoot);
     }
 
-    registerSelfResolutionFallback();
+    yield* Effect.sync(registerSelfResolutionFallback);
     const raw = yield* Effect.tryPromise({
       try: async (): Promise<unknown> => {
         const module: unknown = await import(pathToFileURL(configPath).href);
