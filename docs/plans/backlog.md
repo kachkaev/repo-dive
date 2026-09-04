@@ -27,7 +27,7 @@ The split is a soft one — several entries below still name two possible approa
   The zero-argument `schema` tool is declared with `Schema.Struct({})`, which `effect/unstable/ai` advertises as `{"anyOf":[{"type":"object"},{"type":"array"}]}` rather than a plain `{"type":"object"}` — `query`, which has real parameters, serializes fine.
   And tool failures come back as `Effect.succeed({ error: message })`, so the client sees a successful result carrying an `error` field instead of an MCP error.
   Both work with the clients tried so far; neither is what the protocol expects.
-- **Node support window**: three things disagree about which Node versions are supported — `engines` says `>=22.13.0`, `.tool-versions` pins `22.22.2`, and CI tests exactly that one version.
+- **Node support window**: three things disagree about which Node versions are supported — `engines` says `>=22.13.0`, `devEngines.runtime` pins `22.23.2`, and CI tests exactly that one version.
   Renovate has 22.23.1, 24 and 26 waiting on the dependency dashboard with nothing to say which of them the project actually intends to support.
   Pick the range, then decide whether CI matrixes across it or keeps testing a single version and relies on `engines` to fail fast.
 
