@@ -21,6 +21,12 @@ const dashboardBuilt = existsSync(
   path.join(rootDirectory, "dist", "dashboard", "index.html"),
 );
 
+// A config importing `repo-dive/config` from a repository without node_modules
+// falls back to this package's own `exports`, which point at the built entry.
+const configEntryBuilt = existsSync(
+  path.join(rootDirectory, "dist", "config.js"),
+);
+
 /**
  * Starting the CLI costs a few hundred milliseconds before it does any work, so
  * the tests below run concurrently and wait on the child asynchronously — a
@@ -265,6 +271,31 @@ test.concurrent("scan rejects unknown collectors", async () => {
   }
 });
 
+test.concurrent(
+  "status reports a config's unresolvable import against the config file",
+  async () => {
+    const repoPath = mkdtempSync(
+      path.join(os.tmpdir(), "repo-dive-bad-config-"),
+    );
+    runGit(repoPath, "init", "-b", "main");
+    try {
+      // Only `repo-dive/config` falls back to the running installation; any
+      // other missing package is still the config's own problem to report.
+      writeFileSync(
+        path.join(repoPath, "repo-dive.config.mjs"),
+        'import "repo-dive-not-a-real-package";\n\nexport default {};\n',
+      );
+      const result = await runCli("status", "--repo", repoPath);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(
+        /Failed to load repo-dive\.config\.mjs: Cannot find package 'repo-dive-not-a-real-package' imported from .*repo-dive\.config\.mjs/,
+      );
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  },
+);
+
 test.concurrent("scan fails gracefully outside a git repository", async () => {
   const nonRepoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-no-"));
 
@@ -360,178 +391,182 @@ test
     }
   });
 
-test.concurrent(
-  "index merges contributor aliases from repo-dive.config.ts",
-  async () => {
-    const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-alias-"));
-    runGit(repoPath, "init", "-b", "main");
+test
+  .skipIf(!configEntryBuilt)
+  .concurrent(
+    "index merges contributor aliases from repo-dive.config.ts",
+    async () => {
+      const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-alias-"));
+      runGit(repoPath, "init", "-b", "main");
 
-    function commitAs(
-      email: string,
-      name: string,
-      subject: string,
-      coAuthors: string[] = [],
-    ) {
-      const identity = {
-        ...commitEnvironment,
-        GIT_AUTHOR_EMAIL: email,
-        GIT_AUTHOR_NAME: name,
-        GIT_COMMITTER_EMAIL: email,
-        GIT_COMMITTER_NAME: name,
-      };
-      // One file per commit, so every author keeps a living line for the
-      // survival bands to name. `.md` rather than `.txt`: only source files are
-      // blamed for survival.
-      writeFileSync(
-        path.join(repoPath, `${subject.replaceAll(" ", "-")}.md`),
-        `${subject}\n`,
-      );
-      runGitAs(repoPath, identity, "add", ".");
-      const message = [
-        subject,
-        ...(coAuthors.length > 0
-          ? ["", ...coAuthors.map((entry) => `Co-authored-by: ${entry}`)]
-          : []),
-      ].join("\n");
-      runGitAs(repoPath, identity, "commit", "-m", message);
-    }
+      function commitAs(
+        email: string,
+        name: string,
+        subject: string,
+        coAuthors: string[] = [],
+      ) {
+        const identity = {
+          ...commitEnvironment,
+          GIT_AUTHOR_EMAIL: email,
+          GIT_AUTHOR_NAME: name,
+          GIT_COMMITTER_EMAIL: email,
+          GIT_COMMITTER_NAME: name,
+        };
+        // One file per commit, so every author keeps a living line for the
+        // survival bands to name. `.md` rather than `.txt`: only source files are
+        // blamed for survival.
+        writeFileSync(
+          path.join(repoPath, `${subject.replaceAll(" ", "-")}.md`),
+          `${subject}\n`,
+        );
+        runGitAs(repoPath, identity, "add", ".");
+        const message = [
+          subject,
+          ...(coAuthors.length > 0
+            ? ["", ...coAuthors.map((entry) => `Co-authored-by: ${entry}`)]
+            : []),
+        ].join("\n");
+        runGitAs(repoPath, identity, "commit", "-m", message);
+      }
 
-    try {
-      commitAs("alice@work.example", "Alice", "first");
-      // Co-authored across kinds, and by an alias of the author herself — the
-      // agent's help counts, Alice crediting Alice does not.
-      commitAs("alice@personal.example", "Alice", "second", [
-        "Claude <noreply@anthropic.com>",
-        "Alice <alice@work.example>",
-      ]);
-      // A bot identity — its kind should be auto-derived without config.
-      commitAs(
-        "29139614+renovate[bot]@users.noreply.github.com",
-        "renovate[bot]",
-        "bump deps",
-      );
-      // An AI agent recognizable only by its name: the email says nothing.
-      commitAs("noreply@anthropic.com", "Claude", "agent edit");
+      try {
+        commitAs("alice@work.example", "Alice", "first");
+        // Co-authored across kinds, and by an alias of the author herself — the
+        // agent's help counts, Alice crediting Alice does not.
+        commitAs("alice@personal.example", "Alice", "second", [
+          "Claude <noreply@anthropic.com>",
+          "Alice <alice@work.example>",
+        ]);
+        // A bot identity — its kind should be auto-derived without config.
+        commitAs(
+          "29139614+renovate[bot]@users.noreply.github.com",
+          "renovate[bot]",
+          "bump deps",
+        );
+        // An AI agent recognizable only by its name: the email says nothing.
+        commitAs("noreply@anthropic.com", "Claude", "agent edit");
 
-      // A .ts config (exercises Node's type stripping through the real CLI). The
-      // `defineConfig` import is covered by unit tests — a temp repo has no
-      // node_modules to resolve `repo-dive/config` from, so use a typed
-      // plain object here.
-      writeFileSync(
-        path.join(repoPath, "repo-dive.config.ts"),
-        [
-          "const config = {",
-          "  contributors: {",
-          "    aliases: [",
-          "      {",
-          '        emails: ["alice@work.example", "alice@personal.example"],',
-          '        displayName: "Alice A.",',
-          '        url: "https://github.com/alice",',
-          "      },",
-          "    ],",
-          "  },",
-          "};",
-          "export default config;",
-          "",
-        ].join("\n"),
-      );
+        // A .ts config (exercises Node's type stripping through the real CLI)
+        // importing `defineConfig` from a repository with no node_modules to
+        // resolve `repo-dive/config` from — the shape a bare clone in CI has.
+        writeFileSync(
+          path.join(repoPath, "repo-dive.config.ts"),
+          [
+            'import { defineConfig } from "repo-dive/config";',
+            "",
+            "export default defineConfig({",
+            "  contributors: {",
+            "    aliases: [",
+            "      {",
+            '        emails: ["alice@work.example", "alice@personal.example"],',
+            '        displayName: "Alice A.",',
+            '        url: "https://github.com/alice",',
+            "      },",
+            "    ],",
+            "  },",
+            "});",
+            "",
+          ].join("\n"),
+        );
 
-      await runCli(
-        "scan",
-        "--repo",
-        repoPath,
-        "--collectors",
-        "commit-meta,churn,survival",
-      );
-      const indexRun = await runCli("index", "--repo", repoPath);
-      expect(indexRun.status, indexRun.stderr).toBe(0);
+        await runCli(
+          "scan",
+          "--repo",
+          repoPath,
+          "--collectors",
+          "commit-meta,churn,survival",
+        );
+        const indexRun = await runCli("index", "--repo", repoPath);
+        expect(indexRun.status, indexRun.stderr).toBe(0);
 
-      const dashboard: unknown = JSON.parse(
-        readFileSync(
-          path.join(repoPath, ".repo-dive", "index", "dashboard.json"),
-          "utf8",
-        ),
-      );
-      const contributorCount = numberAt(
-        recordAt(dashboard, "repo"),
-        "contributorCount",
-      );
-      expect(
-        contributorCount,
-        "Alice's aliases collapse; the bot and the AI agent stay separate",
-      ).toBe(3);
+        const dashboard: unknown = JSON.parse(
+          readFileSync(
+            path.join(repoPath, ".repo-dive", "index", "dashboard.json"),
+            "utf8",
+          ),
+        );
+        const contributorCount = numberAt(
+          recordAt(dashboard, "repo"),
+          "contributorCount",
+        );
+        expect(
+          contributorCount,
+          "Alice's aliases collapse; the bot and the AI agent stay separate",
+        ).toBe(3);
 
-      // A fixture repo has no origin, so the report has nothing to link to and
-      // falls back to naming the checkout. The bounding shas are what its
-      // header hangs the "coverage" dates off.
-      const repo = recordAt(dashboard, "repo");
-      expect(repo).not.toHaveProperty("remoteUrl");
-      expect(stringAt(repo, "name")).toBe(path.basename(repoPath));
-      expect(stringAt(repo, "firstCommitSha")).toMatch(/^[\da-f]{10}$/);
-      expect(stringAt(repo, "lastCommitSha")).toMatch(/^[\da-f]{10}$/);
+        // A fixture repo has no origin, so the report has nothing to link to and
+        // falls back to naming the checkout. The bounding shas are what its
+        // header hangs the "coverage" dates off.
+        const repo = recordAt(dashboard, "repo");
+        expect(repo).not.toHaveProperty("remoteUrl");
+        expect(stringAt(repo, "name")).toBe(path.basename(repoPath));
+        expect(stringAt(repo, "firstCommitSha")).toMatch(/^[\da-f]{10}$/);
+        expect(stringAt(repo, "lastCommitSha")).toMatch(/^[\da-f]{10}$/);
 
-      const contributors = arrayAt(dashboard, "contributors");
-      const alice = contributors.find(
-        (row) => stringAt(row, "email") === "alice@work.example",
-      );
-      expect(alice, "Alice should be present").toBeTruthy();
-      expect(stringAt(alice, "name")).toBe("Alice A.");
-      expect(stringAt(alice, "url")).toBe("https://github.com/alice");
-      expect(stringAt(alice, "kind")).toBe("human");
-      expect(numberAt(alice, "commits")).toBe(2);
+        const contributors = arrayAt(dashboard, "contributors");
+        const alice = contributors.find(
+          (row) => stringAt(row, "email") === "alice@work.example",
+        );
+        expect(alice, "Alice should be present").toBeTruthy();
+        expect(stringAt(alice, "name")).toBe("Alice A.");
+        expect(stringAt(alice, "url")).toBe("https://github.com/alice");
+        expect(stringAt(alice, "kind")).toBe("human");
+        expect(numberAt(alice, "commits")).toBe(2);
 
-      const bot = contributors.find((row) => stringAt(row, "kind") === "bot");
-      expect(bot, "renovate should be auto-classified as a bot").toBeTruthy();
-      expect(stringAt(bot, "email")).toBe("renovate[bot]");
+        const bot = contributors.find((row) => stringAt(row, "kind") === "bot");
+        expect(bot, "renovate should be auto-classified as a bot").toBeTruthy();
+        expect(stringAt(bot, "email")).toBe("renovate[bot]");
 
-      // Cross-kind co-authorship, recorded from both ends of the same edge.
-      expect(
-        recordAt(alice, "assistedBy"),
-        "one of Alice's commits was co-authored by an AI agent",
-      ).toEqual({ ai: 1 });
-      expect(
-        alice,
-        "human-to-human credit (here, an alias of herself) is not cross-kind",
-      ).not.toHaveProperty("assisted");
+        // Cross-kind co-authorship, recorded from both ends of the same edge.
+        expect(
+          recordAt(alice, "assistedBy"),
+          "one of Alice's commits was co-authored by an AI agent",
+        ).toEqual({ ai: 1 });
+        expect(
+          alice,
+          "human-to-human credit (here, an alias of herself) is not cross-kind",
+        ).not.toHaveProperty("assisted");
 
-      const agent = contributors.find((row) => stringAt(row, "kind") === "ai");
-      expect(
-        recordAt(agent, "assisted"),
-        "the agent helped a human once",
-      ).toEqual({ human: 1 });
-      expect(
-        agent,
-        "nobody co-authored the agent's own commit",
-      ).not.toHaveProperty("assistedBy");
-      expect(
-        bot,
-        "the bot neither gave nor received cross-kind help",
-      ).not.toHaveProperty("assisted");
+        const agent = contributors.find(
+          (row) => stringAt(row, "kind") === "ai",
+        );
+        expect(
+          recordAt(agent, "assisted"),
+          "the agent helped a human once",
+        ).toEqual({ human: 1 });
+        expect(
+          agent,
+          "nobody co-authored the agent's own commit",
+        ).not.toHaveProperty("assistedBy");
+        expect(
+          bot,
+          "the bot neither gave nor received cross-kind help",
+        ).not.toHaveProperty("assisted");
 
-      // Each commit row carries its author's kind, so the dashboard can split
-      // the calendar and monthly charts without re-deriving kinds client-side.
-      const commitKinds = arrayAt(dashboard, "commits").map((row) =>
-        stringAt(row, "kind"),
-      );
-      // Same-second fixture commits have no stable order; compare as a multiset.
-      expect(commitKinds.toSorted()).toEqual(["ai", "bot", "human", "human"]);
+        // Each commit row carries its author's kind, so the dashboard can split
+        // the calendar and monthly charts without re-deriving kinds client-side.
+        const commitKinds = arrayAt(dashboard, "commits").map((row) =>
+          stringAt(row, "kind"),
+        );
+        // Same-second fixture commits have no stable order; compare as a multiset.
+        expect(commitKinds.toSorted()).toEqual(["ai", "bot", "human", "human"]);
 
-      // Survival facts carry only an email, so a band's label has to be
-      // recovered from the commits: the kind, because without the author's name
-      // "Claude <noreply@anthropic.com>" reads as an ordinary human, and the
-      // name a human's band goes by, which is never their address.
-      const survivalAuthors = Object.keys(
-        recordAt(arrayAt(dashboard, "survival").at(-1), "byContributor"),
-      );
-      expect(
-        survivalAuthors.toSorted(),
-        "bands go by name, not by email",
-      ).toEqual(["AI agents", "Alice A.", "Bots"]);
-    } finally {
-      rmSync(repoPath, { force: true, recursive: true });
-    }
-  },
-);
+        // Survival facts carry only an email, so a band's label has to be
+        // recovered from the commits: the kind, because without the author's name
+        // "Claude <noreply@anthropic.com>" reads as an ordinary human, and the
+        // name a human's band goes by, which is never their address.
+        const survivalAuthors = Object.keys(
+          recordAt(arrayAt(dashboard, "survival").at(-1), "byContributor"),
+        );
+        expect(
+          survivalAuthors.toSorted(),
+          "bands go by name, not by email",
+        ).toEqual(["AI agents", "Alice A.", "Bots"]);
+      } finally {
+        rmSync(repoPath, { force: true, recursive: true });
+      }
+    },
+  );
 
 test.concurrent(
   "index sums founding-graft lineages into the tree timelines",

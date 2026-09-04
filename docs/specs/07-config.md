@@ -49,6 +49,7 @@ repo-dive attributes every metric to each commit's git **author** (not the commi
 `catalog` is read by every command — it decides where the catalog is.
 The rest is read by the **`index`** step (the map phase stays raw — the catalog is never rewritten).
 `.ts` config relies on Node's built-in type stripping, unflagged since Node 22.18 / 23.6; on older runtimes use a `.mjs`/`.js` config.
+The config's `repo-dive/config` import resolves like any other from the analyzed repository, and falls back to the installation running the CLI when the repository cannot resolve it itself — so a bare clone without `node_modules` loads a `defineConfig` config just as well.
 Malformed config fails `index` with a friendly message rather than silently degrading.
 
 ## `contributors`

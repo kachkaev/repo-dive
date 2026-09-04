@@ -1,6 +1,8 @@
 // A plain default-exported object rather than `defineConfig` from
-// "repo-dive/config": the examples workflow copies this file into a bare clone
-// of the analyzed repository, where repo-dive is not an installed dependency.
+// "repo-dive/config": this file is type-checked as part of this repository,
+// where that import would resolve to the built `dist/` and so fail a fresh
+// checkout's `tsc`. At run time the import would be fine — repo-dive resolves
+// it against its own installation when the analyzed clone cannot.
 
 /**
  * The effect monorepo was assembled on 2023-12-27 from a fresh "workspace

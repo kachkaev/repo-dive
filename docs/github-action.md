@@ -149,6 +149,7 @@ No `actions/checkout` is needed in this shape, and a distinct `cache-key-prefix`
 ## Configuration
 
 A [`repo-dive.config.ts`](specs/07-config.md) at the root of the analyzed repository is picked up automatically, exactly as in local runs.
+Its `import { defineConfig } from "repo-dive/config"` works even though a bare clone has no `node_modules`: the import falls back to the repo-dive installation the action runs.
 One caveat: the built-in cache assumes the default catalog location, so if the config moves the catalog via `catalog.dir`, set `cache: false` and cache the relocated directory with `actions/cache` yourself.
 
 ## Versioning

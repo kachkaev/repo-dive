@@ -44,7 +44,7 @@ Each one is a single self-contained HTML file exported with `repo-dive report` a
 ## Usage
 
 Run from inside the repository you want to analyze (or pass `--repo /path/to/repo`).
-Node 22.13 or newer is required.
+Node 22.15 or newer is required.
 
 ```sh
 npx repo-dive            # the whole pipeline: scan + index + dashboard
