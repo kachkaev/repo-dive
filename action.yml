@@ -87,7 +87,7 @@ runs:
       id: node
       shell: bash
       run: |
-        required=22.13.0
+        required=22.15.0
         current=$(node --version 2> /dev/null | sed 's/^v//' || true)
         if [ -n "$current" ] && [ "$(printf '%s\n' "$required" "$current" | sort -V | head -n1)" = "$required" ]; then
           echo "adequate=true" >> "$GITHUB_OUTPUT"

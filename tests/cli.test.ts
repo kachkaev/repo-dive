@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -19,6 +20,12 @@ const rootDirectory = fileURLToPath(new URL("../", import.meta.url));
 // Several tests exercise the full pipeline, which needs the built dashboard.
 const dashboardBuilt = existsSync(
   path.join(rootDirectory, "dist", "dashboard", "index.html"),
+);
+
+// A config importing `repo-dive/config` from a repository without node_modules
+// falls back to this package's own `exports`, which point at the built entry.
+const configEntryBuilt = existsSync(
+  path.join(rootDirectory, "dist", "config.js"),
 );
 
 /**
@@ -265,6 +272,116 @@ test.concurrent("scan rejects unknown collectors", async () => {
   }
 });
 
+/** A one-commit repository carrying the given `repo-dive.config.*` source. */
+function createRepoWithConfig(fileName: string, source: string) {
+  const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-config-"));
+  runGit(repoPath, "init", "-b", "main");
+  writeFileSync(path.join(repoPath, "a.txt"), "hello\n");
+  writeFileSync(path.join(repoPath, fileName), source);
+  runGit(repoPath, "add", ".");
+  runGit(repoPath, "commit", "-m", "Init");
+  return repoPath;
+}
+
+const defineConfigSource = [
+  'import { defineConfig } from "repo-dive/config";',
+  "",
+  "export default defineConfig({});",
+  "",
+].join("\n");
+
+test
+  .skipIf(!configEntryBuilt)
+  .concurrent(
+    "status loads a defineConfig config from a repository without node_modules",
+    async () => {
+      // The issue #194 shape: a bare clone in CI tracks a `.ts` config whose
+      // `repo-dive/config` import only the running installation can satisfy.
+      const repoPath = createRepoWithConfig(
+        "repo-dive.config.ts",
+        defineConfigSource,
+      );
+      try {
+        const result = await runCli("status", "--repo", repoPath);
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout).toMatch(/Commits: 1/);
+      } finally {
+        rmSync(repoPath, { force: true, recursive: true });
+      }
+    },
+  );
+
+test.concurrent(
+  "status prefers the analyzed repository's own repo-dive over the fallback",
+  async () => {
+    const repoPath = createRepoWithConfig(
+      "repo-dive.config.ts",
+      defineConfigSource,
+    );
+    try {
+      // A local copy that announces itself the moment it is imported.
+      const localCopyPath = path.join(repoPath, "node_modules", "repo-dive");
+      mkdirSync(localCopyPath, { recursive: true });
+      writeFileSync(
+        path.join(localCopyPath, "package.json"),
+        JSON.stringify({
+          name: "repo-dive",
+          type: "module",
+          exports: { "./config": "./config.js" },
+        }),
+      );
+      writeFileSync(
+        path.join(localCopyPath, "config.js"),
+        // Linking checks the named export before anything runs, so the copy
+        // has to offer `defineConfig` for its top-level throw to be reached.
+        'export const defineConfig = (config) => config;\nthrow new Error("the local copy was imported");\n',
+      );
+      const result = await runCli("status", "--repo", repoPath);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(
+        /Failed to load repo-dive\.config\.ts: the local copy was imported/,
+      );
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  },
+);
+
+test.concurrent(
+  "status reports a config's unresolvable imports against the config file",
+  async () => {
+    // Only `repo-dive/*` falls back to the running installation, and when that
+    // cannot help either, the error still names the file the user can fix.
+    const cases = [
+      {
+        specifier: "repo-dive-not-a-real-package",
+        missing: "repo-dive-not-a-real-package",
+      },
+      { specifier: "repo-dive/not-an-entry-point", missing: "repo-dive" },
+    ];
+    await Promise.all(
+      cases.map(async ({ specifier, missing }) => {
+        const repoPath = createRepoWithConfig(
+          "repo-dive.config.mjs",
+          `import "${specifier}";\n\nexport default {};\n`,
+        );
+        try {
+          const result = await runCli("status", "--repo", repoPath);
+          expect(result.status).toBe(1);
+          expect(result.stderr).toContain(
+            `Failed to load repo-dive.config.mjs: Cannot find package '${missing}' imported from `,
+          );
+          expect(result.stderr).toContain(
+            path.join(repoPath, "repo-dive.config.mjs"),
+          );
+        } finally {
+          rmSync(repoPath, { force: true, recursive: true });
+        }
+      }),
+    );
+  },
+);
+
 test.concurrent("scan fails gracefully outside a git repository", async () => {
   const nonRepoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-no-"));
 
@@ -413,10 +530,9 @@ test.concurrent(
       // An AI agent recognizable only by its name: the email says nothing.
       commitAs("noreply@anthropic.com", "Claude", "agent edit");
 
-      // A .ts config (exercises Node's type stripping through the real CLI). The
-      // `defineConfig` import is covered by unit tests — a temp repo has no
-      // node_modules to resolve `repo-dive/config` from, so use a typed
-      // plain object here.
+      // A .ts config (exercises Node's type stripping through the real CLI).
+      // A plain object rather than `defineConfig`, so that this test does not
+      // depend on the built `dist/config.js` the import would fall back to.
       writeFileSync(
         path.join(repoPath, "repo-dive.config.ts"),
         [

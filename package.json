@@ -129,7 +129,7 @@
   },
   "packageManager": "pnpm@12.3.3",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.15.0"
   },
   "devEngines": {
     "runtime": {
