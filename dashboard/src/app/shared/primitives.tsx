@@ -1,6 +1,11 @@
 import { InfoIcon, LoaderCircleIcon } from "lucide-react";
 import { type ReactNode, useDeferredValue } from "react";
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "./@ui-primitive/tooltip.tsx";
 import { formatDate, formatDayOfWeek } from "./format.ts";
 import { Markdown } from "./markdown.tsx";
 
@@ -197,6 +202,13 @@ export function Swatch({
 }
 
 /**
+ * How the legend tooltips name the modifier that isolates a series: the key
+ * is ⌥ on Apple keyboards and Alt everywhere else. Sniffed once — the report
+ * is a static page and the keyboard does not change under it.
+ */
+const altKeyName = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌥" : "Alt";
+
+/**
  * Rendered below its chart, centered like a figure caption: legends change
  * with the controls, and above the marks a height change would shift them
  * mid-read. Laid out as inline boxes rather than a wrapping flexbox so
@@ -209,27 +221,118 @@ export function Swatch({
 export function Legend({
   items,
   marginClassName,
+  toggles,
 }: {
   items: LegendEntry[];
   /** Replaces the default `mt-2` — e.g. a second legend standing further off. */
   marginClassName?: string | undefined;
+  /**
+   * Makes every item a button that hides its series from the chart. A hidden
+   * item stays in place, crossed out at partial opacity, so the legend never
+   * reflows under the cursor. Omitted, the legend is a static caption.
+   */
+  toggles?: LegendToggles | undefined;
 }) {
+  const hiddenLabels = toggles?.hiddenLabels;
   return (
     <div
       className={`${marginClassName ?? "mt-2"} text-center text-xs text-balance text-(--text-secondary)`}
     >
-      {items.map((item) => (
-        <span
-          key={item.label}
-          className="mx-2 my-0.5 inline-flex items-center gap-1.5"
-        >
-          <Swatch color={item.color} hatch={item.hatch} />
-          {item.label}
-        </span>
-      ))}
+      {items.map((item) => {
+        const hidden = hiddenLabels?.has(item.label) ?? false;
+        const swatch = (
+          <Swatch
+            color={item.color}
+            hatch={item.hatch}
+            className={
+              hidden
+                ? "inline-block size-2.5 rounded-xs opacity-35"
+                : "inline-block size-2.5 rounded-xs"
+            }
+          />
+        );
+        if (toggles === undefined) {
+          return (
+            <span
+              key={item.label}
+              className="mx-2 my-0.5 inline-flex items-center gap-1.5"
+            >
+              {swatch}
+              {item.label}
+            </span>
+          );
+        }
+        // What the modifier click will do, phrased from the current state:
+        // it isolates the item while anything else is showing, and brings
+        // everything back once nothing else is (see LegendToggles.onSolo).
+        const othersVisible = items.some(
+          (other) =>
+            other.label !== item.label && !hiddenLabels?.has(other.label),
+        );
+        return (
+          <Tooltip key={item.label}>
+            <TooltipTrigger
+              delay={400}
+              render={
+                // `select-none`: quick repeated clicks would otherwise select
+                // the label as a word. `group` lets the label preview the
+                // click on hover (below); besides that and the text shift the
+                // ring is the only feedback — no fill, so the row stays a
+                // caption.
+                <button
+                  type="button"
+                  aria-pressed={!hidden}
+                  className="group mx-2 my-0.5 inline-flex items-center gap-1.5 rounded-xs outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  onClick={(event) => {
+                    if (event.altKey) {
+                      toggles.onSolo(item.label);
+                    } else {
+                      toggles.onToggle(item.label);
+                    }
+                  }}
+                />
+              }
+            >
+              {swatch}
+              {/* Hovering a visible label previews the click with a faint
+                  strike-through — the line it will get. A hidden label keeps
+                  its crossed-out look on hover; the text shift is enough. */}
+              <span
+                className={
+                  hidden
+                    ? "line-through opacity-60"
+                    : "group-hover:line-through group-hover:decoration-muted-foreground/40"
+                }
+              >
+                {item.label}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              Click to {hidden ? "show" : "hide"} · {altKeyName}-click to{" "}
+              {othersVisible ? "show only this" : "show all"}
+            </TooltipContent>
+          </Tooltip>
+        );
+      })}
     </div>
   );
 }
+
+/**
+ * The chart-side half of a {@link Legend} with toggles: which labels are hidden,
+ * and what a click / modifier click on a label does.
+ */
+export type LegendToggles = {
+  hiddenLabels: ReadonlySet<string>;
+  /** A click: hides a visible label, shows a hidden one. */
+  onToggle: (label: string) => void;
+  /**
+   * An alt/option click: shows only this label while any other is showing,
+   * and shows every label again once none is — so a second modifier click
+   * undoes the first, and an emptied chart comes back with one click.
+   */
+  onSolo: (label: string) => void;
+};
 
 export function DataTable(props: {
   caption: string;

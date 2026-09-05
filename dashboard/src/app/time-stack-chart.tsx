@@ -56,6 +56,7 @@ function ChartMarks({
   displayRows,
   rows,
   seriesKeys,
+  drawnKeys,
   colors,
   xScale,
   yScale,
@@ -68,7 +69,14 @@ function ChartMarks({
   mode: "area" | "bar" | "line";
   displayRows: Array<Record<string, number>>;
   rows: Array<Record<string, number>>;
+  /** Every series, in stack order — what `colors` is indexed by. */
   seriesKeys: string[];
+  /**
+   * The subset of `seriesKeys` actually drawn, in the same order. A series the
+   * viewer hid via the legend is left out of the stack entirely, so the ones
+   * above it settle down onto the ones below; the scales are untouched.
+   */
+  drawnKeys: string[];
   colors: string[];
   xScale: TimeScale;
   yScale: LinearScale;
@@ -90,7 +98,7 @@ function ChartMarks({
       {mode === "area" && (
         <AreaStack
           data={displayRows}
-          keys={seriesKeys}
+          keys={drawnKeys}
           x={(datum) => xScale(datum.data["dateMs"] ?? 0)}
           y0={(datum) => yScale(datum[0])}
           y1={(datum) => yScale(datum[1])}
@@ -132,7 +140,7 @@ function ChartMarks({
       {mode === "bar" && (
         <BarStack
           data={displayRows}
-          keys={seriesKeys}
+          keys={drawnKeys}
           x={(datum) => datum["dateMs"] ?? 0}
           xScale={xScale}
           yScale={yScale}
@@ -170,13 +178,13 @@ function ChartMarks({
         </BarStack>
       )}
       {mode === "line" &&
-        seriesKeys.map((key, index) => (
+        drawnKeys.map((key) => (
           <LinePath
             key={key}
             data={rows}
             x={(datum) => xScale(datum["dateMs"] ?? 0)}
             y={(datum) => yScale(datum[key] ?? 0)}
-            stroke={colors[index]}
+            stroke={colors[seriesKeys.indexOf(key)]}
             strokeWidth={2}
             curve={curveMonotoneX}
           />
@@ -184,10 +192,10 @@ function ChartMarks({
       {/* A single snapshot can't draw an area/line — show dot markers. */}
       {rows.length === 1 &&
         mode !== "bar" &&
-        seriesKeys.map((key, index) => {
+        drawnKeys.map((key, index) => {
           let stackBase = 0;
           if (mode === "area") {
-            for (const priorKey of seriesKeys.slice(0, index)) {
+            for (const priorKey of drawnKeys.slice(0, index)) {
               stackBase += displayRows[0]?.[priorKey] ?? 0;
             }
           }
@@ -198,7 +206,7 @@ function ChartMarks({
               cx={xScale(displayRows[0]?.["dateMs"] ?? 0)}
               cy={yScale(value)}
               r={4}
-              fill={colors[index]}
+              fill={colors[seriesKeys.indexOf(key)]}
               stroke="var(--surface-1)"
               strokeWidth={1}
             />
@@ -258,6 +266,7 @@ function HoverTooltip({
   colors,
   seriesHatch,
   tooltipGroups,
+  hiddenLabels,
   legendRank,
   formatValue,
   zeroLabel,
@@ -274,6 +283,12 @@ function HoverTooltip({
   colors: string[];
   seriesHatch: Record<string, string> | undefined;
   tooltipGroups: SeriesGroup[] | undefined;
+  /**
+   * Rows the legend has hidden from the marks. They keep their place and their
+   * numbers here — the card reports the data, not the drawing — and are only
+   * crossed out the way the legend crosses them out.
+   */
+  hiddenLabels: ReadonlySet<string>;
   legendRank: (label: string) => number;
   formatValue: (value: number) => string;
   zeroLabel: string | undefined;
@@ -343,9 +358,21 @@ function HoverTooltip({
               <Swatch
                 color={entry.color}
                 hatch={entry.hatch}
-                className="inline-block size-2 rounded-xs"
+                className={
+                  hiddenLabels.has(entry.key)
+                    ? "inline-block size-2 rounded-xs opacity-35"
+                    : "inline-block size-2 rounded-xs"
+                }
               />
-              <span className="text-(--text-secondary)">{entry.key}</span>
+              <span
+                className={
+                  hiddenLabels.has(entry.key)
+                    ? "text-(--text-secondary) line-through opacity-60"
+                    : "text-(--text-secondary)"
+                }
+              >
+                {entry.key}
+              </span>
               <span
                 className={`ml-auto pl-3 tabular-nums ${
                   showPercent ? "text-(--text-muted)" : "font-medium"
@@ -407,6 +434,17 @@ export function TimeSeriesChart(props: {
   /** When set, the tooltip sums each group's sub-series into one row. */
   tooltipGroups?: SeriesGroup[];
   /**
+   * Lets the viewer hide series by clicking their legend items (alt/option
+   * click isolates one) — to read the slopes of the remaining ones without a
+   * spike lower in the stack bending them. The hidden series leave the stack;
+   * everything else holds still: both axes, the legend's layout (the item
+   * stays put, crossed out) and the hover card's rows and numbers. Off by
+   * default — a legend that names age shades or one series explains nothing
+   * by hiding, and a chart with a kind filter above it already has a way to
+   * subset its series.
+   */
+  legendToggles?: boolean | undefined;
+  /**
    * Extends the time axis back to this instant when it predates the first data
    * point, so a series that starts mid-history (e.g. dependencies, tracked only
    * once a lockfile exists) still shares the repo's full timeline. Only ever
@@ -442,6 +480,16 @@ export function TimeSeriesChart(props: {
   // The instant under the cursor (continuous), not a data index — so the
   // crosshair reaches the whole domain, including stretches with no data point.
   const [hoverMs, setHoverMs] = useState<number | undefined>();
+  // Legend labels the viewer has hidden. Kept as labels, not series keys, so
+  // one entry covers a group's year bands, and kept across the controls above
+  // the frame: a language hidden in the flat variant stays hidden in the
+  // shaded one, and labels that a variant does not draw (its contributors,
+  // say) simply wait, unseen, for the split to come back. Not deferred with
+  // the props below: a click must cross the label out at once, whatever the
+  // marks are busy with.
+  const [hiddenLabels, setHiddenLabels] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const patternIdBase = useId();
 
   // A toggle above the frame (split, shading, #/%) swaps most of these props
@@ -455,7 +503,11 @@ export function TimeSeriesChart(props: {
   // second (see StaleOverlay). Hover state is not deferred: the crosshair
   // stays urgent and consistent with whichever props are on screen.
   const deferredProps = useDeferredValue(props);
-  const stale = deferredProps !== props;
+  // The marks follow a legend click the same way — the label crosses out at
+  // once, the stack settles in the deferred pass.
+  const deferredHiddenLabels = useDeferredValue(hiddenLabels);
+  const stale =
+    deferredProps !== props || deferredHiddenLabels !== hiddenLabels;
   const {
     points,
     seriesKeys,
@@ -468,6 +520,7 @@ export function TimeSeriesChart(props: {
     legendItems,
     secondaryLegendItems,
     tooltipGroups,
+    legendToggles,
     separateGroups,
     domainStartMs,
     domainEndMs,
@@ -502,6 +555,69 @@ export function TimeSeriesChart(props: {
   // Lines aren't parts of a whole, and a single series is always 100%.
   const supportsPercent = mode !== "line" && seriesKeys.length > 1;
   const showPercent = supportsPercent && (percentMode ?? false);
+
+  // An empty `legendItems` hides the legend — a one-entry legend for a chart
+  // like the all-lines total explains nothing.
+  const resolvedLegendItems =
+    legendItems ??
+    seriesKeys.map((key, index) => ({
+      label: key,
+      color: colors[index] ?? "var(--series-1)",
+      hatch: seriesHatch?.[key],
+    }));
+  const legendLabels = new Set(resolvedLegendItems.map((item) => item.label));
+  // Two items at least: hiding the only one would leave nothing to compare.
+  const canToggle = (legendToggles ?? false) && resolvedLegendItems.length > 1;
+  // Only the labels this variant actually draws count as hidden — the state
+  // may remember labels from another split. Two views of the same state: the
+  // urgent one for the legend (a click crosses the label out at once), the
+  // deferred one for the marks and the hover card, which follow the stack.
+  const legendHiddenLabels: ReadonlySet<string> = canToggle
+    ? new Set([...hiddenLabels].filter((label) => legendLabels.has(label)))
+    : new Set();
+  const drawnHiddenLabels: ReadonlySet<string> = canToggle
+    ? new Set(
+        [...deferredHiddenLabels].filter((label) => legendLabels.has(label)),
+      )
+    : new Set();
+  // A legend label stands for one series key of the same name, unless the
+  // tooltip groups say it collapses several (a contributor's year bands).
+  const hiddenKeys = new Set(
+    [...drawnHiddenLabels].flatMap(
+      (label) =>
+        tooltipGroups?.find((group) => group.label === label)?.keys ?? [label],
+    ),
+  );
+  const drawnKeys = seriesKeys.filter((key) => !hiddenKeys.has(key));
+
+  const toggleLabel = (label: string) => {
+    setHiddenLabels((previous) => {
+      const next = new Set(previous);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  };
+  // Isolate the label while anything else is showing; once nothing else is
+  // (it is alone, or the chart is empty), bring everything back. Judged
+  // inside the updater against the state the click lands on.
+  const soloLabel = (label: string) => {
+    setHiddenLabels((previous) => {
+      const othersVisible = resolvedLegendItems.some(
+        (item) => item.label !== label && !previous.has(item.label),
+      );
+      return othersVisible
+        ? new Set(
+            resolvedLegendItems
+              .filter((item) => item.label !== label)
+              .map((item) => item.label),
+          )
+        : new Set();
+    });
+  };
 
   // Sorted here rather than trusted from the caller: everything downstream —
   // the area paths, the bisector, the first/last row read as the data's span —
@@ -676,16 +792,6 @@ export function TimeSeriesChart(props: {
     return index === -1 ? Number.MAX_SAFE_INTEGER : index;
   };
 
-  // An empty `legendItems` hides the legend — a one-entry legend for a chart
-  // like the all-lines total explains nothing.
-  const resolvedLegendItems =
-    legendItems ??
-    seriesKeys.map((key, index) => ({
-      label: key,
-      color: colors[index] ?? "var(--series-1)",
-      hatch: seriesHatch?.[key],
-    }));
-
   return (
     <StaleOverlay stale={stale}>
       <div ref={containerRef} className="relative">
@@ -713,6 +819,7 @@ export function TimeSeriesChart(props: {
               displayRows={displayRows}
               rows={rows}
               seriesKeys={seriesKeys}
+              drawnKeys={drawnKeys}
               colors={colors}
               xScale={xScale}
               yScale={yScale}
@@ -787,13 +894,27 @@ export function TimeSeriesChart(props: {
             colors={colors}
             seriesHatch={seriesHatch}
             tooltipGroups={tooltipGroups}
+            hiddenLabels={drawnHiddenLabels}
             legendRank={legendRank}
             formatValue={formatValue}
             zeroLabel={zeroLabel}
           />
         )}
       </div>
-      {resolvedLegendItems.length > 0 && <Legend items={resolvedLegendItems} />}
+      {resolvedLegendItems.length > 0 && (
+        <Legend
+          items={resolvedLegendItems}
+          toggles={
+            canToggle
+              ? {
+                  hiddenLabels: legendHiddenLabels,
+                  onToggle: toggleLabel,
+                  onSolo: soloLabel,
+                }
+              : undefined
+          }
+        />
+      )}
       {/* The second legend stands off by 12px, clearly more than the 4px
           between a wrapped legend's rows — so the two read as separate
           vocabularies, not as more rows of the first. */}
