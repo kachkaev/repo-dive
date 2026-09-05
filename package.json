@@ -82,7 +82,7 @@
     "@babel/core": "8.0.1",
     "@base-ui/react": "1.7.0",
     "@changesets/changelog-github": "1.0.1",
-    "@changesets/cli": "3.0.1",
+    "@changesets/cli": "3.0.2",
     "@changesets/config": "4.0.0",
     "@effect/platform-node": "4.0.0-rc.112",
     "@effect/vitest": "4.0.0-rc.112",
