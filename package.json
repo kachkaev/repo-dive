@@ -124,7 +124,7 @@
     "tailwindcss": "4.3.3",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "vite": "8.2.2",
-    "vitest": "4.1.11",
+    "vitest": "5.0.0",
     "yaml": "2.9.0"
   },
   "packageManager": "pnpm@12.3.3",
