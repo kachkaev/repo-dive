@@ -1,6 +1,11 @@
 import { InfoIcon, LoaderCircleIcon } from "lucide-react";
 import { type ReactNode, useDeferredValue } from "react";
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "./@ui-primitive/tooltip.tsx";
 import { formatDate, formatDayOfWeek } from "./format.ts";
 import { Markdown } from "./markdown.tsx";
 
@@ -209,27 +214,104 @@ export function Swatch({
 export function Legend({
   items,
   marginClassName,
+  toggles,
 }: {
   items: LegendEntry[];
   /** Replaces the default `mt-2` — e.g. a second legend standing further off. */
   marginClassName?: string | undefined;
+  /**
+   * Makes every item a button that hides its series from the chart. A hidden
+   * item stays in place, crossed out at partial opacity, so the legend never
+   * reflows under the cursor. Omitted, the legend is a static caption.
+   */
+  toggles?: LegendToggles | undefined;
 }) {
+  const hiddenLabels = toggles?.hiddenLabels;
   return (
     <div
       className={`${marginClassName ?? "mt-2"} text-center text-xs text-balance text-(--text-secondary)`}
     >
-      {items.map((item) => (
-        <span
-          key={item.label}
-          className="mx-2 my-0.5 inline-flex items-center gap-1.5"
-        >
-          <Swatch color={item.color} hatch={item.hatch} />
-          {item.label}
-        </span>
-      ))}
+      {items.map((item) => {
+        const hidden = hiddenLabels?.has(item.label) ?? false;
+        const swatch = (
+          <Swatch
+            color={item.color}
+            hatch={item.hatch}
+            className={
+              hidden
+                ? "inline-block size-2.5 rounded-xs opacity-35"
+                : "inline-block size-2.5 rounded-xs"
+            }
+          />
+        );
+        if (toggles === undefined) {
+          return (
+            <span
+              key={item.label}
+              className="mx-2 my-0.5 inline-flex items-center gap-1.5"
+            >
+              {swatch}
+              {item.label}
+            </span>
+          );
+        }
+        // What the double-click will do, phrased from the current state: it
+        // isolates the item while anything else is still visible, and brings
+        // everything back once nothing else is (see LegendToggles.onSolo).
+        const othersVisible = items.some(
+          (other) =>
+            other.label !== item.label && !hiddenLabels?.has(other.label),
+        );
+        const hint = `Click to ${hidden ? "show" : "hide"} · double-click to ${othersVisible ? "show only this" : "show all"}`;
+        return (
+          <Tooltip key={item.label}>
+            <TooltipTrigger
+              delay={400}
+              render={
+                // `select-none`: a double-click would otherwise select the
+                // label as a word. The ring is the only focus/hover feedback
+                // besides the text shift — no fill, so the row stays a caption.
+                <button
+                  type="button"
+                  aria-pressed={!hidden}
+                  className="mx-2 my-0.5 inline-flex items-center gap-1.5 rounded-xs outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  onClick={() => {
+                    toggles.onToggle(item.label);
+                  }}
+                  onDoubleClick={() => {
+                    toggles.onSolo(item.label);
+                  }}
+                />
+              }
+            >
+              {swatch}
+              <span className={hidden ? "line-through opacity-60" : undefined}>
+                {item.label}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{hint}</TooltipContent>
+          </Tooltip>
+        );
+      })}
     </div>
   );
 }
+
+/**
+ * The chart-side half of a {@link Legend} with toggles: which labels are hidden,
+ * and what a click / double-click on a label does.
+ */
+export type LegendToggles = {
+  hiddenLabels: ReadonlySet<string>;
+  /** A click: hides a visible label, shows a hidden one. */
+  onToggle: (label: string) => void;
+  /**
+   * A double-click: shows only this label while any other is visible, and
+   * shows every label again once this is the only one left — so a second
+   * double-click undoes the first.
+   */
+  onSolo: (label: string) => void;
+};
 
 export function DataTable(props: {
   caption: string;
