@@ -276,14 +276,13 @@ export function Legend({
               }
             >
               {swatch}
-              {/* Hovering previews the click: a visible label shows a faint
-                  strike-through (the line it will get), a hidden one lets its
-                  strike-through fade and the text brighten (what showing it
-                  restores). */}
+              {/* Hovering a visible label previews the click with a faint
+                  strike-through — the line it will get. A hidden label keeps
+                  its crossed-out look on hover; the text shift is enough. */}
               <span
                 className={
                   hidden
-                    ? "line-through opacity-60 group-hover:opacity-80 group-hover:decoration-muted-foreground/40"
+                    ? "line-through opacity-60"
                     : "group-hover:line-through group-hover:decoration-muted-foreground/40"
                 }
               >
