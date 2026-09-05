@@ -601,22 +601,21 @@ export function TimeSeriesChart(props: {
       return next;
     });
   };
-  // Isolate the label; once it is the only one showing, bring everything
-  // back. Judged inside the updater against the state the click lands on.
+  // Isolate the label while anything else is showing; once nothing else is
+  // (it is alone, or the chart is empty), bring everything back. Judged
+  // inside the updater against the state the click lands on.
   const soloLabel = (label: string) => {
     setHiddenLabels((previous) => {
-      const onlyThisVisible =
-        !previous.has(label) &&
-        resolvedLegendItems.every(
-          (item) => item.label === label || previous.has(item.label),
-        );
-      return onlyThisVisible
-        ? new Set()
-        : new Set(
+      const othersVisible = resolvedLegendItems.some(
+        (item) => item.label !== label && !previous.has(item.label),
+      );
+      return othersVisible
+        ? new Set(
             resolvedLegendItems
               .filter((item) => item.label !== label)
               .map((item) => item.label),
-          );
+          )
+        : new Set();
     });
   };
 

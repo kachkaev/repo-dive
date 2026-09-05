@@ -263,14 +263,12 @@ export function Legend({
           );
         }
         // What the modifier click will do, phrased from the current state:
-        // it isolates the item unless the item is already the only one
-        // showing, when it brings everything back (see LegendToggles.onSolo).
-        const onlyThisVisible =
-          !hidden &&
-          items.every(
-            (other) =>
-              other.label === item.label || hiddenLabels?.has(other.label),
-          );
+        // it isolates the item while anything else is showing, and brings
+        // everything back once nothing else is (see LegendToggles.onSolo).
+        const othersVisible = items.some(
+          (other) =>
+            other.label !== item.label && !hiddenLabels?.has(other.label),
+        );
         return (
           <Tooltip key={item.label}>
             <TooltipTrigger
@@ -311,7 +309,7 @@ export function Legend({
             </TooltipTrigger>
             <TooltipContent>
               Click to {hidden ? "show" : "hide"} · {altKeyName}-click to{" "}
-              {onlyThisVisible ? "show all" : "show only this"}
+              {othersVisible ? "show only this" : "show all"}
             </TooltipContent>
           </Tooltip>
         );
@@ -329,9 +327,9 @@ export type LegendToggles = {
   /** A click: hides a visible label, shows a hidden one. */
   onToggle: (label: string) => void;
   /**
-   * An alt/option click: shows only this label — unless it is already the
-   * only one showing, when it shows every label again, so a second modifier
-   * click undoes the first.
+   * An alt/option click: shows only this label while any other is showing,
+   * and shows every label again once none is — so a second modifier click
+   * undoes the first, and an emptied chart comes back with one click.
    */
   onSolo: (label: string) => void;
 };
