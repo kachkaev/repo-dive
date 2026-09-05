@@ -255,31 +255,21 @@ export function Legend({
             </span>
           );
         }
-        // What the double-click will do, phrased from the current state: it
-        // isolates the item while anything else is still visible, and brings
-        // everything back once nothing else is (see LegendToggles.onSolo).
-        const othersVisible = items.some(
-          (other) =>
-            other.label !== item.label && !hiddenLabels?.has(other.label),
-        );
-        const hint = `Click to ${hidden ? "show" : "hide"} · double-click to ${othersVisible ? "show only this" : "show all"}`;
         return (
           <Tooltip key={item.label}>
             <TooltipTrigger
               delay={400}
               render={
-                // `select-none`: a double-click would otherwise select the
-                // label as a word. The ring is the only focus/hover feedback
-                // besides the text shift — no fill, so the row stays a caption.
+                // `select-none`: quick repeated clicks would otherwise select
+                // the label as a word. The ring is the only focus/hover
+                // feedback besides the text shift — no fill, so the row stays
+                // a caption.
                 <button
                   type="button"
                   aria-pressed={!hidden}
                   className="mx-2 my-0.5 inline-flex items-center gap-1.5 rounded-xs outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   onClick={() => {
                     toggles.onToggle(item.label);
-                  }}
-                  onDoubleClick={() => {
-                    toggles.onSolo(item.label);
                   }}
                 />
               }
@@ -289,7 +279,9 @@ export function Legend({
                 {item.label}
               </span>
             </TooltipTrigger>
-            <TooltipContent>{hint}</TooltipContent>
+            <TooltipContent>
+              {hidden ? "Click to show" : "Click to hide"}
+            </TooltipContent>
           </Tooltip>
         );
       })}
@@ -299,18 +291,12 @@ export function Legend({
 
 /**
  * The chart-side half of a {@link Legend} with toggles: which labels are hidden,
- * and what a click / double-click on a label does.
+ * and what a click on a label does.
  */
 export type LegendToggles = {
   hiddenLabels: ReadonlySet<string>;
   /** A click: hides a visible label, shows a hidden one. */
   onToggle: (label: string) => void;
-  /**
-   * A double-click: shows only this label while any other is visible, and
-   * shows every label again once this is the only one left — so a second
-   * double-click undoes the first.
-   */
-  onSolo: (label: string) => void;
 };
 
 export function DataTable(props: {

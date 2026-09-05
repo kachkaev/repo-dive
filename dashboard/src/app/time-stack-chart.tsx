@@ -434,9 +434,9 @@ export function TimeSeriesChart(props: {
   /** When set, the tooltip sums each group's sub-series into one row. */
   tooltipGroups?: SeriesGroup[];
   /**
-   * Lets the viewer hide series from the legend (click) or isolate one
-   * (double-click) — to read the slopes of the remaining ones without a
-   * spike lower in the stack bending them. The hidden series leave the stack;
+   * Lets the viewer hide series by clicking their legend items — to read the
+   * slopes of the remaining ones without a spike lower in the stack bending
+   * them. The hidden series leave the stack;
    * everything else holds still: both axes, the legend's layout (the item
    * stays put, crossed out) and the hover card's rows and numbers. Off by
    * default — a legend that names age shades or one series explains nothing
@@ -599,24 +599,6 @@ export function TimeSeriesChart(props: {
         next.add(label);
       }
       return next;
-    });
-  };
-  // Isolate the label while anything else is still visible; once it is the
-  // only one left, bring everything back. Judged inside the updater: the
-  // double-click lands after two clicks that toggled the label and toggled it
-  // back, and this way it sees the state those clicks left.
-  const soloLabel = (label: string) => {
-    setHiddenLabels((previous) => {
-      const othersVisible = resolvedLegendItems.some(
-        (item) => item.label !== label && !previous.has(item.label),
-      );
-      return othersVisible
-        ? new Set(
-            resolvedLegendItems
-              .filter((item) => item.label !== label)
-              .map((item) => item.label),
-          )
-        : new Set();
     });
   };
 
@@ -910,7 +892,6 @@ export function TimeSeriesChart(props: {
               ? {
                   hiddenLabels: legendHiddenLabels,
                   onToggle: toggleLabel,
-                  onSolo: soloLabel,
                 }
               : undefined
           }
