@@ -735,12 +735,22 @@ export function TimeSeriesChart(props: {
   const dataMinMs = rows[0]?.["dateMs"];
   // eslint-disable-next-line unicorn/prefer-at -- see the comment above
   const dataMaxMs = rows[rows.length - 1]?.["dateMs"];
+  // The outermost bars are centred on the first and last points, so their outer
+  // halves hang past the data's span — that overhang is exactly what `xInset`
+  // reserves. Without the same slack here, those edge pixels sit over a bar yet
+  // fall outside the span and read as a gap ("No data"). Converted from px to
+  // ms by hand: `xScale.invert` is an opaque call, which the compiler would
+  // treat as a possible mutation and fuse into the hover-reactive scope. Lines
+  // and areas put their points on the range edges, so `xInset` — and the slack
+  // with it — is 0.
+  const snapSlackMs =
+    (xInset * (xMax - xMin)) / Math.max(1, innerWidth - 2 * xInset);
   const hoverInData =
     hoverMs !== undefined &&
     dataMinMs !== undefined &&
     dataMaxMs !== undefined &&
-    hoverMs >= dataMinMs &&
-    hoverMs <= dataMaxMs;
+    hoverMs >= dataMinMs - snapSlackMs &&
+    hoverMs <= dataMaxMs + snapSlackMs;
   // Nearest row to the cursor, searched inline rather than with d3's bisector:
   // React Compiler cannot see into an opaque `.center(rows, hoverMs)` call, so
   // it had to assume the call mutates `rows` — which pulled `rows` (and every
