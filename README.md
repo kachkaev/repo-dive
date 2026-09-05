@@ -73,12 +73,13 @@ Collectors so far:
 - **todo-comments** — TODO/FIXME/HACK/XXX counts
 - **languages** — lines and file count per language across a commit's source files (lockfiles, minified bundles and generated data excluded)
 - **survival** — `git blame` line survival by extension, author and age cohort (sampled monthly)
+- **file-survival** — file survival by extension, creator and creation cohort, renames followed (sampled monthly)
 
 The catalog hides itself from git, but other tools that walk the repository (prettier, markdownlint, cspell, docker builds) each read one ignore file at its root.
 `scan` warns when the catalog is missing from those; `repo-dive ignore` adds it to every one that needs it, writing the entry in the shape the file is already written in and skipping the files whose tool learns about the catalog elsewhere.
 
 `index` normalizes raw snapshots into `.repo-dive/index/metrics.sqlite` — a facts-by-categories cube, rebuildable at any time — plus `dashboard.json`.
-`dashboard` then serves a local React app with interactive charts: languages over time, a GitHub-style commit calendar, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
+`dashboard` then serves a local React app with interactive charts: languages over time, file counts over time, a GitHub-style commit calendar, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
 
 ## Configuration
 

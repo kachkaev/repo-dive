@@ -6,6 +6,7 @@ import { churnCollector } from "./collectors/churn.ts";
 import { commitMetaCollector } from "./collectors/commit-meta.ts";
 import { dependenciesCollector } from "./collectors/dependencies.ts";
 import { directivesCollector } from "./collectors/directives.ts";
+import { fileSurvivalCollector } from "./collectors/file-survival.ts";
 import { fileTypesCollector } from "./collectors/file-types.ts";
 import { languagesCollector } from "./collectors/languages.ts";
 import type { Collector } from "./collectors/shared/types.ts";
@@ -28,6 +29,7 @@ export const builtInCollectors: readonly Collector[] = [
   todoCommentsCollector,
   languagesCollector,
   survivalCollector,
+  fileSurvivalCollector,
 ];
 
 export class UnknownCollectorError extends Data.TaggedError(

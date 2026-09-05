@@ -98,6 +98,15 @@ export type Collector = {
 export const describesTreeState = (collector: Collector): boolean =>
   collector.strategy !== "log";
 
+/**
+ * YYYY-MM of a unix timestamp in UTC — the age-cohort key the survival
+ * collectors bin by, shared so lines and files land in identical cohorts.
+ */
+export const cohortMonthOf = (unixSeconds: number): string => {
+  const date = new Date(unixSeconds * 1000);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+};
+
 /** File extension used as a category key, e.g. ".ts"; files without one map to "(none)". */
 export const extensionOf = (filePath: string): string => {
   const basename = filePath.split("/").at(-1) ?? "";

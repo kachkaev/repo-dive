@@ -276,6 +276,9 @@ const buildDashboardData = (
       sha: commit.sha.slice(0, 10),
       date: commit.committedAt,
       byLanguage: groupMetric(commit, "languages.lines", "language"),
+      // The same scan also counts files, so the file-count timeline gets its
+      // dense flat-by-language variant from data every catalog already holds.
+      byLanguageFiles: groupMetric(commit, "languages.files", "language"),
     }),
   );
 
@@ -425,50 +428,57 @@ const buildDashboardData = (
     );
   };
 
-  const survival = composeSeries(
-    (commit) => hasMetric(commit, "survival.lines"),
-    (commit) => {
-      // Living lines cross-tabulated by contributor (and by extension) and the
-      // year each line was authored — the dashboard splits each contributor's
-      // or language's area into year bands.
-      const byContributorYear: Record<string, Record<string, number>> = {};
-      const byLanguageYear: Record<string, Record<string, number>> = {};
-      for (const facts of commit.factsByCollector.values()) {
-        for (const fact of facts) {
-          if (fact.metric !== "survival.lines") {
-            continue;
+  /**
+   * One survival series — living lines or living files, the same shape at two
+   * grains: the units cross-tabulated by contributor (and by extension) and
+   * the year each was authored, so the dashboard can split a contributor's or
+   * language's area into year bands.
+   */
+  const survivalSeriesOf = (metric: "survival.lines" | "survival.files") =>
+    composeSeries(
+      (commit) => hasMetric(commit, metric),
+      (commit) => {
+        const byContributorYear: Record<string, Record<string, number>> = {};
+        const byLanguageYear: Record<string, Record<string, number>> = {};
+        for (const facts of commit.factsByCollector.values()) {
+          for (const fact of facts) {
+            if (fact.metric !== metric) {
+              continue;
+            }
+            const label = survivalLabelOf(fact.categories?.["author"] ?? "");
+            const year = (fact.categories?.["cohort"] ?? "").slice(0, 4) || "?";
+            const byYear = (byContributorYear[label] ??= {});
+            byYear[year] = (byYear[year] ?? 0) + fact.value;
+            // Survival facts stay keyed by extension — the raw truth — and are
+            // relabelled here with the same map the languages collector uses, so
+            // both halves of "Lines by language" name their stacks identically.
+            const language = languageOfExtension(
+              fact.categories?.["extension"] ?? "",
+            );
+            const languageYears = (byLanguageYear[language] ??= {});
+            languageYears[year] = (languageYears[year] ?? 0) + fact.value;
           }
-          const label = survivalLabelOf(fact.categories?.["author"] ?? "");
-          const year = (fact.categories?.["cohort"] ?? "").slice(0, 4) || "?";
-          const byYear = (byContributorYear[label] ??= {});
-          byYear[year] = (byYear[year] ?? 0) + fact.value;
-          // Survival facts stay keyed by extension — the raw truth — and are
-          // relabelled here with the same map the languages collector uses, so
-          // both halves of "Lines by language" name their stacks identically.
-          const language = languageOfExtension(
-            fact.categories?.["extension"] ?? "",
-          );
-          const languageYears = (byLanguageYear[language] ??= {});
-          languageYears[year] = (languageYears[year] ?? 0) + fact.value;
         }
-      }
-      return {
-        sha: commit.sha.slice(0, 10),
-        date: commit.committedAt,
-        byCohort: groupMetric(commit, "survival.lines", "cohort"),
-        byContributor: sumByKey(
-          groupMetric(commit, "survival.lines", "author"),
-          survivalLabelOf,
-        ),
-        byContributorYear,
-        byLanguage: sumByKey(
-          groupMetric(commit, "survival.lines", "extension"),
-          languageOfExtension,
-        ),
-        byLanguageYear,
-      };
-    },
-  );
+        return {
+          sha: commit.sha.slice(0, 10),
+          date: commit.committedAt,
+          byCohort: groupMetric(commit, metric, "cohort"),
+          byContributor: sumByKey(
+            groupMetric(commit, metric, "author"),
+            survivalLabelOf,
+          ),
+          byContributorYear,
+          byLanguage: sumByKey(
+            groupMetric(commit, metric, "extension"),
+            languageOfExtension,
+          ),
+          byLanguageYear,
+        };
+      },
+    );
+
+  const survival = survivalSeriesOf("survival.lines");
+  const fileSurvival = survivalSeriesOf("survival.files");
 
   // One bucket per person, whether they authored commits, only ever helped
   // with someone else's, or both — humans, bots and AI agents all measured the
@@ -630,6 +640,7 @@ const buildDashboardData = (
     dependencies,
     topRules,
     survival,
+    fileSurvival,
     contributors,
   };
 };

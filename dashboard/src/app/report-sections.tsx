@@ -22,6 +22,7 @@ import {
   type ContributorBarsItem,
 } from "./contributor-bars.tsx";
 import { DivergingBars } from "./diverging-bars.tsx";
+import { FilesTimeline } from "./files-timeline.tsx";
 import { LinesTimeline } from "./lines-timeline.tsx";
 import {
   Select,
@@ -568,6 +569,18 @@ export function ReportSections({
     <RevealSequentially>
       {(data.languages.length > 0 || data.survival.length > 0) && (
         <LinesTimeline
+          data={data}
+          maxContributorsInCharts={maxContributorsInCharts}
+        />
+      )}
+
+      {/* The same timeline at the file grain, directly under its line-grain
+          sibling. Gated on data the file chart can actually draw: per-language
+          file counts (absent in dashboard.json written before they landed) or
+          file-survival samples. */}
+      {(data.languages.some((row) => row.byLanguageFiles !== undefined) ||
+        (data.fileSurvival ?? []).length > 0) && (
+        <FilesTimeline
           data={data}
           maxContributorsInCharts={maxContributorsInCharts}
         />

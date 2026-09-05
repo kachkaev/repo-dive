@@ -82,6 +82,7 @@ export type WeekStart = "monday" | "sunday";
  */
 export const chartIds = [
   "lines-of-code",
+  "number-of-files",
   "commit-calendar",
   "commits-per-month",
   "churn-per-month",
