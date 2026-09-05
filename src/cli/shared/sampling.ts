@@ -22,6 +22,7 @@ export const parseSamplingPolicy = (
   input: string,
 ): Result.Result<SamplingPolicy, InvalidSamplingPolicyError> => {
   if (
+    // eslint-disable-next-line unicorn/prefer-includes-over-repeated-comparisons -- The repeated comparisons narrow `input` to SamplingPolicy; `.includes()` would not
     input === "all" ||
     input === "weekly" ||
     input === "monthly" ||

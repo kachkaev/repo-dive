@@ -40,7 +40,7 @@ export const monthShortNames = [
 ];
 
 export const formatMonth = (isoMonth: string): string => {
-  const [year, month] = isoMonth.split("-");
+  const [year, month] = isoMonth.split("-", 2);
   return `${monthShortNames[Number(month) - 1] ?? month} ${year}`;
 };
 

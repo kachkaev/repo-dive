@@ -295,9 +295,9 @@ export const runGc = ({
           value: { kind: "stale" },
         });
       }
-      for (const [name, count] of [
-        ...plan.countsByCollector.entries(),
-      ].toSorted(([left], [right]) => left.localeCompare(right))) {
+      for (const [name, count] of [...plan.countsByCollector].toSorted(
+        ([left], [right]) => left.localeCompare(right),
+      )) {
         choices.push({
           title: `All ${count} outputs of collector "${name}"`,
           value: { kind: "collector", name },
@@ -388,7 +388,7 @@ export const runGc = ({
       reportLines.push(`${count} outputs of collector "${name}"`);
     }
 
-    if (targets.size === 0 && !pruneCacheNamespaces) {
+    if (!pruneCacheNamespaces && targets.size === 0) {
       yield* Console.log("Nothing to garbage-collect.");
       return;
     }

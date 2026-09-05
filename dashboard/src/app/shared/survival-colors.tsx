@@ -87,7 +87,7 @@ export function survivalColorScalesOf(
   // them.
   const humanSlots = new Map(
     contributorOrder
-      .filter((label) => !(label in kindGroupSeriesColors))
+      .filter((label) => !Object.hasOwn(kindGroupSeriesColors, label))
       .map((label, slot) => [label, slot]),
   );
 

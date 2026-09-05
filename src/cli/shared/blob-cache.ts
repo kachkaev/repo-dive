@@ -47,6 +47,7 @@ export const getBlobCache = (catalogPath: string): BlobCache => {
   const storedSchema = db.prepare("PRAGMA user_version").get();
   if (Number(storedSchema?.["user_version"] ?? 0) !== schemaVersion) {
     db.exec("DROP TABLE IF EXISTS blob_results");
+    // eslint-disable-next-line unicorn/no-unsafe-sqlite-interpolation -- PRAGMA statements cannot take bound parameters, and schemaVersion is a module constant, not input
     db.exec(`PRAGMA user_version = ${schemaVersion}`);
   }
   db.exec(`
@@ -195,13 +196,13 @@ export const pruneBlobCacheNamespaces = (
     return 0;
   }
   try {
-    const deleteNamespace = db.prepare(
+    const namespaceDeletion = db.prepare(
       "DELETE FROM blob_results WHERE collector = ? AND cache_key = ?",
     );
     db.exec("BEGIN");
     try {
       for (const { collector, cacheKey } of namespaces) {
-        deleteNamespace.run(collector, cacheKey);
+        namespaceDeletion.run(collector, cacheKey);
       }
       db.exec("COMMIT");
     } catch (error) {

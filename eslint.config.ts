@@ -3,7 +3,7 @@ import { defineConfig } from "eslint/config";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default defineConfig([
-  ...generateBaseConfigs({ tsconfigRootDir: import.meta.dirname }),
+  generateBaseConfigs({ tsconfigRootDir: import.meta.dirname }),
 
   {
     ignores: [".claude/**", ".husky/**", "dist/**"],
@@ -32,6 +32,20 @@ export default defineConfig([
   },
 
   {
+    // Rules added in eslint-plugin-unicorn v65–v74 (via @kachkaev/eslint-config-base v2) that this
+    // codebase does not adopt yet. Each is up for review in https://github.com/kachkaev/repo-dive/issues/212.
+    rules: {
+      "unicorn/consistent-boolean-name": "off", // Names like `dryRun` or `value` are part of the CLI's and components' public shape.
+      "unicorn/max-nested-calls": "off", // Effect programs and CLI wiring are naturally deeply nested pipe/gen calls.
+      "unicorn/no-break-in-nested-loop": "off",
+      "unicorn/no-non-function-verb-prefix": "off", // Flags booleans such as `removeStale` and prepared statements such as `deleteNamespace`; the names are clear in context. // `continue` in a nested loop reads fine here; extracting functions for it adds noise.
+      "unicorn/no-unreadable-for-of-expression": "off",
+      "unicorn/single-line-block-comment-style": "off", // Single-line `/** … */` doc comments are the norm here; rewriting them into three-line blocks is churn without benefit. // Iterating over `map.entries()` or a filtered array inline is idiomatic here.
+      "unicorn/require-array-sort-compare": "off", // Type-unaware: it also flags string arrays, where the default sort is what we want.
+    },
+  },
+
+  {
     files: ["examples/*/repo-dive.config.ts"],
     rules: {
       "import/no-default-export": "off", // repo-dive reads the config from the file's default export.
@@ -48,7 +62,8 @@ export default defineConfig([
   {
     files: ["src/**/*.ts"],
     rules: {
-      "@typescript-eslint/explicit-module-boundary-types": "off", // Effect-heavy APIs infer large Effect<Success, Error, Requirements> signatures; repeating them adds noise.
+      "@typescript-eslint/explicit-module-boundary-types": "off",
+      "import/no-extraneous-dependencies": "off", // The CLI is bundled by Vite with only Node.js builtins external, so its packages live in devDependencies by design; src/config.ts, the one file shipped unbundled, has no imports. // Effect-heavy APIs infer large Effect<Success, Error, Requirements> signatures; repeating them adds noise.
       "func-style": "off", // Effect code is typically composed from const-bound helpers that are easy to pass around and pipe.
       "unicorn/no-array-callback-reference": "off", // False positive for Effect.forEach(iterable, effect), which is not Array#forEach(callback, thisArg).
       "unicorn/no-array-method-this-argument": "off", // False positive for Effect.forEach(iterable, effect), which reuses array method names with different argument positions.

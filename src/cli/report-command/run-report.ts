@@ -57,9 +57,9 @@ export const runReport = ({
 
       let result = indexHtml;
 
-      const styleMatches = [
-        ...result.matchAll(/<link rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/g),
-      ];
+      const styleMatches = result
+        .matchAll(/<link rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/g)
+        .toArray();
       for (const match of styleMatches) {
         const css = await readFile(
           path.join(assetsDir, match[1] ?? ""),
@@ -68,11 +68,9 @@ export const runReport = ({
         result = result.replace(match[0], () => `<style>${css}</style>`);
       }
 
-      const scriptMatches = [
-        ...result.matchAll(
-          /<script type="module"[^>]*src="([^"]+)"[^>]*><\/script>/g,
-        ),
-      ];
+      const scriptMatches = result
+        .matchAll(/<script type="module"[^>]*src="([^"]+)"[^>]*><\/script>/g)
+        .toArray();
       for (const match of scriptMatches) {
         const js = await readFile(path.join(assetsDir, match[1] ?? ""), "utf8");
         const safeJs = js.replaceAll("</script", String.raw`<\/script`);

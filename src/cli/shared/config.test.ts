@@ -334,7 +334,7 @@ test("resolveConfig rejects invalid charts.annotations", () => {
     resolveInRepo({ charts: { annotations: { "no-such-chart": "Note." } } }),
   ).toThrow(/unknown chart id "no-such-chart"; known ids: lines-of-code/);
   expect(() =>
-    resolveInRepo({ charts: { annotations: { "loose-ends": "   " } } }),
+    resolveInRepo({ charts: { annotations: { "loose-ends": " ".repeat(3) } } }),
   ).toThrow(/`charts.annotations.loose-ends` must be a non-empty string/);
   expect(() =>
     resolveInRepo({ charts: { annotations: { dependencies: 42 } } }),

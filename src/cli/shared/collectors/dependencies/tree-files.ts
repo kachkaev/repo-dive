@@ -33,7 +33,9 @@ const listBlobs = (
           continue;
         }
         const filePath = line.slice(tabIndex + 1);
-        const [, type = "", blobSha = ""] = line.slice(0, tabIndex).split(" ");
+        const [, type = "", blobSha = ""] = line
+          .slice(0, tabIndex)
+          .split(" ", 3);
         if (type === "blob" && blobSha && include(filePath)) {
           blobs.push({ blobSha, filePath });
         }
@@ -71,12 +73,12 @@ const fetchBlobContents = (
             }
             const header = decoder.decode(bytes.subarray(offset, headerEnd));
             offset = headerEnd + 1;
-            const [sha = "", type = "", sizeRaw = ""] = header.split(" ");
+            const [sha = "", type = "", sizeRaw = ""] = header.split(" ", 3);
             if (!sha || type === "missing") {
               continue;
             }
             const size = Number(sizeRaw);
-            if (!Number.isInteger(size)) {
+            if (!Number.isSafeInteger(size)) {
               continue;
             }
             if (type === "blob" && size <= maxBlobBytes) {

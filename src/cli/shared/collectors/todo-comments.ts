@@ -21,10 +21,12 @@ export const scanFileForTodos = (content: string): TodoCommentsOutput => {
 
   for (const line of content.split("\n")) {
     for (const [marker, pattern] of markerPatterns) {
-      if (pattern.test(line)) {
-        byMarker[marker] = (byMarker[marker] ?? 0) + 1;
-        total += 1;
+      if (!pattern.test(line)) {
+        continue;
       }
+
+      byMarker[marker] = (byMarker[marker] ?? 0) + 1;
+      total += 1;
     }
   }
 

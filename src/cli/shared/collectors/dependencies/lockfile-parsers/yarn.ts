@@ -1,4 +1,3 @@
-// eslint-disable-next-line import/no-extraneous-dependencies -- bundled into dist by Vite (like effect), so it lives in devDependencies by design
 import { parse as parseYaml } from "yaml";
 
 import { isRecord } from "./shared/helpers.ts";

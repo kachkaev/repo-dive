@@ -4,7 +4,7 @@ import { numberAt, recordAt } from "../../../shared/json.ts";
 import { runGit } from "../git.ts";
 import { type Collector, extensionOf, type Fact } from "./shared/types.ts";
 
-const recordSeparator = "\u001E";
+const recordSeparator = "\u{1E}";
 
 type ChurnByExtension = {
   files: number;
@@ -29,7 +29,7 @@ export const parseNumstat = (stdout: string): ChurnOutput => {
   const byExtension: Record<string, ChurnByExtension> = {};
 
   for (const line of stdout.split("\n")) {
-    const [addedRaw, deletedRaw, filePath] = line.split("\t");
+    const [addedRaw, deletedRaw, filePath] = line.split("\t", 3);
     if (!filePath || addedRaw === undefined || deletedRaw === undefined) {
       continue;
     }

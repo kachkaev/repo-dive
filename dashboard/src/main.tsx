@@ -12,23 +12,21 @@ if (!rootElement) {
 }
 const root = createRoot(rootElement);
 
-loadDashboardData().then(
-  (data) => {
-    document.title = `${data.repo.name} · repo-dive`;
-    root.render(
-      <StrictMode>
-        <App data={data} />
-      </StrictMode>,
-    );
-  },
-  (error: unknown) => {
-    root.render(
-      <main className="mx-auto max-w-xl px-6 py-16 text-center">
-        <h1 className="text-lg font-semibold">Could not load dashboard data</h1>
-        <p className="mt-2 text-sm text-(--text-secondary)">
-          {error instanceof Error ? error.message : String(error)}
-        </p>
-      </main>,
-    );
-  },
-);
+try {
+  const data = await loadDashboardData();
+  document.title = `${data.repo.name} · repo-dive`;
+  root.render(
+    <StrictMode>
+      <App data={data} />
+    </StrictMode>,
+  );
+} catch (error) {
+  root.render(
+    <main className="mx-auto max-w-xl px-6 py-16 text-center">
+      <h1 className="text-lg font-semibold">Could not load dashboard data</h1>
+      <p className="mt-2 text-sm text-(--text-secondary)">
+        {error instanceof Error ? error.message : String(error)}
+      </p>
+    </main>,
+  );
+}

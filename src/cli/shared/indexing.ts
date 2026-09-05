@@ -129,19 +129,21 @@ const groupMetric = (
   const grouped: Record<string, number> = {};
   for (const facts of commit.factsByCollector.values()) {
     for (const fact of facts) {
-      if (fact.metric === metric) {
-        const key = fact.categories?.[categoryKey] ?? "(unknown)";
-        grouped[key] = (grouped[key] ?? 0) + fact.value;
+      if (fact.metric !== metric) {
+        continue;
       }
+
+      const key = fact.categories?.[categoryKey] ?? "(unknown)";
+      grouped[key] = (grouped[key] ?? 0) + fact.value;
     }
   }
   return grouped;
 };
 
 const hasMetric = (commit: CommitFacts, metric: string): boolean =>
-  [...commit.factsByCollector.values()].some((facts) =>
-    facts.some((fact) => fact.metric === metric),
-  );
+  commit.factsByCollector
+    .values()
+    .some((facts) => facts.some((fact) => fact.metric === metric));
 
 /** Re-keys a numeric record, summing values whose new keys collide. */
 const sumByKey = (
@@ -229,7 +231,9 @@ const buildDashboardData = (
     );
   /** The raw `"Name <email>"` trailers on a commit, in the order git listed them. */
   const coAuthorsOf = (commit: CommitFacts): string[] =>
-    [...commit.factsByCollector.values()]
+    commit.factsByCollector
+      .values()
+      .toArray()
       .flat()
       .filter((fact) => fact.metric === "commits.coAuthor")
       .map((fact) => fact.categories?.["coAuthor"] ?? "");
@@ -516,7 +520,7 @@ const buildDashboardData = (
     const name = nameOf(resolved, observedName);
     const email = resolved.canonicalEmail.toLowerCase();
     const key =
-      resolved.kind === "human" ? email : `${name.toLowerCase()}\u001F${email}`;
+      resolved.kind === "human" ? email : `${name.toLowerCase()}\u{1F}${email}`;
     const bucket = contributorMap.get(key) ?? {
       email: resolved.canonicalEmail,
       name,
@@ -594,7 +598,9 @@ const buildDashboardData = (
     bot: 0,
     ai: 0,
   };
-  const contributors = [...contributorMap.values()]
+  const contributors = contributorMap
+    .values()
+    .toArray()
     .toSorted((left, right) => involvementOf(right) - involvementOf(left))
     .filter((bucket) => {
       if (keptPerKind[bucket.kind] >= perKindCap) {
@@ -616,9 +622,9 @@ const buildDashboardData = (
       charts: {
         weekStartsOn: config.weekStartsOn,
         // Left out entirely when empty, so unannotated dashboards ship no key
-        ...(Object.keys(config.chartAnnotations).length > 0
-          ? { annotations: config.chartAnnotations }
-          : {}),
+        ...(Object.keys(config.chartAnnotations).length > 0 && {
+          annotations: config.chartAnnotations,
+        }),
       },
     },
     repo: {

@@ -25,12 +25,14 @@ import {
 } from "../shared/scan.ts";
 
 const exists = (filePath: string) =>
-  Effect.promise(() =>
-    access(filePath).then(
-      () => true,
-      () => false,
-    ),
-  );
+  Effect.promise(async () => {
+    try {
+      await access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  });
 
 export const runStatus = ({
   repoPath,

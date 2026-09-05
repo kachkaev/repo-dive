@@ -138,6 +138,6 @@ test("withIgnoreEntry writes something coversPath then recognizes", () => {
   ]) {
     const { contents } = add(before);
     expect(coversPath(contents, ".repo-dive"), before).toBe(true);
-    expect(contents, before).not.toContain("\n\n\n");
+    expect(contents, before).not.toContain("\n".repeat(3));
   }
 });
