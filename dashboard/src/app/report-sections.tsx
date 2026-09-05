@@ -750,6 +750,7 @@ export function ReportSections({
             mode="area"
             percentMode={directDependenciesPercent}
             {...directDependenciesChart}
+            legendToggles
             domainStartMs={repoStartMs}
             zeroLabel="No package.json"
           />
@@ -785,6 +786,7 @@ export function ReportSections({
             mode="area"
             percentMode={dependenciesPercent}
             {...dependenciesChart}
+            legendToggles
             domainStartMs={repoStartMs}
             zeroLabel="No lockfile"
           />
@@ -797,7 +799,7 @@ export function ReportSections({
           subtitle={looseEndsSubtitle}
           annotation={annotations?.["loose-ends"]}
         >
-          <TimeSeriesChart mode="line" {...looseEndsChart} />
+          <TimeSeriesChart mode="line" legendToggles {...looseEndsChart} />
         </Section>
       )}
 

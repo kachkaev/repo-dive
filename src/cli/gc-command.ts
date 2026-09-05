@@ -11,16 +11,19 @@ export const gcCommand = Command.make("gc", {
     ),
   ),
   unreachable: Flag.boolean("unreachable").pipe(
+    Flag.withDefault(false),
     Flag.withDescription(
       "Remove data for commits no longer reachable from HEAD",
     ),
   ),
   offMainline: Flag.boolean("off-mainline").pipe(
+    Flag.withDefault(false),
     Flag.withDescription(
       "Remove tree snapshots stored under commits that are not on HEAD's first-parent chain",
     ),
   ),
   stale: Flag.boolean("stale").pipe(
+    Flag.withDefault(false),
     Flag.withDescription(
       "Remove catalog outputs and blob-cache entries written by old collector versions or by collectors that no longer exist",
     ),
@@ -33,9 +36,11 @@ export const gcCommand = Command.make("gc", {
     ),
   ),
   dryRun: Flag.boolean("dry-run").pipe(
+    Flag.withDefault(false),
     Flag.withDescription("Report what would be removed without removing it"),
   ),
   yes: Flag.boolean("yes").pipe(
+    Flag.withDefault(false),
     Flag.withAlias("y"),
     Flag.withDescription("Skip the confirmation prompt"),
   ),

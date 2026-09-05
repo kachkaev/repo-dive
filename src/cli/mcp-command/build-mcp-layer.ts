@@ -25,7 +25,6 @@ const schemaTool = Tool.make("schema", {
   description:
     "Describe the repository's metrics cube: tables, available metrics with row counts, " +
     "sample category keys per metric, and the commit range. Call this before writing queries.",
-  parameters: Schema.Struct({}),
   success: Schema.Unknown,
   failure: QueryError,
 })

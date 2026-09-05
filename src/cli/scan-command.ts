@@ -32,6 +32,7 @@ export const scanCommand = Command.make("scan", {
     ),
   ),
   force: Flag.boolean("force").pipe(
+    Flag.withDefault(false),
     Flag.withDescription(
       "Re-collect even where outputs with the current collector version already exist",
     ),

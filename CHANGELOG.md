@@ -1,5 +1,22 @@
 # repo-dive
 
+## 0.15.2
+
+### Patch Changes
+
+- [#195](https://github.com/kachkaev/repo-dive/pull/195) [`fb3dd89`](https://github.com/kachkaev/repo-dive/commit/fb3dd890a5e453769feadc59c0b999bd462d3348) - Resolve a config's `repo-dive/config` import in repositories without `node_modules`.
+  Every command used to exit with `Cannot find package 'repo-dive'` when the analyzed repository was a bare clone tracking a `repo-dive.config.ts` that imports `defineConfig` — the shape the GitHub Action and the "Analyzing a different repository" recipe produce.
+  The import now falls back to the repo-dive installation running the command whenever the repository cannot resolve it itself.
+  Node 22.15 or newer is now required, up from 22.13.
+
+## 0.15.1
+
+### Patch Changes
+
+- [#167](https://github.com/kachkaev/repo-dive/pull/167) [`188a1a9`](https://github.com/kachkaev/repo-dive/commit/188a1a99a14daa03633ca4503e455a6167accf30) - Stop classifying humans as AI agents when their name or employer merely contains an agent word.
+  Agent products are now recognized by the whole-word name they sign with (`Sam Devine` is no longer Devin, `Kai Haider` is not aider), Claude and Devin additionally need the agent/model word agents append (`Claude Opus 4.5`, `Devin AI`), and on the email side only agent-specific mailboxes count — `alice@openai.com` marks an employee, not an agent.
+  Existing catalogs pick the corrected kinds up on their next `index` run — kinds are derived at index time, so no re-scan is needed.
+
 ## 0.15.0
 
 ### Minor Changes

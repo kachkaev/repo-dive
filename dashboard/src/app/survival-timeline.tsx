@@ -554,6 +554,10 @@ export function SurvivalTimeline({
         domainEndMs={domainEndMs}
         domainPeak={domainPeak}
         secondaryLegendItems={yearLegendItems}
+        // Languages and contributors can be hidden to read the rest; the
+        // all-units legend names year shades (or nothing), where hiding a
+        // band would mean nothing.
+        legendToggles={deferredDimension !== "all"}
         {...chart}
       />
     </Section>

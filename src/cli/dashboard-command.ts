@@ -15,6 +15,7 @@ export const dashboardCommand = Command.make("dashboard", {
     Flag.withDescription("Port to serve the dashboard on"),
   ),
   open: Flag.boolean("open").pipe(
+    Flag.withDefault(false),
     Flag.withDescription("Open the dashboard in the default browser"),
   ),
 }).pipe(

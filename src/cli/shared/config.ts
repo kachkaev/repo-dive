@@ -1,4 +1,5 @@
 import { access } from "node:fs/promises";
+import { registerHooks } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -499,11 +500,67 @@ const firstExistingConfigPath = async (
   return undefined;
 };
 
+const isRepoDiveSpecifier = (specifier: string): boolean =>
+  specifier === "repo-dive" || specifier.startsWith("repo-dive/");
+
+/** `ERR_MODULE_NOT_FOUND` from `import`, `MODULE_NOT_FOUND` from `require`. */
+const isModuleNotFoundError = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  (error.code === "ERR_MODULE_NOT_FOUND" || error.code === "MODULE_NOT_FOUND");
+
+let selfResolutionFallbackRegistered = false;
+
+/**
+ * Lets a config import `repo-dive/config` even when the analyzed repository
+ * has no `node_modules` to resolve it from — a bare clone in CI, say. Node
+ * resolves a bare specifier relative to the importing file, so the import
+ * would otherwise die on a package it only needs for types: `defineConfig` is
+ * an identity function.
+ *
+ * The hook lets Node try the repository's own resolution first, so a repo-dive
+ * installed there still wins, and only when that fails re-resolves the
+ * specifier as if this very module had imported it — against the running
+ * installation's own `exports`. Anything but a `repo-dive` specifier, and any
+ * other failure, passes through untouched. Registered once per process, and
+ * only once a config file is actually about to be imported.
+ */
+const registerSelfResolutionFallback = (): void => {
+  if (selfResolutionFallbackRegistered) {
+    return;
+  }
+  selfResolutionFallbackRegistered = true;
+  registerHooks({
+    resolve: (specifier, context, nextResolve) => {
+      try {
+        return nextResolve(specifier, context);
+      } catch (error) {
+        if (!isRepoDiveSpecifier(specifier) || !isModuleNotFoundError(error)) {
+          throw error;
+        }
+        try {
+          return nextResolve(specifier, {
+            ...context,
+            parentURL: import.meta.url,
+          });
+        } catch {
+          // The original error names the repository's file, which is what the
+          // user can act on; the retry's would blame repo-dive's own files.
+          throw error;
+        }
+      }
+    },
+  });
+};
+
 /**
  * Loads `repo-dive.config.*` from the analyzed repo root, if present.
  *
  * `.ts` config relies on Node's built-in type stripping (unflagged on Node
- * ≥ 22.18); on older runtimes, use a `.mjs`/`.js` config instead. Returns the
+ * ≥ 22.18); on older runtimes, use a `.mjs`/`.js` config instead. A
+ * `repo-dive/config` import the repository cannot resolve itself falls back to
+ * this installation (see {@link registerSelfResolutionFallback}). Returns the
  * zero-config defaults when no file is found.
  */
 export const loadConfig = (
@@ -519,6 +576,7 @@ export const loadConfig = (
       return resolveConfig({}, repoRoot);
     }
 
+    yield* Effect.sync(registerSelfResolutionFallback);
     const raw = yield* Effect.tryPromise({
       try: async (): Promise<unknown> => {
         const module: unknown = await import(pathToFileURL(configPath).href);
