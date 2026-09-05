@@ -202,6 +202,13 @@ export function Swatch({
 }
 
 /**
+ * How the legend tooltips name the modifier that isolates a series: the key
+ * is ⌥ on Apple keyboards and Alt everywhere else. Sniffed once — the report
+ * is a static page and the keyboard does not change under it.
+ */
+const altKeyName = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌥" : "Alt";
+
+/**
  * Rendered below its chart, centered like a figure caption: legends change
  * with the controls, and above the marks a height change would shift them
  * mid-read. Laid out as inline boxes rather than a wrapping flexbox so
@@ -255,6 +262,15 @@ export function Legend({
             </span>
           );
         }
+        // What the modifier click will do, phrased from the current state:
+        // it isolates the item unless the item is already the only one
+        // showing, when it brings everything back (see LegendToggles.onSolo).
+        const onlyThisVisible =
+          !hidden &&
+          items.every(
+            (other) =>
+              other.label === item.label || hiddenLabels?.has(other.label),
+          );
         return (
           <Tooltip key={item.label}>
             <TooltipTrigger
@@ -269,8 +285,12 @@ export function Legend({
                   type="button"
                   aria-pressed={!hidden}
                   className="group mx-2 my-0.5 inline-flex items-center gap-1.5 rounded-xs outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  onClick={() => {
-                    toggles.onToggle(item.label);
+                  onClick={(event) => {
+                    if (event.altKey) {
+                      toggles.onSolo(item.label);
+                    } else {
+                      toggles.onToggle(item.label);
+                    }
                   }}
                 />
               }
@@ -290,7 +310,8 @@ export function Legend({
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              {hidden ? "Click to show" : "Click to hide"}
+              Click to {hidden ? "show" : "hide"} · {altKeyName}-click to{" "}
+              {onlyThisVisible ? "show all" : "show only this"}
             </TooltipContent>
           </Tooltip>
         );
@@ -301,12 +322,18 @@ export function Legend({
 
 /**
  * The chart-side half of a {@link Legend} with toggles: which labels are hidden,
- * and what a click on a label does.
+ * and what a click / modifier click on a label does.
  */
 export type LegendToggles = {
   hiddenLabels: ReadonlySet<string>;
   /** A click: hides a visible label, shows a hidden one. */
   onToggle: (label: string) => void;
+  /**
+   * An alt/option click: shows only this label — unless it is already the
+   * only one showing, when it shows every label again, so a second modifier
+   * click undoes the first.
+   */
+  onSolo: (label: string) => void;
 };
 
 export function DataTable(props: {

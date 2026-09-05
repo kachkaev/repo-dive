@@ -434,9 +434,9 @@ export function TimeSeriesChart(props: {
   /** When set, the tooltip sums each group's sub-series into one row. */
   tooltipGroups?: SeriesGroup[];
   /**
-   * Lets the viewer hide series by clicking their legend items — to read the
-   * slopes of the remaining ones without a spike lower in the stack bending
-   * them. The hidden series leave the stack;
+   * Lets the viewer hide series by clicking their legend items (alt/option
+   * click isolates one) — to read the slopes of the remaining ones without a
+   * spike lower in the stack bending them. The hidden series leave the stack;
    * everything else holds still: both axes, the legend's layout (the item
    * stays put, crossed out) and the hover card's rows and numbers. Off by
    * default — a legend that names age shades or one series explains nothing
@@ -599,6 +599,24 @@ export function TimeSeriesChart(props: {
         next.add(label);
       }
       return next;
+    });
+  };
+  // Isolate the label; once it is the only one showing, bring everything
+  // back. Judged inside the updater against the state the click lands on.
+  const soloLabel = (label: string) => {
+    setHiddenLabels((previous) => {
+      const onlyThisVisible =
+        !previous.has(label) &&
+        resolvedLegendItems.every(
+          (item) => item.label === label || previous.has(item.label),
+        );
+      return onlyThisVisible
+        ? new Set()
+        : new Set(
+            resolvedLegendItems
+              .filter((item) => item.label !== label)
+              .map((item) => item.label),
+          );
     });
   };
 
@@ -892,6 +910,7 @@ export function TimeSeriesChart(props: {
               ? {
                   hiddenLabels: legendHiddenLabels,
                   onToggle: toggleLabel,
+                  onSolo: soloLabel,
                 }
               : undefined
           }
