@@ -168,11 +168,13 @@ const roundPartPx = (values: readonly number[], size: number): number[] => {
     remaining -= 1;
   }
   for (const [index, value] of px.entries()) {
-    if (value === 0 && (values[index] ?? 0) > 0) {
-      const tallest = px.indexOf(Math.max(...px));
-      px[tallest] = (px[tallest] ?? 0) - 1;
-      px[index] = 1;
+    if (!(value === 0 && (values[index] ?? 0) > 0)) {
+      continue;
     }
+
+    const tallest = px.indexOf(Math.max(...px));
+    px[tallest] = (px[tallest] ?? 0) - 1;
+    px[index] = 1;
   }
   return px;
 };
@@ -520,9 +522,11 @@ export function CommitCalendar({
   // Intensity thresholds are quartiles of nonzero daily counts over the WHOLE
   // history, computed per filter — switching ranges never recolors a day, and
   // each kind gets its own max so bot bursts don't flatten the human view.
-  const nonzero = [...dayTotals.values()]
+  const nonzero = dayTotals
+    .values()
     .map((total) => filterValueOf(total, kindFilter))
     .filter((value) => value > 0)
+    .toArray()
     .toSorted((left, right) => left - right);
   const quartile = (share: number): number =>
     nonzero[Math.floor(share * (nonzero.length - 1))] ?? 0;
@@ -550,12 +554,15 @@ export function CommitCalendar({
       break;
     }
     case "this-year": {
-      strips.push({ title: `${anchorYear}`, months: monthsOfYear(anchorYear) });
+      strips.push({
+        title: String(anchorYear),
+        months: monthsOfYear(anchorYear),
+      });
       break;
     }
     case "all-years": {
       for (let year = anchorYear; year >= firstYear; year -= 1) {
-        strips.push({ title: `${year}`, months: monthsOfYear(year) });
+        strips.push({ title: String(year), months: monthsOfYear(year) });
       }
       break;
     }
@@ -570,13 +577,13 @@ export function CommitCalendar({
           year -= 1
         ) {
           if (year >= firstYear) {
-            strips.push({ title: `${year}`, months: monthsOfYear(year) });
+            strips.push({ title: String(year), months: monthsOfYear(year) });
           }
         }
         break;
       }
       const year = Number(range.slice("year-".length));
-      strips.push({ title: `${year}`, months: monthsOfYear(year) });
+      strips.push({ title: String(year), months: monthsOfYear(year) });
     }
   }
 

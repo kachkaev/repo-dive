@@ -4,8 +4,8 @@ import { arrayAt, stringAt } from "../../../shared/json.ts";
 import { runGit } from "../git.ts";
 import type { Collector, Fact } from "./shared/types.ts";
 
-const fieldSeparator = "\u001F";
-const recordSeparator = "\u001E";
+const fieldSeparator = "\u{1F}";
+const recordSeparator = "\u{1E}";
 
 const format = [
   "%H",

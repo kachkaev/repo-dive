@@ -405,7 +405,7 @@ export function ReportSections({
           (_, index) => Number(data.generatedAt.slice(0, 4)) - index,
         ).map((year) => ({
           value: `year-${year}` as const,
-          label: `${year}`,
+          label: String(year),
         }))
       : []),
   ];
@@ -445,8 +445,8 @@ export function ReportSections({
     }
     monthlyBuckets.set(month, bucket);
   }
-  const monthlyRows = [...monthlyBuckets.entries()].toSorted(
-    ([left], [right]) => left.localeCompare(right),
+  const monthlyRows = [...monthlyBuckets].toSorted(([left], [right]) =>
+    left.localeCompare(right),
   );
   // Keep only kinds that ever occur, so a bot-free repo gets no empty series.
   const presentCommitKindKeys = commitKindOrder.filter((kind) =>
@@ -473,7 +473,7 @@ export function ReportSections({
     legendItems: commitKindKeys.map((kind) => ({
       label: commitKindSeries[kind],
       color: commitKindColorOf(kind),
-      ...(kind === "humanAi" ? { hatch: kindColors.ai } : {}),
+      ...(kind === "humanAi" && { hatch: kindColors.ai }),
     })),
   };
   const commitsSupportPercent = commitsChart.seriesKeys.length > 1;

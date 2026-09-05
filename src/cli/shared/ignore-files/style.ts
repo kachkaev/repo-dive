@@ -10,7 +10,7 @@
  */
 
 const isBlank = (line: string): boolean => line.trim() === "";
-const isComment = (line: string): boolean => line.trim().startsWith("#");
+const isComment = (line: string): boolean => line.trimStart().startsWith("#");
 const isPattern = (line: string): boolean => !isBlank(line) && !isComment(line);
 
 /**

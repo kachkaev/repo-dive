@@ -1,4 +1,3 @@
-// eslint-disable-next-line import/no-extraneous-dependencies -- bundled into dist by Vite (like effect), so it lives in devDependencies by design
 import { parseAllDocuments } from "yaml";
 
 import { countKeys, isRecord } from "./shared/helpers.ts";
@@ -47,7 +46,7 @@ export const parsePnpmLockfile = (
       ? Object.values(root["importers"]).filter(isRecord)
       : [];
     const projectImporters = importerEntries.filter((importer) =>
-      standardGroups.some((group) => group in importer),
+      standardGroups.some((group) => Object.hasOwn(importer, group)),
     );
 
     // A document with only `packageManagerDependencies`/`configDependencies`

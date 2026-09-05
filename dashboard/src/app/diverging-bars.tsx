@@ -36,6 +36,13 @@ export function DivergingBars({
   const [containerRef, width] = useMeasuredWidth<HTMLDivElement>();
   const [hoverIndex, setHoverIndex] = useState<number | undefined>();
   const hatchId = useId();
+
+  if (points.length === 0) {
+    return (
+      <p className="text-sm text-(--text-muted)">No data collected yet.</p>
+    );
+  }
+
   const showSecondary =
     positiveSecondaryLabel !== undefined &&
     positiveSecondaryHatch !== undefined &&
@@ -70,12 +77,6 @@ export function DivergingBars({
     nice: true,
   });
 
-  if (points.length === 0) {
-    return (
-      <p className="text-sm text-(--text-muted)">No data collected yet.</p>
-    );
-  }
-
   const barWidth = Math.max(
     1,
     Math.min(18, (innerWidth / Math.max(1, points.length)) * 0.7),
@@ -89,7 +90,7 @@ export function DivergingBars({
   const hoverBarX =
     hoverIndex === undefined ? 0 : margin.left + xScale(dates[hoverIndex] ?? 0);
   const cardPosition =
-    hoverBarX - 10 - 170 >= 0
+    hoverBarX >= 10 + 170
       ? { right: width - hoverBarX + 10 }
       : { left: Math.min(hoverBarX + 10, Math.max(0, width - 170)) };
 
@@ -205,7 +206,7 @@ export function DivergingBars({
                 const bounds = event.currentTarget.getBoundingClientRect();
                 const x = event.clientX - bounds.left;
                 let nearest = 0;
-                let nearestDistance = Number.POSITIVE_INFINITY;
+                let nearestDistance = Infinity;
                 for (const [index, dateMs] of dates.entries()) {
                   const distance = Math.abs(xScale(dateMs) - x);
                   if (distance < nearestDistance) {

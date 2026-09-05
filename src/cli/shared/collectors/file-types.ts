@@ -28,7 +28,7 @@ export const parseLsTree = (stdout: string): FileTypesOutput => {
     }
 
     const filePath = line.slice(tabIndex + 1);
-    const [, type, , sizeRaw] = line.slice(0, tabIndex).split(/\s+/);
+    const [, type, , sizeRaw] = line.slice(0, tabIndex).split(/\s+/, 4);
     if (type !== "blob") {
       continue;
     }

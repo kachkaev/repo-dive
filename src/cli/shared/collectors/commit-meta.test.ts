@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 
 import { parseCommitMeta, parseTrailers } from "./commit-meta.ts";
 
-const separator = "\u001F";
+const separator = "\u{1F}";
 
 test("parseCommitMeta extracts full commit metadata", () => {
   const meta = parseCommitMeta(

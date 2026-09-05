@@ -106,7 +106,7 @@ export const scanFileForDirectives = (content: string): DirectivesOutput => {
       output.eslintBlocks.count += 1;
       addRules(output.eslintBlocks.byRule, parseRules(line, "eslint-disable"));
       openBlock = { line: index };
-    } else if (line.includes("eslint-enable") && openBlock) {
+    } else if (openBlock && line.includes("eslint-enable")) {
       output.eslintBlocks.closedCount += 1;
       output.eslintBlocks.coveredLines += Math.max(
         0,

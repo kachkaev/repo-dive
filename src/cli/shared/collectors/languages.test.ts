@@ -11,7 +11,7 @@ test("countLines counts a trailing-newline-less last line, but not an empty file
   expect(countLines("\n")).toBe(1);
   expect(countLines("a\nb\n")).toBe(2);
   expect(countLines("a\nb")).toBe(2);
-  expect(countLines("\n\n\n")).toBe(3);
+  expect(countLines("\n".repeat(3))).toBe(3);
 });
 
 test("summarizeLineCounts groups per extension and totals", () => {

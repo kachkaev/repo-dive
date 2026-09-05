@@ -36,14 +36,14 @@ test("parseRemoteUrl drops credentials and ssh ports", () => {
   expect(parseRemoteUrl("https://git.example.com:8443/org/repo.git")).toBe(
     "https://git.example.com:8443/org/repo",
   );
-  expect(parseRemoteUrl("http://git.example.com/org/repo.git")).toBe(
-    "http://git.example.com/org/repo",
+  expect(parseRemoteUrl("https://git.example.com/org/repo.git")).toBe(
+    "https://git.example.com/org/repo",
   );
 });
 
 test("parseRemoteUrl gives up on remotes with nothing to open", () => {
   expect(parseRemoteUrl("")).toBeUndefined();
-  expect(parseRemoteUrl("   ")).toBeUndefined();
+  expect(parseRemoteUrl(" ".repeat(3))).toBeUndefined();
   expect(parseRemoteUrl("../sibling-repo.git")).toBeUndefined();
   expect(parseRemoteUrl("/srv/git/repo.git")).toBeUndefined();
   expect(parseRemoteUrl("file:///srv/git/repo.git")).toBeUndefined();

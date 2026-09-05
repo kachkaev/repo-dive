@@ -20,10 +20,10 @@ const snapshot = (
 
 test("composeLineageSeries returns a single lineage's rows unchanged", () => {
   const rows = composeLineageSeries<Row>([
-    snapshot(0, Number.POSITIVE_INFINITY, "a1", "2024-01-01T00:00:00Z", 10, {
+    snapshot(0, Infinity, "a1", "2024-01-01T00:00:00Z", 10, {
       TypeScript: 10,
     }),
-    snapshot(0, Number.POSITIVE_INFINITY, "a2", "2024-02-01T00:00:00Z", 25, {
+    snapshot(0, Infinity, "a2", "2024-02-01T00:00:00Z", 25, {
       TypeScript: 20,
       Markdown: 5,
     }),
@@ -60,17 +60,10 @@ test("composeLineageSeries sums parallel lineages, carrying the latest forward",
       Markdown: 10,
     }),
     // …then the monorepo's first post-assembly snapshot holding both.
-    snapshot(
-      0,
-      Number.POSITIVE_INFINITY,
-      "mono1",
-      "2024-01-01T00:00:00Z",
-      185,
-      {
-        TypeScript: 172,
-        Markdown: 13,
-      },
-    ),
+    snapshot(0, Infinity, "mono1", "2024-01-01T00:00:00Z", 185, {
+      TypeScript: 172,
+      Markdown: 13,
+    }),
   ]);
 
   expect(rows.map((row) => ({ sha: row.sha, lines: row.lines }))).toStrictEqual(
@@ -98,10 +91,10 @@ test("composeLineageSeries keeps an unabsorbed lineage contributing forever", ()
       5,
       {},
     ),
-    snapshot(0, Number.POSITIVE_INFINITY, "b", "2024-03-01T00:00:00Z", 7, {}),
+    snapshot(0, Infinity, "b", "2024-03-01T00:00:00Z", 7, {}),
     // Lineage 1 is still alive here (ends June), so it adds; at the next
     // snapshot it has expired.
-    snapshot(0, Number.POSITIVE_INFINITY, "c", "2024-07-01T00:00:00Z", 9, {}),
+    snapshot(0, Infinity, "c", "2024-07-01T00:00:00Z", 9, {}),
   ]);
 
   expect(rows.map((row) => row.lines)).toStrictEqual([5, 12, 9]);

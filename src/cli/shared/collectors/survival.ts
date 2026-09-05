@@ -99,15 +99,17 @@ export const survivalCollector: Collector = {
       let totalLines = 0;
       for (const { extension, attributions } of attributionsPerFile) {
         for (const attribution of attributions) {
-          const key = `${extension}\u001F${attribution.authorEmail}\u001F${attribution.cohortMonth}`;
+          const key = `${extension}\u{1F}${attribution.authorEmail}\u{1F}${attribution.cohortMonth}`;
           counts.set(key, (counts.get(key) ?? 0) + 1);
           totalLines += 1;
         }
       }
 
-      const rows: SurvivalRow[] = [...counts.entries()].map(([key, lines]) => {
-        const [extension = "", authorEmail = "", cohortMonth = ""] =
-          key.split("\u001F");
+      const rows: SurvivalRow[] = [...counts].map(([key, lines]) => {
+        const [extension = "", authorEmail = "", cohortMonth = ""] = key.split(
+          "\u{1F}",
+          3,
+        );
         return { extension, authorEmail, cohortMonth, lines };
       });
 
@@ -118,18 +120,15 @@ export const survivalCollector: Collector = {
       } satisfies SurvivalOutput;
     }),
   normalize: (raw) => {
-    const facts: Fact[] = [];
-    for (const row of arrayAt(raw, "rows")) {
-      facts.push({
-        metric: "survival.lines",
-        value: numberAt(row, "lines"),
-        categories: {
-          extension: stringAt(row, "extension"),
-          author: stringAt(row, "authorEmail"),
-          cohort: stringAt(row, "cohortMonth"),
-        },
-      });
-    }
+    const facts: Fact[] = Array.from(arrayAt(raw, "rows"), (row) => ({
+      metric: "survival.lines",
+      value: numberAt(row, "lines"),
+      categories: {
+        extension: stringAt(row, "extension"),
+        author: stringAt(row, "authorEmail"),
+        cohort: stringAt(row, "cohortMonth"),
+      },
+    }));
     return facts;
   },
 };

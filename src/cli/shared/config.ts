@@ -323,7 +323,7 @@ const parseMaxInCharts = (value: unknown): number => {
   }
   if (
     typeof value !== "number" ||
-    !Number.isInteger(value) ||
+    !Number.isSafeInteger(value) ||
     value < 1 ||
     value > 100
   ) {
@@ -530,6 +530,7 @@ const registerSelfResolutionFallback = (): void => {
   if (selfResolutionFallbackRegistered) {
     return;
   }
+  // eslint-disable-next-line unicorn/no-top-level-assignment-in-function -- A module-level flag is the point: the hook must be registered once per process
   selfResolutionFallbackRegistered = true;
   registerHooks({
     resolve: (specifier, context, nextResolve) => {

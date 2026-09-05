@@ -15,7 +15,7 @@ import {
   summarizeCommits,
 } from "./scan.ts";
 
-const separator = "\u001F";
+const separator = "\u{1F}";
 
 const sampleLog = [
   [
@@ -143,12 +143,10 @@ function git(
       encoding: "utf8",
       env: {
         ...process.env,
-        ...(options?.isoDate
-          ? {
-              GIT_AUTHOR_DATE: options.isoDate,
-              GIT_COMMITTER_DATE: options.isoDate,
-            }
-          : {}),
+        ...(options?.isoDate && {
+          GIT_AUTHOR_DATE: options.isoDate,
+          GIT_COMMITTER_DATE: options.isoDate,
+        }),
       },
     },
   );
@@ -322,7 +320,7 @@ it.effect(
       ).toStrictEqual(
         [
           // HEAD's own lineage never stops contributing…
-          { shas: [later], endsAtMs: Number.POSITIVE_INFINITY },
+          { shas: [later], endsAtMs: Infinity },
           // …while each absorbed one ends the instant the assembly completes,
           // i.e. at the first post-assembly commit.
           { shas: [old1, old2].toSorted(), endsAtMs: laterMs },

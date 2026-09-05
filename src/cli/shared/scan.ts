@@ -69,7 +69,7 @@ class CollectorRunError extends Data.TaggedError("CollectorRunError")<{
   }
 }
 
-const fieldSeparator = "\u001F";
+const fieldSeparator = "\u{1F}";
 
 const gitLogFormat = ["%H", "%an", "%ae", "%aI", "%cI", "%s"].join("%x1f");
 
@@ -331,9 +331,7 @@ export const listLineages = (
     const claimed = new Set<string>();
     const initial = yield* listFirstParentChain(repoRoot);
     const queue: Array<{ chain: ChainEntry[]; endsAtMs: number }> =
-      initial.length > 0
-        ? [{ chain: initial, endsAtMs: Number.POSITIVE_INFINITY }]
-        : [];
+      initial.length > 0 ? [{ chain: initial, endsAtMs: Infinity }] : [];
 
     while (queue.length > 0) {
       const pending = queue.shift();
@@ -710,7 +708,7 @@ export const runScan = ({
 
       const written = new Set(
         yield* Effect.forEach(
-          [...outputs.entries()],
+          outputs.entries().toArray(),
           ([sha, output]) =>
             writeCollectorOutput({
               catalog,

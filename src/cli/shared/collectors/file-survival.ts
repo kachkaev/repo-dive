@@ -151,7 +151,7 @@ export const fileSurvivalCollector: Collector = {
         if (tabIndex === -1) {
           continue;
         }
-        const [, type] = line.slice(0, tabIndex).split(/\s+/);
+        const [, type] = line.slice(0, tabIndex).split(/\s+/, 2);
         const filePath = line.slice(tabIndex + 1);
         if (type === "blob" && isScannableSourceFile(filePath)) {
           files.push(filePath);
@@ -189,29 +189,24 @@ export const fileSurvivalCollector: Collector = {
         counts.set(key, (counts.get(key) ?? 0) + 1);
       }
 
-      const rows: FileSurvivalRow[] = [...counts.entries()].map(
-        ([key, fileCount]) => {
-          const [extension = "", authorEmail = "", cohortMonth = ""] =
-            key.split(fieldSeparator);
-          return { extension, authorEmail, cohortMonth, files: fileCount };
-        },
-      );
+      const rows: FileSurvivalRow[] = [...counts].map(([key, fileCount]) => {
+        const [extension = "", authorEmail = "", cohortMonth = ""] =
+          key.split(fieldSeparator);
+        return { extension, authorEmail, cohortMonth, files: fileCount };
+      });
 
       return { rows, totalFiles: files.length } satisfies FileSurvivalOutput;
     }),
   normalize: (raw) => {
-    const facts: Fact[] = [];
-    for (const row of arrayAt(raw, "rows")) {
-      facts.push({
-        metric: "survival.files",
-        value: numberAt(row, "files"),
-        categories: {
-          extension: stringAt(row, "extension"),
-          author: stringAt(row, "authorEmail"),
-          cohort: stringAt(row, "cohortMonth"),
-        },
-      });
-    }
+    const facts: Fact[] = Array.from(arrayAt(raw, "rows"), (row) => ({
+      metric: "survival.files",
+      value: numberAt(row, "files"),
+      categories: {
+        extension: stringAt(row, "extension"),
+        author: stringAt(row, "authorEmail"),
+        cohort: stringAt(row, "cohortMonth"),
+      },
+    }));
     return facts;
   },
 };

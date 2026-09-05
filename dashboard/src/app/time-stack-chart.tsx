@@ -300,7 +300,7 @@ function HoverTooltip({
   // `right`), so the gap to the line stays 10px whatever the card's true width.
   const cardWidth = supportsPercent ? 220 : 180;
   const crosshairX = margin.left + xScale(crosshairMs);
-  const fitsLeftOfLine = crosshairX - 10 - cardWidth >= 0;
+  const fitsLeftOfLine = crosshairX >= 10 + cardWidth;
   return (
     <div
       className="pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm"
@@ -573,12 +573,10 @@ export function TimeSeriesChart(props: {
   // urgent one for the legend (a click crosses the label out at once), the
   // deferred one for the marks and the hover card, which follow the stack.
   const legendHiddenLabels: ReadonlySet<string> = canToggle
-    ? new Set([...hiddenLabels].filter((label) => legendLabels.has(label)))
+    ? hiddenLabels.intersection(legendLabels)
     : new Set();
   const drawnHiddenLabels: ReadonlySet<string> = canToggle
-    ? new Set(
-        [...deferredHiddenLabels].filter((label) => legendLabels.has(label)),
-      )
+    ? deferredHiddenLabels.intersection(legendLabels)
     : new Set();
   // A legend label stands for one series key of the same name, unless the
   // tooltip groups say it collapses several (a contributor's year bands).
@@ -700,13 +698,11 @@ export function TimeSeriesChart(props: {
   }
   const yMax = yPeak || 1;
 
-  const yScale = showPercent
-    ? scaleLinear({ domain: [0, 1], range: [innerHeight, 0] })
-    : scaleLinear({
-        domain: [0, yMax * 1.05],
-        range: [innerHeight, 0],
-        nice: true,
-      });
+  const yScale = scaleLinear({
+    domain: showPercent ? [0, 1] : [0, yMax * 1.05],
+    range: [innerHeight, 0],
+    nice: !showPercent,
+  });
 
   // The topmost sub-series of every group but the last — where a crisp divider
   // is drawn between adjacent primary categories.
@@ -771,8 +767,8 @@ export function TimeSeriesChart(props: {
     // nearer. Coalesced outside the ternary test: the compiler bails on a
     // logical expression inside one ("Unexpected terminal kind `logical`").
     const previous = Math.max(0, low - 1);
-    const previousMs = rows[previous]?.["dateMs"] ?? Number.NEGATIVE_INFINITY;
-    const nextMs = rows[low]?.["dateMs"] ?? Number.POSITIVE_INFINITY;
+    const previousMs = rows[previous]?.["dateMs"] ?? -Infinity;
+    const nextMs = rows[low]?.["dateMs"] ?? Infinity;
     hoverIndex = hoverMs - previousMs <= nextMs - hoverMs ? previous : low;
   }
   const hovered = hoverIndex === undefined ? undefined : rows[hoverIndex];
