@@ -1,5 +1,24 @@
 # repo-dive
 
+## 0.16.0
+
+### Minor Changes
+
+- [#206](https://github.com/kachkaev/repo-dive/pull/206) [`791fbf1`](https://github.com/kachkaev/repo-dive/commit/791fbf17a9f20794a39506818f3891fa8398679f) - Let legend items hide and isolate series in the lines-of-code, dependency and loose-ends charts.
+  Click a legend item to take its series out of the stack (the item stays in place, crossed out) and click again to bring it back; alt/option-click an item to show only that series, or to show everything again when nothing else is showing.
+  The axes stay put and the hover card keeps reporting every series, so hiding a category that spiked lets the slopes of the others be read against the same scale.
+
+- [#169](https://github.com/kachkaev/repo-dive/pull/169) [`20cfa8a`](https://github.com/kachkaev/repo-dive/commit/20cfa8a958063ec7f40e97ac65b72c167d428463) - Add a "Number of files" chart under "Lines of code", mirroring its splits: by language, by contributor and all files, with age shading and percentage mode.
+  The two charts share one color scale, so a language or contributor keeps the same color in both.
+  The contributor split and age shading come from a new `file-survival` collector that attributes each living file to the commit that created it (renames followed, sampled monthly like `survival`); a file keeps its creator and creation cohort through later edits, until it is deleted.
+  The flat by-language variant is derived from file counts the `languages` collector already records, so existing catalogs show it after a plain `repo-dive index`; run `repo-dive scan` to collect the survival-based variants.
+  The new section accepts annotations under the `number-of-files` chart id.
+
+### Patch Changes
+
+- [#204](https://github.com/kachkaev/repo-dive/pull/204) [`fabc9fe`](https://github.com/kachkaev/repo-dive/commit/fabc9fe826164fdcf277906d9fff46c94401f188) - Fix the tooltip reading "No data" over the outer halves of a bar chart's first and last bars.
+  Bars are centred on their point, so those edge pixels fell just outside the data's own time span and were treated as a gap.
+
 ## 0.15.2
 
 ### Patch Changes
