@@ -261,13 +261,14 @@ export function Legend({
               delay={400}
               render={
                 // `select-none`: quick repeated clicks would otherwise select
-                // the label as a word. The ring is the only focus/hover
-                // feedback besides the text shift — no fill, so the row stays
-                // a caption.
+                // the label as a word. `group` lets the label preview the
+                // click on hover (below); besides that and the text shift the
+                // ring is the only feedback — no fill, so the row stays a
+                // caption.
                 <button
                   type="button"
                   aria-pressed={!hidden}
-                  className="mx-2 my-0.5 inline-flex items-center gap-1.5 rounded-xs outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="group mx-2 my-0.5 inline-flex items-center gap-1.5 rounded-xs outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   onClick={() => {
                     toggles.onToggle(item.label);
                   }}
@@ -275,7 +276,17 @@ export function Legend({
               }
             >
               {swatch}
-              <span className={hidden ? "line-through opacity-60" : undefined}>
+              {/* Hovering previews the click: a visible label shows a faint
+                  strike-through (the line it will get), a hidden one lets its
+                  strike-through fade and the text brighten (what showing it
+                  restores). */}
+              <span
+                className={
+                  hidden
+                    ? "line-through opacity-60 group-hover:opacity-80 group-hover:decoration-muted-foreground/40"
+                    : "group-hover:line-through group-hover:decoration-muted-foreground/40"
+                }
+              >
                 {item.label}
               </span>
             </TooltipTrigger>
