@@ -1,5 +1,12 @@
 # repo-dive
 
+## 0.16.1
+
+### Patch Changes
+
+- [#220](https://github.com/kachkaev/repo-dive/pull/220) [`db4215e`](https://github.com/kachkaev/repo-dive/commit/db4215e5935b828b75729920051942ee161fc6bc) - Fix hover card lag on dense charts.
+  The crosshair and hover card of the time-series charts now sit on their own compositor layers, so moving the cursor over a chart with thousands of data points (e.g. lines of code by language in a repo with many commits) no longer redraws every stacked area on each mouse move.
+
 ## 0.16.0
 
 ### Minor Changes
