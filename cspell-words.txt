@@ -67,6 +67,7 @@ oxc
 Picci
 Pijul
 pnp
+rasterizes
 Rebuildability
 rebuildable
 repodive

@@ -217,12 +217,21 @@ function ChartMarks({
 }
 
 /**
- * The dashed cursor line. Split out (like {@link HoverTooltip}) so the parent
- * body never calls `xScale(crosshairMs)`: React Compiler cannot know a d3
- * scale function is pure, so a call with a hover-reactive argument would
- * extend the scale's mutable range into the hover scope, fusing every derived
- * value — including ChartMarks' props — into one memo block that recomputes on
- * each mouse move. Inside a child, the call runs on a frozen prop instead.
+ * The dashed cursor line. Drawn as its own 1px-wide overlay next to the main
+ * `<svg>` rather than as a `<line>` inside it, and moved with a transform on
+ * its own compositor layer (`will-change-transform`): a line inside the chart
+ * would invalidate the layer holding the stacked paths, and the browser then
+ * re-rasterizes every path under the damaged tiles on each mouse move — with a
+ * dense per-commit series that is megabytes of path data, and the card lags
+ * behind the cursor although React itself re-renders almost nothing. On a
+ * separate layer the move is compositor-only and the marks stay cached.
+ *
+ * Also split out (like {@link HoverTooltip}) so the parent body never calls
+ * `xScale(crosshairMs)`: React Compiler cannot know a d3 scale function is
+ * pure, so a call with a hover-reactive argument would extend the scale's
+ * mutable range into the hover scope, fusing every derived value — including
+ * ChartMarks' props — into one memo block that recomputes on each mouse move.
+ * Inside a child, the call runs on a frozen prop instead.
  */
 function CrosshairLine({
   xScale,
@@ -233,17 +242,27 @@ function CrosshairLine({
   crosshairMs: number;
   innerHeight: number;
 }) {
+  // Snapped to whole pixels: a fractional translate would smear the 1px dashes
+  // across two columns, and half a pixel is well below what a cursor resolves.
+  const x = margin.left + Math.round(xScale(crosshairMs));
   return (
-    <line
-      x1={xScale(crosshairMs)}
-      x2={xScale(crosshairMs)}
-      y1={0}
-      y2={innerHeight}
-      stroke="var(--text-muted)"
-      strokeWidth={1}
-      strokeDasharray="3,3"
-      pointerEvents="none"
-    />
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none absolute will-change-transform"
+      style={{ left: 0, top: margin.top, transform: `translateX(${x}px)` }}
+      width={1}
+      height={innerHeight}
+    >
+      <line
+        x1={0.5}
+        x2={0.5}
+        y1={0}
+        y2={innerHeight}
+        stroke="var(--text-muted)"
+        strokeWidth={1}
+        strokeDasharray="3,3"
+      />
+    </svg>
   );
 }
 
@@ -251,7 +270,9 @@ function CrosshairLine({
  * The floating value card next to the cursor. Hover-reactive by nature — it
  * re-renders on every mouse move, which is cheap; what matters is that its
  * work (positioning via `xScale`, per-series rows) happens here and not in the
- * parent body (see {@link CrosshairLine} for why).
+ * parent body (see {@link CrosshairLine} for why). Like the crosshair it lives
+ * on its own compositor layer (`will-change-transform`), so repainting the
+ * card as it moves over the marks never re-rasterizes the paths beneath it.
  */
 function HoverTooltip({
   crosshairMs,
@@ -303,7 +324,7 @@ function HoverTooltip({
   const fitsLeftOfLine = crosshairX >= 10 + cardWidth;
   return (
     <div
-      className="pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm"
+      className="pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm will-change-transform"
       style={
         fitsLeftOfLine
           ? { right: width - crosshairX + 10 }
@@ -825,13 +846,6 @@ export function TimeSeriesChart(props: {
               barWidth={barWidth}
               hatchUrlOf={hatchUrlOf}
             />
-            {crosshairMs !== undefined && (
-              <CrosshairLine
-                xScale={xScale}
-                crosshairMs={crosshairMs}
-                innerHeight={innerHeight}
-              />
-            )}
             <AxisLeft
               scale={yScale}
               // Every series here counts something whole, and formatCount
@@ -876,6 +890,14 @@ export function TimeSeriesChart(props: {
             />
           </Group>
         </svg>
+        {/* Over the chart, under the card — both outside the <svg>, see CrosshairLine. */}
+        {crosshairMs !== undefined && (
+          <CrosshairLine
+            xScale={xScale}
+            crosshairMs={crosshairMs}
+            innerHeight={innerHeight}
+          />
+        )}
         {crosshairMs !== undefined && (
           <HoverTooltip
             crosshairMs={crosshairMs}
