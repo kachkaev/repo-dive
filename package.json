@@ -79,7 +79,7 @@
   },
   "prettier": "@kachkaev/prettier-config",
   "devDependencies": {
-    "@babel/core": "8.0.1",
+    "@babel/core": "8.0.5",
     "@base-ui/react": "1.8.0",
     "@changesets/changelog-github": "1.0.1",
     "@changesets/cli": "3.0.2",
