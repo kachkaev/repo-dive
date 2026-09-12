@@ -89,7 +89,7 @@
     "@kachkaev/eslint-config-base": "2.0.0",
     "@kachkaev/markdownlint-config": "1.0.1",
     "@kachkaev/prettier-config": "2.2.1",
-    "@rolldown/plugin-babel": "0.2.3",
+    "@rolldown/plugin-babel": "0.2.4",
     "@tailwindcss/vite": "4.3.3",
     "@tsconfig/node-ts": "23.6.4",
     "@tsconfig/strictest": "2.0.8",
