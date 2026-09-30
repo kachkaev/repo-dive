@@ -1,6 +1,16 @@
 allowBuilds:
   esbuild: true # Required by Vite to install the platform-specific esbuild binary used during bundling.
   msgpackr-extract: true # Required by effect -> msgpackr on pnpm 11+, including CI installs.
+# Collapse compatible duplicate versions whenever pnpm writes the lockfile, so every install keeps it
+# as lean as `pnpm dedupe` would. This replaces the `pnpm dedupe --check` CI step: the two algorithms
+# can break ties differently, so the check could fail a lockfile a plain `pnpm install` just wrote.
+autoDedupe: true
+# TEMPORARY, see https://github.com/kachkaev/reusable-stuff/issues/347: @kachkaev/eslint-config-base v2
+# installs eslint-plugin-import from a git snapshot because the plugin has no ESLint 10-compatible
+# release on npm yet, and pnpm blocks git-hosted transitive dependencies by default. While this is
+# off, review lockfile diffs in dependency PRs for unexpected codeload.github.com tarballs. Remove
+# once the config is back on npm releases (tracked in the issue above).
+blockExoticSubdeps: false
 # Wait 8 hours after a version is published before installing it, so a compromised release has time to
 # be spotted and unpublished; pnpm's own default of 1 day delays every update more than we'd like. Keep
 # in sync with the `minimumReleaseAge` floor in the shared Renovate preset
@@ -12,9 +22,5 @@ minimumReleaseAge: 480
 minimumReleaseAgeExclude:
   - "@kachkaev/*"
 nodeLinker: isolated
-# TEMPORARY, see https://github.com/kachkaev/reusable-stuff/issues/347: @kachkaev/eslint-config-base v2
-# installs eslint-plugin-import from a git snapshot because the plugin has no ESLint 10-compatible
-# release on npm yet, and pnpm blocks git-hosted transitive dependencies by default. While this is
-# off, review lockfile diffs in dependency PRs for unexpected codeload.github.com tarballs. Remove
-# once the config is back on npm releases (tracked in the issue above).
-blockExoticSubdeps: false
+# Have `pnpm add` also add the matching `@types/*` package to devDependencies, when one exists
+saveTypes: true
