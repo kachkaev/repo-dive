@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { ChildProcessSpawner } from "effect/unstable/process";
+import type { ChildProcessSpawner } from "effect/process";
 
 import { type CommandError, runGit } from "../git.ts";
 

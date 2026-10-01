@@ -3,7 +3,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { Console, Effect, Schema } from "effect";
-import type { ChildProcessSpawner } from "effect/unstable/process";
+import type { ChildProcessSpawner } from "effect/process";
 
 import { loadConfig } from "./config.ts";
 import { resolveRepoRoot } from "./scan.ts";

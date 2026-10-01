@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { type Cause, Effect } from "effect";
-import type { ChildProcessSpawner } from "effect/unstable/process";
+import type { ChildProcessSpawner } from "effect/process";
 
 import { type CommandError, runGit } from "../git.ts";
 

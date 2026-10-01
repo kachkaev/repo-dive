@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { ChildProcessSpawner } from "effect/unstable/process";
+import type { ChildProcessSpawner } from "effect/process";
 
 import { getBlobCache } from "../../blob-cache.ts";
 import { runCommandBytes, runGit } from "../../git.ts";

@@ -1,20 +1,20 @@
-import { Command, Flag } from "effect/unstable/cli";
+import { Command, Flag } from "effect/cli";
 
 import { defaultDashboardPort } from "./shared/config.ts";
 import { runDashboard } from "./shared/dashboard-server.ts";
 
 export const dashboardCommand = Command.make("dashboard", {
-  repoPath: Flag.string("repo").pipe(
+  repoPath: Flag.String("repo").pipe(
     Flag.withDefault("."),
     Flag.withDescription(
       "Path to the git repository whose insights to show (defaults to the current directory)",
     ),
   ),
-  port: Flag.integer("port").pipe(
+  port: Flag.Int("port").pipe(
     Flag.withDefault(defaultDashboardPort),
     Flag.withDescription("Port to serve the dashboard on"),
   ),
-  open: Flag.boolean("open").pipe(
+  open: Flag.Boolean("open").pipe(
     Flag.withDefault(false),
     Flag.withDescription("Open the dashboard in the default browser"),
   ),

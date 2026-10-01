@@ -1,9 +1,9 @@
-import { Command, Flag } from "effect/unstable/cli";
+import { Command, Flag } from "effect/cli";
 
 import { runStatus } from "./status-command/run-status.ts";
 
 export const statusCommand = Command.make("status", {
-  repoPath: Flag.string("repo").pipe(
+  repoPath: Flag.String("repo").pipe(
     Flag.withDefault("."),
     Flag.withDescription(
       "Path to the git repository to inspect (defaults to the current directory)",

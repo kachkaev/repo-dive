@@ -1,9 +1,9 @@
-import { Command, Flag } from "effect/unstable/cli";
+import { Command, Flag } from "effect/cli";
 
 import { runIndex } from "./shared/indexing.ts";
 
 export const indexCommand = Command.make("index", {
-  repoPath: Flag.string("repo").pipe(
+  repoPath: Flag.String("repo").pipe(
     Flag.withDefault("."),
     Flag.withDescription(
       "Path to the git repository whose catalog to index (defaults to the current directory)",

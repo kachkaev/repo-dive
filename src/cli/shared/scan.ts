@@ -7,7 +7,7 @@ import {
   type PlatformError,
   Ref,
 } from "effect";
-import type { ChildProcessSpawner } from "effect/unstable/process";
+import type { ChildProcessSpawner } from "effect/process";
 
 import {
   type Catalog,

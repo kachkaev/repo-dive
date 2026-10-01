@@ -1,6 +1,6 @@
 ---
 name: editing-effect-code
-description: 'Effect v4 (beta) conventions for this repo''s CLI code: tagged errors with typed channels, layers provided only at the entrypoint, Result for fallible sync parsers, no shared mutation under concurrency, Clock/DateTime for time, it.effect tests. Use when writing or reviewing any code that imports from "effect".'
+description: 'Effect v4 conventions for this repo''s CLI code: tagged errors with typed channels, layers provided only at the entrypoint, Result for fallible sync parsers, no shared mutation under concurrency, Clock/DateTime for time, it.effect tests. Use when writing or reviewing any code that imports from "effect".'
 license: MIT
 metadata:
   author: kachkaev
@@ -9,14 +9,15 @@ metadata:
 
 # Editing Effect code
 
-This repo pins `effect@4.0.0-rc.x` — a v4 **release candidate**, while most online docs and LLM training data describe v3.
+This repo is on Effect v4, while most online docs and LLM training data describe v3 — or the v4 betas, whose names kept changing until the stable release.
 When unsure whether an API exists or what it is called, check the installed package (`node_modules/effect/dist/*.d.ts`) or a clone of [Effect-TS/effect](https://github.com/Effect-TS/effect) at the pinned version — not memory.
-Notable v4 renames: `Effect.catch` (was `catchAll`), `Result` (replaces `Either`), `Schema.TaggedErrorClass` (was `Schema.TaggedError`), `Effect.callback` (was `Effect.async`).
+Notable v4 renames: `Effect.catch` (was `catchAll`), `Result` (replaces `Either`), `Effect.callback` (was `Effect.async`).
+Late betas and release candidates also used names that 4.0 dropped: import from `effect/cli`, `effect/process` and `effect/ai` (not `effect/unstable/*`), and use PascalCase CLI constructors such as `Flag.String`, `Flag.Boolean`, `Flag.Int` and `Prompt.Confirm`.
 
 ## Errors
 
 Define errors as `Data.TaggedError` classes with fields, computing the human message in a getter.
-Use `Schema.TaggedErrorClass` instead when the error crosses a serialization boundary (e.g. MCP tool `failure` schemas — see [`query.ts`](../../../src/cli/shared/query.ts)):
+Use `Schema.TaggedError` instead when the error crosses a serialization boundary (e.g. MCP tool `failure` schemas — see [`query.ts`](../../../src/cli/shared/query.ts)):
 
 ```ts
 class GitCommandError extends Data.TaggedError("GitCommandError")<{
@@ -107,11 +108,11 @@ No `Date.now()` or `new Date()` inside effects:
 ## Flags
 
 The v4 parser negates boolean flags automatically (`--no-x`).
-Since rc.110, an omitted boolean flag is a parse error ("Missing required flag") rather than `false`, so every `Flag.boolean` needs `Flag.withDefault(false)` — or `Flag.withDefault(true)` for a default-true flag, which now works (`--no-x` still parses to `false`):
+An omitted boolean flag is a parse error ("Missing required flag") rather than `false`, so every `Flag.Boolean` needs `Flag.withDefault(false)` — or `Flag.withDefault(true)` for a default-true flag, which now works (`--no-x` still parses to `false`):
 
 ```ts
-force: Flag.boolean("force").pipe(Flag.withDefault(false), ...),
-open: Flag.boolean("open").pipe(Flag.withDefault(true), ...),
+force: Flag.Boolean("force").pipe(Flag.withDefault(false), ...),
+open: Flag.Boolean("open").pipe(Flag.withDefault(true), ...),
 ```
 
 Never name a flag `no-something`.

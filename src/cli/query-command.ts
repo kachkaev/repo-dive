@@ -1,19 +1,19 @@
-import { Argument, Command, Flag } from "effect/unstable/cli";
+import { Argument, Command, Flag } from "effect/cli";
 
 import { runQuery } from "./shared/query.ts";
 
 export const queryCommand = Command.make("query", {
-  repoPath: Flag.string("repo").pipe(
+  repoPath: Flag.String("repo").pipe(
     Flag.withDefault("."),
     Flag.withDescription(
       "Path to the git repository whose metrics cube to query (defaults to the current directory)",
     ),
   ),
-  json: Flag.boolean("json").pipe(
+  json: Flag.Boolean("json").pipe(
     Flag.withDefault(false),
     Flag.withDescription("Print rows as JSON instead of a table"),
   ),
-  sql: Argument.string("sql").pipe(
+  sql: Argument.String("sql").pipe(
     Argument.withDescription(
       'A read-only SQL statement, e.g. "SELECT metric, sum(value) FROM facts GROUP BY metric"',
     ),

@@ -1,5 +1,5 @@
 import type { Effect } from "effect";
-import type { ChildProcessSpawner } from "effect/unstable/process";
+import type { ChildProcessSpawner } from "effect/process";
 
 import type { ResolvedConfig } from "../../config.ts";
 import { sourceExtensions } from "../../languages.ts";

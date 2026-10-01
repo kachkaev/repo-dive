@@ -190,7 +190,7 @@ The same stdio server works with any MCP client — point yours at `npx repo-div
 
 ## Development
 
-The project is written in TypeScript with [Effect](https://effect.website) v4 (beta) and its built-in CLI toolkit (`effect/unstable/cli`).
+The project is written in TypeScript with [Effect](https://effect.website) v4 and its built-in CLI toolkit (`effect/cli`).
 
 ```sh
 pnpm install
