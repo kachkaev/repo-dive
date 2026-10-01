@@ -715,150 +715,149 @@ const writeSqlite = (
   }
 };
 
-export const runIndex = ({
+export const runIndex = Effect.fn("runIndex")(function* ({
   repoPath,
 }: {
   readonly repoPath: string;
-}): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function* () {
-    const repoRoot = yield* resolveRepoRoot(repoPath);
-    const config = yield* loadConfig(repoRoot);
-    const catalogPath = config.catalogPath;
-    const commitsPath = path.join(catalogPath, "commits");
-    const registry = new Map(
-      builtInCollectors.map((collector) => [collector.name, collector]),
-    );
+}): Effect.fn.Return<void, Error, ChildProcessSpawner.ChildProcessSpawner> {
+  const repoRoot = yield* resolveRepoRoot(repoPath);
+  const config = yield* loadConfig(repoRoot);
+  const catalogPath = config.catalogPath;
+  const commitsPath = path.join(catalogPath, "commits");
+  const registry = new Map(
+    builtInCollectors.map((collector) => [collector.name, collector]),
+  );
 
-    const gitCommits = yield* listCommits(repoRoot);
-    const lineages = yield* listLineages(repoRoot);
-    /** sha → its lineage's index and contribution window end. */
-    const lineageBySha = new Map<string, { index: number; endsAtMs: number }>();
-    for (const [index, lineage] of lineages.entries()) {
-      for (const sha of lineage.shas) {
-        lineageBySha.set(sha, { index, endsAtMs: lineage.endsAtMs });
+  const gitCommits = yield* listCommits(repoRoot);
+  const lineages = yield* listLineages(repoRoot);
+  /** sha → its lineage's index and contribution window end. */
+  const lineageBySha = new Map<string, { index: number; endsAtMs: number }>();
+  for (const [index, lineage] of lineages.entries()) {
+    for (const sha of lineage.shas) {
+      lineageBySha.set(sha, { index, endsAtMs: lineage.endsAtMs });
+    }
+  }
+  const remoteUrl = yield* readRemoteUrl(repoRoot);
+  const catalogShas = new Set(
+    yield* Effect.tryPromise(async () => {
+      try {
+        return await readdir(commitsPath);
+      } catch {
+        return [];
       }
-    }
-    const remoteUrl = yield* readRemoteUrl(repoRoot);
-    const catalogShas = new Set(
-      yield* Effect.tryPromise(async () => {
-        try {
-          return await readdir(commitsPath);
-        } catch {
-          return [];
-        }
-      }),
+    }),
+  );
+
+  // Oldest first so every derived series is naturally chronological, ordered
+  // by the very committer date snapshots are plotted against: `git log` order
+  // almost always agrees, but a skewed clock can put it out of step, and a
+  // timeline whose x coordinate moves backwards draws as a zigzag rather than
+  // a curve. Reversed before sorting, so commits sharing a committer date (a
+  // rebased batch lands with one) keep git's parent-before-child order.
+  const orderedCommits = gitCommits
+    .toReversed()
+    .filter((commit) => catalogShas.has(commit.hash))
+    .toSorted(
+      (left, right) =>
+        Date.parse(left.committerDate) - Date.parse(right.committerDate),
     );
 
-    // Oldest first so every derived series is naturally chronological, ordered
-    // by the very committer date snapshots are plotted against: `git log` order
-    // almost always agrees, but a skewed clock can put it out of step, and a
-    // timeline whose x coordinate moves backwards draws as a zigzag rather than
-    // a curve. Reversed before sorting, so commits sharing a committer date (a
-    // rebased batch lands with one) keep git's parent-before-child order.
-    const orderedCommits = gitCommits
-      .toReversed()
-      .filter((commit) => catalogShas.has(commit.hash))
-      .toSorted(
-        (left, right) =>
-          Date.parse(left.committerDate) - Date.parse(right.committerDate),
-      );
+  if (orderedCommits.length === 0) {
+    return yield* new NoCollectedCommitsError({ commitsPath });
+  }
 
-    if (orderedCommits.length === 0) {
-      return yield* new NoCollectedCommitsError({ commitsPath });
-    }
-
-    // Concurrent reads still land in input (chronological) order — forEach
-    // preserves element order in the collected results.
-    const readOutcomes = yield* Effect.forEach(
-      orderedCommits,
-      (commit) =>
-        Effect.tryPromise(async () => {
-          const commitDir = path.join(commitsPath, commit.hash);
-          const onMainline = lineageBySha.has(commit.hash);
-          const factsByCollector = new Map<string, readonly Fact[]>();
-          let unknownCollectorDirs = 0;
-          let offMainlineSnapshots = 0;
-          for (const collectorName of await readdir(commitDir)) {
-            const collector = registry.get(collectorName);
-            if (!collector) {
-              unknownCollectorDirs += 1;
-              continue;
-            }
-            // Snapshots taken off the mainline (by an older version of this
-            // tool, or before a rebase moved the commit aside) would show up
-            // as cliffs in every timeline. Leave them in the catalog but out
-            // of the cube.
-            if (!onMainline && describesTreeState(collector)) {
-              offMainlineSnapshots += 1;
-              continue;
-            }
-            const raw: unknown = JSON.parse(
-              await readFile(
-                path.join(commitDir, collectorName, "output.json"),
-                "utf8",
-              ),
-            );
-            factsByCollector.set(collectorName, collector.normalize(raw));
+  // Concurrent reads still land in input (chronological) order — forEach
+  // preserves element order in the collected results.
+  const readOutcomes = yield* Effect.forEach(
+    orderedCommits,
+    (commit) =>
+      Effect.tryPromise(async () => {
+        const commitDir = path.join(commitsPath, commit.hash);
+        const onMainline = lineageBySha.has(commit.hash);
+        const factsByCollector = new Map<string, readonly Fact[]>();
+        let unknownCollectorDirs = 0;
+        let offMainlineSnapshots = 0;
+        for (const collectorName of await readdir(commitDir)) {
+          const collector = registry.get(collectorName);
+          if (!collector) {
+            unknownCollectorDirs += 1;
+            continue;
           }
-          const facts: CommitFacts = {
-            sha: commit.hash,
-            authoredAt: commit.authorDate,
-            committedAt: commit.committerDate,
-            authorEmail: commit.authorEmail,
-            authorName: commit.authorName,
-            factsByCollector,
-          };
-          return { facts, unknownCollectorDirs, offMainlineSnapshots };
-        }),
-      { concurrency: 16 },
-    );
+          // Snapshots taken off the mainline (by an older version of this
+          // tool, or before a rebase moved the commit aside) would show up
+          // as cliffs in every timeline. Leave them in the catalog but out
+          // of the cube.
+          if (!onMainline && describesTreeState(collector)) {
+            offMainlineSnapshots += 1;
+            continue;
+          }
+          const raw: unknown = JSON.parse(
+            await readFile(
+              path.join(commitDir, collectorName, "output.json"),
+              "utf8",
+            ),
+          );
+          factsByCollector.set(collectorName, collector.normalize(raw));
+        }
+        const facts: CommitFacts = {
+          sha: commit.hash,
+          authoredAt: commit.authorDate,
+          committedAt: commit.committerDate,
+          authorEmail: commit.authorEmail,
+          authorName: commit.authorName,
+          factsByCollector,
+        };
+        return { facts, unknownCollectorDirs, offMainlineSnapshots };
+      }),
+    { concurrency: 16 },
+  );
 
-    const commitFacts = readOutcomes.map((outcome) => outcome.facts);
-    const unknownCollectorDirs = readOutcomes.reduce(
-      (total, outcome) => total + outcome.unknownCollectorDirs,
-      0,
-    );
-    const offMainlineSnapshots = readOutcomes.reduce(
-      (total, outcome) => total + outcome.offMainlineSnapshots,
-      0,
-    );
+  const commitFacts = readOutcomes.map((outcome) => outcome.facts);
+  const unknownCollectorDirs = readOutcomes.reduce(
+    (total, outcome) => total + outcome.unknownCollectorDirs,
+    0,
+  );
+  const offMainlineSnapshots = readOutcomes.reduce(
+    (total, outcome) => total + outcome.offMainlineSnapshots,
+    0,
+  );
 
-    const indexDir = path.join(catalogPath, "index");
-    yield* Effect.tryPromise(() => mkdir(indexDir, { recursive: true }));
+  const indexDir = path.join(catalogPath, "index");
+  yield* Effect.tryPromise(() => mkdir(indexDir, { recursive: true }));
 
-    const dbPath = path.join(indexDir, "metrics.sqlite");
-    yield* Effect.tryPromise(() => rm(dbPath, { force: true }));
-    const factCount = yield* Effect.try(() => writeSqlite(dbPath, commitFacts));
+  const dbPath = path.join(indexDir, "metrics.sqlite");
+  yield* Effect.tryPromise(() => rm(dbPath, { force: true }));
+  const factCount = yield* Effect.try(() => writeSqlite(dbPath, commitFacts));
 
-    const dashboardData = buildDashboardData(
-      repoRoot,
-      commitFacts,
-      config,
-      remoteUrl,
-      (sha) => lineageBySha.get(sha),
-    );
-    const dashboardPath = path.join(indexDir, "dashboard.json");
-    yield* Effect.tryPromise(() =>
-      writeFile(dashboardPath, JSON.stringify(dashboardData), "utf8"),
-    );
+  const dashboardData = buildDashboardData(
+    repoRoot,
+    commitFacts,
+    config,
+    remoteUrl,
+    (sha) => lineageBySha.get(sha),
+  );
+  const dashboardPath = path.join(indexDir, "dashboard.json");
+  yield* Effect.tryPromise(() =>
+    writeFile(dashboardPath, JSON.stringify(dashboardData), "utf8"),
+  );
 
-    yield* Console.log(
-      [
-        `Indexed ${commitFacts.length} commits into ${factCount} facts.`,
-        `Cube: ${dbPath}`,
-        `Dashboard data: ${dashboardPath}`,
-        ...(unknownCollectorDirs > 0
-          ? [
-              `Skipped ${unknownCollectorDirs} outputs from unknown collectors (see \`gc --stale\`).`,
-            ]
-          : []),
-        ...(offMainlineSnapshots > 0
-          ? [
-              `Skipped ${offMainlineSnapshots} tree snapshots taken off the lineages.`,
-            ]
-          : []),
-      ].join("\n"),
-    );
+  yield* Console.log(
+    [
+      `Indexed ${commitFacts.length} commits into ${factCount} facts.`,
+      `Cube: ${dbPath}`,
+      `Dashboard data: ${dashboardPath}`,
+      ...(unknownCollectorDirs > 0
+        ? [
+            `Skipped ${unknownCollectorDirs} outputs from unknown collectors (see \`gc --stale\`).`,
+          ]
+        : []),
+      ...(offMainlineSnapshots > 0
+        ? [
+            `Skipped ${offMainlineSnapshots} tree snapshots taken off the lineages.`,
+          ]
+        : []),
+    ].join("\n"),
+  );
 
-    yield* warnAboutIgnoreFiles({ repoRoot, config });
-  });
+  yield* warnAboutIgnoreFiles({ repoRoot, config });
+});

@@ -108,7 +108,7 @@ const parsedMemoCapacity = 10_000;
  * files by path (lockfiles/manifests, not the whole source tree) and hands the
  * file path to `scanContent`.
  */
-export const scanTreeFilesWithBlobCache = ({
+export const scanTreeFilesWithBlobCache = Effect.fnUntraced(function* ({
   repoRoot,
   catalogPath,
   sha,
@@ -126,72 +126,71 @@ export const scanTreeFilesWithBlobCache = ({
   readonly include: (filePath: string) => boolean;
   /** Pure per-file scan; its JSON-encoded result is what gets cached. */
   readonly scanContent: (content: string, filePath: string) => unknown;
-}): Effect.Effect<
+}): Effect.fn.Return<
   Array<{ filePath: string; result: unknown }>,
   Error,
   ChildProcessSpawner.ChildProcessSpawner
-> =>
-  Effect.gen(function* () {
-    const blobs = yield* listBlobs(repoRoot, sha, include);
-    const cache = getBlobCache(catalogPath);
+> {
+  const blobs = yield* listBlobs(repoRoot, sha, include);
+  const cache = getBlobCache(catalogPath);
 
-    const memoKey = (blobSha: string) =>
-      `${collectorName}:${cacheKey}:${blobSha}`;
-    if (parsedMemo.size > parsedMemoCapacity) {
-      parsedMemo.clear();
-    }
+  const memoKey = (blobSha: string) =>
+    `${collectorName}:${cacheKey}:${blobSha}`;
+  if (parsedMemo.size > parsedMemoCapacity) {
+    parsedMemo.clear();
+  }
 
-    const unseenShas = [
-      ...new Set(
-        blobs
-          .map((blob) => blob.blobSha)
-          .filter((blobSha) => !parsedMemo.has(memoKey(blobSha))),
-      ),
-    ];
+  const unseenShas = [
+    ...new Set(
+      blobs
+        .map((blob) => blob.blobSha)
+        .filter((blobSha) => !parsedMemo.has(memoKey(blobSha))),
+    ),
+  ];
 
-    // Second level: the on-disk cache survives across runs.
-    const cachedRaw = cache.getMany(collectorName, cacheKey, unseenShas);
-    for (const [blobSha, raw] of cachedRaw) {
-      const parsed: unknown = JSON.parse(raw);
-      parsedMemo.set(memoKey(blobSha), parsed);
-    }
+  // Second level: the on-disk cache survives across runs.
+  const cachedRaw = cache.getMany(collectorName, cacheKey, unseenShas);
+  for (const [blobSha, raw] of cachedRaw) {
+    const parsed: unknown = JSON.parse(raw);
+    parsedMemo.set(memoKey(blobSha), parsed);
+  }
 
-    // Third level: read and scan blobs nobody has ever seen. A blob's parse
-    // depends only on its content, so the first path it appears under wins.
-    const missing = unseenShas.filter((blobSha) => !cachedRaw.has(blobSha));
-    if (missing.length > 0) {
-      const firstPathOf = new Map<string, string>();
-      for (const blob of blobs) {
-        if (!firstPathOf.has(blob.blobSha)) {
-          firstPathOf.set(blob.blobSha, blob.filePath);
-        }
-      }
-      const contents = yield* fetchBlobContents(repoRoot, missing);
-      const fresh = new Map<string, string>();
-      for (const [blobSha, content] of contents) {
-        const result = scanContent(content, firstPathOf.get(blobSha) ?? "");
-        // `scanContent` returns undefined for a matched file it can't make sense
-        // of (e.g. a package.json that isn't a JSON object). JSON.stringify of
-        // undefined is undefined, which cannot be persisted — and would fail the
-        // whole batch write — so store "null": the miss stays cached (not
-        // re-scanned every run) and reads back as a skip downstream.
-        fresh.set(
-          blobSha,
-          result === undefined ? "null" : JSON.stringify(result),
-        );
-        parsedMemo.set(memoKey(blobSha), result);
-      }
-      cache.setMany(collectorName, cacheKey, fresh);
-    }
-
-    const results: Array<{ filePath: string; result: unknown }> = [];
+  // Third level: read and scan blobs nobody has ever seen. A blob's parse
+  // depends only on its content, so the first path it appears under wins.
+  const missing = unseenShas.filter((blobSha) => !cachedRaw.has(blobSha));
+  if (missing.length > 0) {
+    const firstPathOf = new Map<string, string>();
     for (const blob of blobs) {
-      if (parsedMemo.has(memoKey(blob.blobSha))) {
-        results.push({
-          filePath: blob.filePath,
-          result: parsedMemo.get(memoKey(blob.blobSha)),
-        });
+      if (!firstPathOf.has(blob.blobSha)) {
+        firstPathOf.set(blob.blobSha, blob.filePath);
       }
     }
-    return results;
-  });
+    const contents = yield* fetchBlobContents(repoRoot, missing);
+    const fresh = new Map<string, string>();
+    for (const [blobSha, content] of contents) {
+      const result = scanContent(content, firstPathOf.get(blobSha) ?? "");
+      // `scanContent` returns undefined for a matched file it can't make sense
+      // of (e.g. a package.json that isn't a JSON object). JSON.stringify of
+      // undefined is undefined, which cannot be persisted — and would fail the
+      // whole batch write — so store "null": the miss stays cached (not
+      // re-scanned every run) and reads back as a skip downstream.
+      fresh.set(
+        blobSha,
+        result === undefined ? "null" : JSON.stringify(result),
+      );
+      parsedMemo.set(memoKey(blobSha), result);
+    }
+    cache.setMany(collectorName, cacheKey, fresh);
+  }
+
+  const results: Array<{ filePath: string; result: unknown }> = [];
+  for (const blob of blobs) {
+    if (parsedMemo.has(memoKey(blob.blobSha))) {
+      results.push({
+        filePath: blob.filePath,
+        result: parsedMemo.get(memoKey(blob.blobSha)),
+      });
+    }
+  }
+  return results;
+});

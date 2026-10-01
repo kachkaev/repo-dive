@@ -1,3 +1,5 @@
+import { Predicate } from "effect";
+
 /**
  * Direct dependency counts read straight from a `package.json` manifest — the
  * single source of truth for what a project *declares* (as opposed to the
@@ -12,11 +14,8 @@ export type ManifestSummary = {
   };
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 const countKeys = (value: unknown): number =>
-  isRecord(value) ? Object.keys(value).length : 0;
+  Predicate.isObject(value) ? Object.keys(value).length : 0;
 
 /**
  * Reads the `dependencies`, `devDependencies` and `optionalDependencies` blocks
@@ -33,7 +32,7 @@ export const parsePackageManifest = (
   } catch {
     return undefined;
   }
-  if (!isRecord(root)) {
+  if (!Predicate.isObject(root)) {
     return undefined;
   }
   return {

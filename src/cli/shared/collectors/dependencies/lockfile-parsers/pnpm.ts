@@ -1,6 +1,7 @@
+import { Predicate } from "effect";
 import { parseAllDocuments } from "yaml";
 
-import { countKeys, isRecord } from "./shared/helpers.ts";
+import { countKeys } from "./shared/helpers.ts";
 import type { LockfileParser, LockfileSummary } from "./shared/types.ts";
 
 const standardGroups = [
@@ -38,12 +39,12 @@ export const parsePnpmLockfile = (
     } catch {
       continue;
     }
-    if (!isRecord(root)) {
+    if (!Predicate.isObject(root)) {
       continue;
     }
 
-    const importerEntries = isRecord(root["importers"])
-      ? Object.values(root["importers"]).filter(isRecord)
+    const importerEntries = Predicate.isObject(root["importers"])
+      ? Object.values(root["importers"]).filter(Predicate.isObject)
       : [];
     const projectImporters = importerEntries.filter((importer) =>
       standardGroups.some((group) => Object.hasOwn(importer, group)),

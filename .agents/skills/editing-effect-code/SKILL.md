@@ -26,8 +26,7 @@ For what the package does not ship (`MIGRATION.md`, `packages/effect/SCHEMA.md`,
 Effect's [LLM guide](https://effect.website/blog/the-one-weird-git-trick-that-makes-coding-agents-more-effect-ive) vendors that repository with `git subtree`; this repo doesn't, because the installed package is pinned to our version while a subtree tracks `main`.
 
 Follow `AGENTS.md` unless this skill says otherwise.
-Much of the existing code predates it — notably 30-odd `(…) => Effect.gen(…)` wrappers and local `isRecord` helpers.
-Write new and rewritten code the guide's way (`Effect.fn` / `Effect.fnUntraced`, `Predicate.isObject`), and leave untouched code to dedicated migration PRs rather than churning it in unrelated changes.
+Write functions that return an effect with `Effect.fn("name")` where a span helps (command handlers, I/O-level helpers such as `runGit`) and `Effect.fnUntraced` on per-commit or per-file hot paths (collectors, lockfile parsers), and use `Predicate` guards such as `Predicate.isObject` instead of local helpers.
 
 ## Where this repo departs from `AGENTS.md`
 
@@ -73,13 +72,15 @@ class GitCommandError extends Data.TaggedError("GitCommandError")<{
 Everything else declares its requirements in `R` and lets them flow:
 
 ```ts
-export const runGit = (
+export const runGit = Effect.fn("runGit")(function* (
   args: readonly string[],
-): Effect.Effect<
+): Effect.fn.Return<
   string,
   CommandError,
   ChildProcessSpawner.ChildProcessSpawner
-> => ...
+> {
+  // ...
+});
 ```
 
 Never `Effect.provide(...)` inside a shared helper — it builds fresh services per call and hides the dependency.
@@ -121,7 +122,7 @@ Never mutate captured variables from inside `Effect.map`/`Effect.tap` callbacks 
 
 - **Collect results instead**: `Effect.forEach` without `discard` returns results **in input order** even under concurrency — no push-into-array, no re-sorting.
 - Cross-fiber counters (e.g. progress logging) use `Ref`: `const n = yield* Ref.updateAndGet(ref, (c) => c + 1)`.
-- Local `let`/`push` inside a single sequential `Effect.gen` body is fine — the rule is about state shared across fibers.
+- Local `let`/`push` inside a single sequential `Effect.gen` or `Effect.fn` body is fine — the rule is about state shared across fibers.
 
 ## Time
 

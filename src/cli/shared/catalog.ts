@@ -114,64 +114,63 @@ export const findLegacyCatalog = (
  * ignores itself via its own .gitignore; other tools' ignore files are the
  * concern of `ignore-files.ts`.
  */
-export const openCatalog = ({
+export const openCatalog = Effect.fn("openCatalog")(function* ({
   repoRoot,
   catalogPath,
 }: {
   readonly repoRoot: string;
   readonly catalogPath: string;
-}): Effect.Effect<Catalog, Error> =>
-  Effect.gen(function* () {
-    const rootPath = catalogPath;
-    const manifestPath = path.join(rootPath, "catalog.json");
-    const manifest = yield* readJsonIfExists(manifestPath);
+}): Effect.fn.Return<Catalog, Error> {
+  const rootPath = catalogPath;
+  const manifestPath = path.join(rootPath, "catalog.json");
+  const manifest = yield* readJsonIfExists(manifestPath);
 
-    // A relocated catalog has no history under the former name to inherit.
-    if (
-      manifest === undefined &&
-      rootPath === path.resolve(repoRoot, defaultCatalogDirName)
-    ) {
-      const legacyRootPath = yield* findLegacyCatalog(repoRoot);
-      if (legacyRootPath !== undefined) {
-        return yield* new LegacyCatalogError({ legacyRootPath });
-      }
+  // A relocated catalog has no history under the former name to inherit.
+  if (
+    manifest === undefined &&
+    rootPath === path.resolve(repoRoot, defaultCatalogDirName)
+  ) {
+    const legacyRootPath = yield* findLegacyCatalog(repoRoot);
+    if (legacyRootPath !== undefined) {
+      return yield* new LegacyCatalogError({ legacyRootPath });
     }
+  }
 
-    yield* Effect.tryPromise(() => mkdir(rootPath, { recursive: true }));
+  yield* Effect.tryPromise(() => mkdir(rootPath, { recursive: true }));
 
-    if (manifest === undefined) {
-      // `wx`: a .gitignore already sitting in a user-chosen `catalog.dir` is
-      // the user's file, not this scaffold's to overwrite.
-      yield* Effect.tryPromise(async () => {
-        try {
-          await writeFile(path.join(rootPath, ".gitignore"), "*\n", {
-            encoding: "utf8",
-            flag: "wx",
-          });
-        } catch (error) {
-          if (
-            !(error instanceof Error && "code" in error) ||
-            error.code !== "EEXIST"
-          ) {
-            throw error;
-          }
+  if (manifest === undefined) {
+    // `wx`: a .gitignore already sitting in a user-chosen `catalog.dir` is
+    // the user's file, not this scaffold's to overwrite.
+    yield* Effect.tryPromise(async () => {
+      try {
+        await writeFile(path.join(rootPath, ".gitignore"), "*\n", {
+          encoding: "utf8",
+          flag: "wx",
+        });
+      } catch (error) {
+        if (
+          !(error instanceof Error && "code" in error) ||
+          error.code !== "EEXIST"
+        ) {
+          throw error;
         }
-      });
-      const now = yield* DateTime.now;
-      yield* writeJson(manifestPath, {
-        formatVersion: catalogFormatVersion,
-        vcs: "git",
-        createdAt: DateTime.formatIso(now),
-      } satisfies CatalogManifest);
-    } else {
-      const formatVersion = formatVersionOf(manifest);
-      if (formatVersion !== catalogFormatVersion) {
-        return yield* new CatalogFormatError({ rootPath, formatVersion });
       }
+    });
+    const now = yield* DateTime.now;
+    yield* writeJson(manifestPath, {
+      formatVersion: catalogFormatVersion,
+      vcs: "git",
+      createdAt: DateTime.formatIso(now),
+    } satisfies CatalogManifest);
+  } else {
+    const formatVersion = formatVersionOf(manifest);
+    if (formatVersion !== catalogFormatVersion) {
+      return yield* new CatalogFormatError({ rootPath, formatVersion });
     }
+  }
 
-    return { repoRoot, rootPath };
-  });
+  return { repoRoot, rootPath };
+});
 
 const collectorDir = (catalog: Catalog, sha: string, collectorName: string) =>
   path.join(catalog.rootPath, "commits", sha, collectorName);
@@ -201,22 +200,22 @@ export const isCollected = (
     Effect.map((stored) => stored === cacheKey),
   );
 
-export const writeCollectorOutput = ({
-  catalog,
-  sha,
-  collector,
-  cacheKey,
-  output,
-  durationMs,
-}: {
-  readonly catalog: Catalog;
-  readonly sha: string;
-  readonly collector: Collector;
-  readonly cacheKey: string;
-  readonly output: unknown;
-  readonly durationMs: number;
-}): Effect.Effect<void, Error> =>
-  Effect.gen(function* () {
+export const writeCollectorOutput = Effect.fn("writeCollectorOutput")(
+  function* ({
+    catalog,
+    sha,
+    collector,
+    cacheKey,
+    output,
+    durationMs,
+  }: {
+    readonly catalog: Catalog;
+    readonly sha: string;
+    readonly collector: Collector;
+    readonly cacheKey: string;
+    readonly output: unknown;
+    readonly durationMs: number;
+  }): Effect.fn.Return<void, Error> {
     const dir = collectorDir(catalog, sha, collector.name);
     yield* Effect.tryPromise(() => mkdir(dir, { recursive: true }));
     yield* writeJson(path.join(dir, "output.json"), output);
@@ -228,4 +227,5 @@ export const writeCollectorOutput = ({
       completedAt: DateTime.formatIso(now),
       durationMs,
     } satisfies CollectorSidecar);
-  });
+  },
+);

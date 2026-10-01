@@ -73,23 +73,26 @@ function createMergeFixtureRepo() {
 }
 
 /** Writes a realistic catalog output, sidecar included, for one (commit, collector). */
-const seedOutput = (repoRoot: string, sha: string, collectorName: string) =>
-  Effect.gen(function* () {
-    const collector = collectorNamed(collectorName);
-    const config = yield* loadConfig(repoRoot);
-    const catalog = yield* openCatalog({
-      repoRoot,
-      catalogPath: config.catalogPath,
-    });
-    yield* writeCollectorOutput({
-      catalog,
-      sha,
-      collector,
-      cacheKey: collectorCacheKey(collector, config),
-      output: {},
-      durationMs: 1,
-    });
+const seedOutput = Effect.fn("seedOutput")(function* (
+  repoRoot: string,
+  sha: string,
+  collectorName: string,
+) {
+  const collector = collectorNamed(collectorName);
+  const config = yield* loadConfig(repoRoot);
+  const catalog = yield* openCatalog({
+    repoRoot,
+    catalogPath: config.catalogPath,
   });
+  yield* writeCollectorOutput({
+    catalog,
+    sha,
+    collector,
+    cacheKey: collectorCacheKey(collector, config),
+    output: {},
+    durationMs: 1,
+  });
+});
 
 function outputPath(repoRoot: string, sha: string, collectorName: string) {
   return path.join(

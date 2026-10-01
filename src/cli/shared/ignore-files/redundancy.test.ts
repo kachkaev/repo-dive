@@ -11,25 +11,24 @@ import {
   type RepoSetup,
 } from "./redundancy.ts";
 
-const setupIn = (
+const setupIn = Effect.fn("setupIn")(function* (
   manifest: unknown,
   rootFileNames: readonly string[] = [".gitignore", "package.json"],
-) =>
-  Effect.gen(function* () {
-    const repoRoot = mkdtempSync(path.join(os.tmpdir(), "repo-dive-setup-"));
-    try {
-      if (manifest !== undefined) {
-        writeFileSync(
-          path.join(repoRoot, "package.json"),
-          typeof manifest === "string" ? manifest : JSON.stringify(manifest),
-          "utf8",
-        );
-      }
-      return yield* readRepoSetup({ repoRoot, rootFileNames });
-    } finally {
-      rmSync(repoRoot, { force: true, recursive: true });
+) {
+  const repoRoot = mkdtempSync(path.join(os.tmpdir(), "repo-dive-setup-"));
+  try {
+    if (manifest !== undefined) {
+      writeFileSync(
+        path.join(repoRoot, "package.json"),
+        typeof manifest === "string" ? manifest : JSON.stringify(manifest),
+        "utf8",
+      );
     }
-  });
+    return yield* readRepoSetup({ repoRoot, rootFileNames });
+  } finally {
+    rmSync(repoRoot, { force: true, recursive: true });
+  }
+});
 
 const baseSetup: RepoSetup = {
   hasGitignore: true,

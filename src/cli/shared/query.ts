@@ -121,7 +121,7 @@ export const query = (
       }),
   });
 
-export const runQuery = ({
+export const runQuery = Effect.fn("runQuery")(function* ({
   repoPath,
   sql,
   json,
@@ -129,12 +129,11 @@ export const runQuery = ({
   readonly repoPath: string;
   readonly sql: string;
   readonly json: boolean;
-}): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function* () {
-    const repoRoot = yield* resolveRepoRoot(repoPath);
-    const { catalogPath } = yield* loadConfig(repoRoot);
-    const result = yield* query(catalogPath, sql);
-    yield* Console.log(
-      json ? JSON.stringify(result.rows, undefined, 2) : formatTable(result),
-    );
-  });
+}): Effect.fn.Return<void, Error, ChildProcessSpawner.ChildProcessSpawner> {
+  const repoRoot = yield* resolveRepoRoot(repoPath);
+  const { catalogPath } = yield* loadConfig(repoRoot);
+  const result = yield* query(catalogPath, sql);
+  yield* Console.log(
+    json ? JSON.stringify(result.rows, undefined, 2) : formatTable(result),
+  );
+});
