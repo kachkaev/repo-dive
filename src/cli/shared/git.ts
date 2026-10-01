@@ -1,8 +1,5 @@
 import { Data, Effect, type PlatformError, Stream } from "effect";
-import {
-  ChildProcess,
-  type ChildProcessSpawner,
-} from "effect/unstable/process";
+import { ChildProcess, type ChildProcessSpawner } from "effect/process";
 
 class GitCommandError extends Data.TaggedError("GitCommandError")<{
   readonly args: readonly string[];

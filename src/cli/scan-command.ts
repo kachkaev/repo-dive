@@ -1,37 +1,37 @@
 import { Option } from "effect";
-import { Command, Flag } from "effect/unstable/cli";
+import { Command, Flag } from "effect/cli";
 
 import { runScan } from "./shared/scan.ts";
 
 export const scanCommand = Command.make("scan", {
-  repoPath: Flag.string("repo").pipe(
+  repoPath: Flag.String("repo").pipe(
     Flag.withDefault("."),
     Flag.withDescription(
       "Path to the git repository to scan (defaults to the current directory)",
     ),
   ),
   collectorNames: Flag.optional(
-    Flag.string("collectors").pipe(
+    Flag.String("collectors").pipe(
       Flag.withDescription(
         "Comma-separated collector names to run (defaults to all built-in collectors)",
       ),
     ),
   ),
   maxCommits: Flag.optional(
-    Flag.integer("max-commits").pipe(
+    Flag.Int("max-commits").pipe(
       Flag.withDescription(
         "Only scan the newest N commits (useful for a quick first pass)",
       ),
     ),
   ),
   sample: Flag.optional(
-    Flag.string("sample").pipe(
+    Flag.String("sample").pipe(
       Flag.withDescription(
         "Override every collector's sampling policy: all, weekly, monthly, quarterly or every-nth:<n>",
       ),
     ),
   ),
-  force: Flag.boolean("force").pipe(
+  force: Flag.Boolean("force").pipe(
     Flag.withDefault(false),
     Flag.withDescription(
       "Re-collect even where outputs with the current collector version already exist",

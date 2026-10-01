@@ -1,15 +1,15 @@
-import { Command, Flag } from "effect/unstable/cli";
+import { Command, Flag } from "effect/cli";
 
 import { runIgnore } from "./ignore-command/run-ignore.ts";
 
 export const ignoreCommand = Command.make("ignore", {
-  repoPath: Flag.string("repo").pipe(
+  repoPath: Flag.String("repo").pipe(
     Flag.withDefault("."),
     Flag.withDescription(
       "Path to the git repository whose ignore files to update (defaults to the current directory)",
     ),
   ),
-  dryRun: Flag.boolean("dry-run").pipe(
+  dryRun: Flag.Boolean("dry-run").pipe(
     Flag.withDefault(false),
     Flag.withDescription("Report what would be added without writing anything"),
   ),

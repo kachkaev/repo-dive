@@ -1,7 +1,7 @@
 import { NodeStdio } from "@effect/platform-node";
 import { Effect, Layer, Logger, Schema } from "effect";
-import { McpProtocol, McpServer, Tool, Toolkit } from "effect/unstable/ai";
-import type { ChildProcessSpawner } from "effect/unstable/process";
+import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
+import type { ChildProcessSpawner } from "effect/process";
 
 import packageJson from "../../../package.json" with { type: "json" };
 import { loadConfig } from "../shared/config.ts";

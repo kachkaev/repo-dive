@@ -1,6 +1,6 @@
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Console, Data, Effect, Runtime } from "effect";
-import { CliError, Command, Flag } from "effect/unstable/cli";
+import { CliError, Command, Flag } from "effect/cli";
 
 import packageJson from "../package.json" with { type: "json" };
 import { collectorsCommand } from "./cli/collectors-command.ts";
@@ -19,17 +19,17 @@ import { runScan } from "./cli/shared/scan.ts";
 import { statusCommand } from "./cli/status-command.ts";
 
 const cli = Command.make("repo-dive", {
-  repoPath: Flag.string("repo").pipe(
+  repoPath: Flag.String("repo").pipe(
     Flag.withDefault("."),
     Flag.withDescription(
       "Path to the git repository to analyze (defaults to the current directory)",
     ),
   ),
-  port: Flag.integer("port").pipe(
+  port: Flag.Int("port").pipe(
     Flag.withDefault(defaultDashboardPort),
     Flag.withDescription("Port to serve the dashboard on"),
   ),
-  open: Flag.boolean("open").pipe(
+  open: Flag.Boolean("open").pipe(
     Flag.withDefault(true),
     Flag.withDescription(
       "Open the dashboard in the default browser (default: --open; pass --no-open to disable)",

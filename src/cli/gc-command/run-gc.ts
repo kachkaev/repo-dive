@@ -2,8 +2,8 @@ import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 
 import { Console, Effect, type Terminal } from "effect";
-import { Prompt } from "effect/unstable/cli";
-import type { ChildProcessSpawner } from "effect/unstable/process";
+import { Prompt } from "effect/cli";
+import type { ChildProcessSpawner } from "effect/process";
 
 import {
   type BlobCacheNamespace,
@@ -312,7 +312,7 @@ export const runGc = ({
       // A Ctrl-C quit fails with Terminal.QuitError, which the CLI runner
       // turns into a clean interrupt (exit code 130).
       const selected = yield* Prompt.run(
-        Prompt.multiSelect<Action>({
+        Prompt.MultiSelect<Action>({
           message: "What should be removed from the catalog?",
           choices,
         }),
@@ -401,7 +401,7 @@ export const runGc = ({
 
     if (!yes) {
       const confirmed = yield* Prompt.run(
-        Prompt.confirm({ message: summary.replace(/\.$/, "?") }),
+        Prompt.Confirm({ message: summary.replace(/\.$/, "?") }),
       );
       if (!confirmed) {
         yield* Console.log("Aborted — catalog left untouched.");

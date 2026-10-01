@@ -14,7 +14,7 @@ Confirmed decisions are marked as such; everything else is a best guess open for
 
 Confirmed so far:
 
-- TypeScript + Effect v4 (beta) with `effect/unstable/cli`; bootstrap copied from [kachkaev/s20-wifi-setup](https://github.com/kachkaev/s20-wifi-setup)
+- TypeScript + Effect v4 with `effect/cli`; bootstrap copied from [kachkaev/s20-wifi-setup](https://github.com/kachkaev/s20-wifi-setup)
 - Distributed as an npx-runnable npm CLI; single package for now
 - SQLite as the first index backend
 - BSD 3-Clause license

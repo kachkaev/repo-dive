@@ -5,10 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Console, Data, Effect } from "effect";
-import {
-  ChildProcess,
-  type ChildProcessSpawner,
-} from "effect/unstable/process";
+import { ChildProcess, type ChildProcessSpawner } from "effect/process";
 
 import { loadConfig } from "./config.ts";
 import { resolveRepoRoot } from "./scan.ts";

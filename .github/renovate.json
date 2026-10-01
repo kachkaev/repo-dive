@@ -3,7 +3,7 @@
   "extends": ["github>kachkaev/reusable-stuff:renovate-preset"],
   "packageRules": [
     {
-      "description": "Group packages released in lockstep from the Effect monorepo. Renovate's own `group:monorepos` preset matches on `matchSourceUrls`, which does not work here: `monorepo.json` lists `Effect-TS/effect-smol`, while the published packages point at `Effect-TS/effect`. Matching on package names instead keeps the group working no matter where the sources move.",
+      "description": "Group packages released in lockstep from the Effect monorepo. Renovate's own `group:monorepos` preset matches on `matchSourceUrls`, which does not work here: `monorepo.json` lists `Effect-TS/effect-smol`, while the published packages point at `Effect-TS/effect`. Matching on package names instead keeps the group working no matter where the sources move. Still needed as of the 4.0.0 stable release: https://github.com/renovatebot/renovate/pull/44751, which adds `Effect-TS/effect` to the preset, is not merged yet.",
       "groupName": "effect monorepo",
       "matchManagers": ["npm"],
       "matchPackageNames": ["effect", "@effect/**"]
