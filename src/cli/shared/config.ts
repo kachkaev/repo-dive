@@ -3,7 +3,7 @@ import { registerHooks } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 
 import {
   type ChartId,
@@ -193,9 +193,6 @@ const bareResolveContributor = (
 const configError = (message: string): Error =>
   new Error(`Invalid repo-dive config: ${message}`);
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 /** Reads a property by (variable) key — avoids literal index-signature access. */
 const prop = (record: Record<string, unknown>, key: string): unknown =>
   record[key];
@@ -265,7 +262,7 @@ const parseAliasGroup = (
       kind: undefined,
     };
   }
-  if (isPlainObject(group)) {
+  if (Predicate.isObject(group)) {
     return {
       emails: parseEmails(prop(group, "emails"), at),
       displayName: parseOptionalString(
@@ -354,7 +351,7 @@ const parseChartAnnotations = (
   if (value === undefined) {
     return {};
   }
-  if (!isPlainObject(value)) {
+  if (!Predicate.isObject(value)) {
     throw configError("`charts.annotations` must be an object.");
   }
   const annotations: Partial<Record<ChartId, string>> = {};
@@ -437,11 +434,11 @@ export const resolveConfig = (
   raw: unknown,
   repoRoot: string,
 ): ResolvedConfig => {
-  if (!isPlainObject(raw)) {
+  if (!Predicate.isObject(raw)) {
     throw configError("the default export must be an object.");
   }
   const contributors = prop(raw, "contributors");
-  if (contributors !== undefined && !isPlainObject(contributors)) {
+  if (contributors !== undefined && !Predicate.isObject(contributors)) {
     throw configError("`contributors` must be an object.");
   }
   const aliasMap = buildAliasMap(
@@ -451,7 +448,7 @@ export const resolveConfig = (
     contributors === undefined ? undefined : prop(contributors, "maxInCharts"),
   );
   const charts = prop(raw, "charts");
-  if (charts !== undefined && !isPlainObject(charts)) {
+  if (charts !== undefined && !Predicate.isObject(charts)) {
     throw configError("`charts` must be an object.");
   }
   const weekStartsOn = parseWeekStartsOn(
@@ -461,7 +458,7 @@ export const resolveConfig = (
     charts === undefined ? undefined : prop(charts, "annotations"),
   );
   const catalog = prop(raw, "catalog");
-  if (catalog !== undefined && !isPlainObject(catalog)) {
+  if (catalog !== undefined && !Predicate.isObject(catalog)) {
     throw configError("`catalog` must be an object.");
   }
   const catalogPath = parseCatalogPath(
@@ -564,44 +561,43 @@ const registerSelfResolutionFallback = (): void => {
  * this installation (see {@link registerSelfResolutionFallback}). Returns the
  * zero-config defaults when no file is found.
  */
-export const loadConfig = (
+export const loadConfig = Effect.fn("loadConfig")(function* (
   repoRoot: string,
-): Effect.Effect<ResolvedConfig, Error> =>
-  Effect.gen(function* () {
-    const configPath = yield* Effect.tryPromise({
-      try: () => firstExistingConfigPath(repoRoot),
-      catch: (error) =>
-        error instanceof Error ? error : new Error(String(error)),
-    });
-    if (configPath === undefined) {
-      return resolveConfig({}, repoRoot);
-    }
-
-    yield* Effect.sync(registerSelfResolutionFallback);
-    const raw = yield* Effect.tryPromise({
-      try: async (): Promise<unknown> => {
-        const module: unknown = await import(pathToFileURL(configPath).href);
-        return isPlainObject(module) ? prop(module, "default") : undefined;
-      },
-      catch: (error) =>
-        new Error(
-          `Failed to load ${path.basename(configPath)}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        ),
-    });
-
-    if (raw === undefined) {
-      return yield* Effect.fail(
-        configError(
-          `${path.basename(configPath)} must \`export default defineConfig(...)\`.`,
-        ),
-      );
-    }
-
-    return yield* Effect.try({
-      try: () => resolveConfig(raw, repoRoot),
-      catch: (error) =>
-        error instanceof Error ? error : new Error(String(error)),
-    });
+): Effect.fn.Return<ResolvedConfig, Error> {
+  const configPath = yield* Effect.tryPromise({
+    try: () => firstExistingConfigPath(repoRoot),
+    catch: (error) =>
+      error instanceof Error ? error : new Error(String(error)),
   });
+  if (configPath === undefined) {
+    return resolveConfig({}, repoRoot);
+  }
+
+  yield* Effect.sync(registerSelfResolutionFallback);
+  const raw = yield* Effect.tryPromise({
+    try: async (): Promise<unknown> => {
+      const module: unknown = await import(pathToFileURL(configPath).href);
+      return Predicate.isObject(module) ? prop(module, "default") : undefined;
+    },
+    catch: (error) =>
+      new Error(
+        `Failed to load ${path.basename(configPath)}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      ),
+  });
+
+  if (raw === undefined) {
+    return yield* Effect.fail(
+      configError(
+        `${path.basename(configPath)} must \`export default defineConfig(...)\`.`,
+      ),
+    );
+  }
+
+  return yield* Effect.try({
+    try: () => resolveConfig(raw, repoRoot),
+    catch: (error) =>
+      error instanceof Error ? error : new Error(String(error)),
+  });
+});

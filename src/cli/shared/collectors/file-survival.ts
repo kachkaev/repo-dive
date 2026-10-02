@@ -140,63 +140,62 @@ export const fileSurvivalCollector: Collector = {
   version: "1",
   strategy: "tree",
   defaultSampling: "monthly",
-  collect: ({ repoRoot, sha }) =>
-    Effect.gen(function* () {
-      // Blobs only: a submodule is a gitlink entry whose path can end in a
-      // source extension (ollama's `llm/llama.cpp`), yet it is not a file.
-      const fileList = yield* runGit(["-C", repoRoot, "ls-tree", "-r", sha]);
-      const files: string[] = [];
-      for (const line of fileList.split("\n")) {
-        const tabIndex = line.indexOf("\t");
-        if (tabIndex === -1) {
-          continue;
-        }
-        const [, type] = line.slice(0, tabIndex).split(/\s+/, 2);
-        const filePath = line.slice(tabIndex + 1);
-        if (type === "blob" && isScannableSourceFile(filePath)) {
-          files.push(filePath);
-        }
+  collect: Effect.fnUntraced(function* ({ repoRoot, sha }) {
+    // Blobs only: a submodule is a gitlink entry whose path can end in a
+    // source extension (ollama's `llm/llama.cpp`), yet it is not a file.
+    const fileList = yield* runGit(["-C", repoRoot, "ls-tree", "-r", sha]);
+    const files: string[] = [];
+    for (const line of fileList.split("\n")) {
+      const tabIndex = line.indexOf("\t");
+      if (tabIndex === -1) {
+        continue;
       }
-
-      // One pass over the history reachable from the snapshot. `--topo-order`
-      // keeps children ahead of parents, so of a delete-and-recreate pair the
-      // walk meets the recreation first — the lifetime the present file
-      // belongs to. Merges list no files (the creating non-merge commit is
-      // reachable anyway, and it is the one that names the author); `-M`
-      // pairs renames so a moved file keeps its origin.
-      const log = yield* runGit([
-        "-C",
-        repoRoot,
-        "log",
-        "--topo-order",
-        "-M",
-        "--name-status",
-        `--format=${recordSeparator}%ae${fieldSeparator}%at`,
-        sha,
-      ]);
-      const origins = resolveFileOrigins(log, files);
-
-      const counts = new Map<string, number>();
-      for (const filePath of files) {
-        // An unresolved origin (history boundary, undetected rename) keeps the
-        // file counted — it exists — under empty attribution.
-        const origin = origins.get(filePath);
-        const key = [
-          extensionOf(filePath),
-          origin?.authorEmail ?? "",
-          origin?.cohortMonth ?? "",
-        ].join(fieldSeparator);
-        counts.set(key, (counts.get(key) ?? 0) + 1);
+      const [, type] = line.slice(0, tabIndex).split(/\s+/, 2);
+      const filePath = line.slice(tabIndex + 1);
+      if (type === "blob" && isScannableSourceFile(filePath)) {
+        files.push(filePath);
       }
+    }
 
-      const rows: FileSurvivalRow[] = [...counts].map(([key, fileCount]) => {
-        const [extension = "", authorEmail = "", cohortMonth = ""] =
-          key.split(fieldSeparator);
-        return { extension, authorEmail, cohortMonth, files: fileCount };
-      });
+    // One pass over the history reachable from the snapshot. `--topo-order`
+    // keeps children ahead of parents, so of a delete-and-recreate pair the
+    // walk meets the recreation first — the lifetime the present file
+    // belongs to. Merges list no files (the creating non-merge commit is
+    // reachable anyway, and it is the one that names the author); `-M`
+    // pairs renames so a moved file keeps its origin.
+    const log = yield* runGit([
+      "-C",
+      repoRoot,
+      "log",
+      "--topo-order",
+      "-M",
+      "--name-status",
+      `--format=${recordSeparator}%ae${fieldSeparator}%at`,
+      sha,
+    ]);
+    const origins = resolveFileOrigins(log, files);
 
-      return { rows, totalFiles: files.length } satisfies FileSurvivalOutput;
-    }),
+    const counts = new Map<string, number>();
+    for (const filePath of files) {
+      // An unresolved origin (history boundary, undetected rename) keeps the
+      // file counted — it exists — under empty attribution.
+      const origin = origins.get(filePath);
+      const key = [
+        extensionOf(filePath),
+        origin?.authorEmail ?? "",
+        origin?.cohortMonth ?? "",
+      ].join(fieldSeparator);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+
+    const rows: FileSurvivalRow[] = [...counts].map(([key, fileCount]) => {
+      const [extension = "", authorEmail = "", cohortMonth = ""] =
+        key.split(fieldSeparator);
+      return { extension, authorEmail, cohortMonth, files: fileCount };
+    });
+
+    return { rows, totalFiles: files.length } satisfies FileSurvivalOutput;
+  }),
   normalize: (raw) => {
     const facts: Fact[] = Array.from(arrayAt(raw, "rows"), (row) => ({
       metric: "survival.files",

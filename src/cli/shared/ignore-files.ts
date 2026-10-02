@@ -49,38 +49,37 @@ export type IgnoreFileStatus = { readonly name: string } & (
  * searched: ignore files further down govern their own subtree, and the tools
  * that matter read the root one anyway.
  */
-export const checkIgnoreFiles = ({
+export const checkIgnoreFiles = Effect.fn("checkIgnoreFiles")(function* ({
   repoRoot,
   catalogRelativePath,
 }: {
   readonly repoRoot: string;
   readonly catalogRelativePath: string;
-}): Effect.Effect<readonly IgnoreFileStatus[], Error> =>
-  Effect.gen(function* () {
-    const rootFileNames = yield* readRootFileNames(repoRoot);
-    const names = rootFileNames.filter((name) =>
-      ignoreFileNamePattern.test(name),
-    );
-    if (names.length === 0) {
-      return [];
-    }
+}): Effect.fn.Return<readonly IgnoreFileStatus[], Error> {
+  const rootFileNames = yield* readRootFileNames(repoRoot);
+  const names = rootFileNames.filter((name) =>
+    ignoreFileNamePattern.test(name),
+  );
+  if (names.length === 0) {
+    return [];
+  }
 
-    const setup = yield* readRepoSetup({ repoRoot, rootFileNames });
-    return yield* Effect.forEach(names, (name) =>
-      Effect.tryPromise(async (): Promise<IgnoreFileStatus> => {
-        const contents = await readFile(path.join(repoRoot, name), "utf8");
-        if (coversPath(contents, catalogRelativePath)) {
-          return { name, outcome: "listed" };
-        }
-        const reason = redundancyReason({ name, setup });
-        if (reason !== undefined) {
-          return { name, outcome: "redundant", reason };
-        }
-        const { entry } = withIgnoreEntry({ contents, catalogRelativePath });
-        return { name, outcome: "missing", entry };
-      }),
-    );
-  });
+  const setup = yield* readRepoSetup({ repoRoot, rootFileNames });
+  return yield* Effect.forEach(names, (name) =>
+    Effect.tryPromise(async (): Promise<IgnoreFileStatus> => {
+      const contents = await readFile(path.join(repoRoot, name), "utf8");
+      if (coversPath(contents, catalogRelativePath)) {
+        return { name, outcome: "listed" };
+      }
+      const reason = redundancyReason({ name, setup });
+      if (reason !== undefined) {
+        return { name, outcome: "redundant", reason };
+      }
+      const { entry } = withIgnoreEntry({ contents, catalogRelativePath });
+      return { name, outcome: "missing", entry };
+    }),
+  );
+});
 
 /** How the catalog is referred to in messages, whatever a given file spells. */
 export const ignoreEntryFor = (catalogRelativePath: string): string =>
@@ -111,23 +110,22 @@ export const addIgnoreEntry = ({
  * Empty whenever the question does not apply: the catalog lives outside the
  * repository, the check is switched off, or nothing is left to add.
  */
-const missingIgnoreFiles = ({
+const missingIgnoreFiles = Effect.fn("missingIgnoreFiles")(function* ({
   repoRoot,
   config,
 }: {
   readonly repoRoot: string;
   readonly config: ResolvedConfig;
-}): Effect.Effect<readonly string[], Error> =>
-  Effect.gen(function* () {
-    const { catalogRelativePath } = config;
-    if (catalogRelativePath === undefined || !config.checkIgnoreFiles) {
-      return [];
-    }
-    const statuses = yield* checkIgnoreFiles({ repoRoot, catalogRelativePath });
-    return statuses
-      .filter((status) => status.outcome === "missing")
-      .map((status) => status.name);
-  });
+}): Effect.fn.Return<readonly string[], Error> {
+  const { catalogRelativePath } = config;
+  if (catalogRelativePath === undefined || !config.checkIgnoreFiles) {
+    return [];
+  }
+  const statuses = yield* checkIgnoreFiles({ repoRoot, catalogRelativePath });
+  return statuses
+    .filter((status) => status.outcome === "missing")
+    .map((status) => status.name);
+});
 
 /**
  * Warns, once a command has done its work, about ignore files that will send
@@ -135,14 +133,14 @@ const missingIgnoreFiles = ({
  * Best-effort: an unreadable ignore file must not fail the command whose work
  * is already done, so any error here means no warning, nothing more.
  */
-export const warnAboutIgnoreFiles = ({
-  repoRoot,
-  config,
-}: {
-  readonly repoRoot: string;
-  readonly config: ResolvedConfig;
-}): Effect.Effect<void> =>
-  Effect.gen(function* () {
+export const warnAboutIgnoreFiles = Effect.fn("warnAboutIgnoreFiles")(
+  function* ({
+    repoRoot,
+    config,
+  }: {
+    readonly repoRoot: string;
+    readonly config: ResolvedConfig;
+  }): Effect.fn.Return<void, Error> {
     const { catalogRelativePath } = config;
     if (catalogRelativePath === undefined) {
       return;
@@ -159,4 +157,6 @@ export const warnAboutIgnoreFiles = ({
         "  Add the entry: npx repo-dive ignore",
       ].join("\n"),
     );
-  }).pipe(Effect.ignore);
+  },
+  Effect.ignore(),
+);

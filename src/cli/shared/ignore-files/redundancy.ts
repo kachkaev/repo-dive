@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 
 /**
  * Not every ignore file at the root wants the catalog spelled out in it. Some
@@ -13,9 +13,6 @@ import { Effect } from "effect";
  * has to work out why it is there. So this module asks the repository a few
  * questions and lets `ignore` leave those files alone.
  */
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** Anything a flat ESLint config may be called, all of them at the root. */
 const flatEslintConfigPattern = /^eslint\.config\.[cm]?[jt]s$/;
@@ -32,7 +29,7 @@ const readManifest = (
     const parsed: unknown = JSON.parse(
       await readFile(path.join(repoRoot, "package.json"), "utf8"),
     );
-    return isRecord(parsed) ? parsed : {};
+    return Predicate.isObject(parsed) ? parsed : {};
   }).pipe(Effect.orElseSucceed(() => ({})));
 
 /** The major version a dependency range asks for: `^3.2.1` and `~3` both say 3. */
@@ -42,7 +39,7 @@ const declaredMajor = (
 ): number | undefined => {
   for (const field of ["devDependencies", "dependencies"]) {
     const dependencies = manifest[field];
-    const range = isRecord(dependencies)
+    const range = Predicate.isObject(dependencies)
       ? dependencies[packageName]
       : undefined;
     if (typeof range === "string") {
@@ -64,7 +61,7 @@ const overridesPrettierIgnorePath = (
 ): boolean => {
   const scripts = manifest["scripts"];
   return (
-    isRecord(scripts) &&
+    Predicate.isObject(scripts) &&
     Object.values(scripts).some(
       (script) =>
         typeof script === "string" &&
@@ -93,26 +90,25 @@ export type RepoSetup = {
  * or unreadable `package.json` simply answers "no" to everything it would have
  * decided, which leaves `ignore` doing the thorough thing.
  */
-export const readRepoSetup = ({
+export const readRepoSetup = Effect.fn("readRepoSetup")(function* ({
   repoRoot,
   rootFileNames,
 }: {
   readonly repoRoot: string;
   readonly rootFileNames: readonly string[];
-}): Effect.Effect<RepoSetup> =>
-  Effect.gen(function* () {
-    const manifest = yield* readManifest(repoRoot);
+}): Effect.fn.Return<RepoSetup> {
+  const manifest = yield* readManifest(repoRoot);
 
-    return {
-      hasGitignore: rootFileNames.includes(".gitignore"),
-      npmPacksByAllowList: Array.isArray(manifest["files"]),
-      eslintUsesFlatConfig:
-        rootFileNames.some((name) => flatEslintConfigPattern.test(name)) ||
-        (declaredMajor(manifest, "eslint") ?? 0) >= 9,
-      prettierMajor: declaredMajor(manifest, "prettier"),
-      prettierIgnorePathOverridden: overridesPrettierIgnorePath(manifest),
-    };
-  });
+  return {
+    hasGitignore: rootFileNames.includes(".gitignore"),
+    npmPacksByAllowList: Array.isArray(manifest["files"]),
+    eslintUsesFlatConfig:
+      rootFileNames.some((name) => flatEslintConfigPattern.test(name)) ||
+      (declaredMajor(manifest, "eslint") ?? 0) >= 9,
+    prettierMajor: declaredMajor(manifest, "prettier"),
+    prettierIgnorePathOverridden: overridesPrettierIgnorePath(manifest),
+  };
+});
 
 /**
  * Why the tool reading `name` already skips the catalog without an entry of its

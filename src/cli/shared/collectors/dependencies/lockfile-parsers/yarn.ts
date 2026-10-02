@@ -1,6 +1,6 @@
+import { Predicate } from "effect";
 import { parse as parseYaml } from "yaml";
 
-import { isRecord } from "./shared/helpers.ts";
 import type { LockfileParser, LockfileSummary } from "./shared/types.ts";
 
 const versionString = (value: unknown): string =>
@@ -18,10 +18,12 @@ const parseBerryLockfile = (content: string): LockfileSummary | undefined => {
   } catch {
     return undefined;
   }
-  if (!isRecord(root)) {
+  if (!Predicate.isObject(root)) {
     return undefined;
   }
-  const metadata = isRecord(root["__metadata"]) ? root["__metadata"] : {};
+  const metadata = Predicate.isObject(root["__metadata"])
+    ? root["__metadata"]
+    : {};
   const resolvedCount = Object.keys(root).filter(
     (key) => key !== "__metadata" && !key.includes("@workspace:"),
   ).length;

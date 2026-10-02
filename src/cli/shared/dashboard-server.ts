@@ -4,7 +4,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { Console, Data, Effect } from "effect";
+import { Console, Data, Effect, type PlatformError, type Scope } from "effect";
 import { ChildProcess, type ChildProcessSpawner } from "effect/process";
 
 import { loadConfig } from "./config.ts";
@@ -50,27 +50,32 @@ export const resolveAssetsDir = (): string | undefined => {
   );
 };
 
-export const openInBrowser = (
-  url: string,
-): Effect.Effect<void, never, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const command =
-        process.platform === "darwin"
-          ? "open"
-          : process.platform === "win32"
-            ? "start"
-            : "xdg-open";
-      const handle = yield* ChildProcess.make(command, [url], {
-        stdin: "ignore",
-        stdout: "ignore",
-        stderr: "ignore",
-      });
-      yield* handle.exitCode;
-    }),
-  ).pipe(Effect.ignore);
+export const openInBrowser = Effect.fn("openInBrowser")(
+  function* (
+    url: string,
+  ): Effect.fn.Return<
+    void,
+    PlatformError.PlatformError,
+    ChildProcessSpawner.ChildProcessSpawner | Scope.Scope
+  > {
+    const command =
+      process.platform === "darwin"
+        ? "open"
+        : process.platform === "win32"
+          ? "start"
+          : "xdg-open";
+    const handle = yield* ChildProcess.make(command, [url], {
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    yield* handle.exitCode;
+  },
+  Effect.scoped,
+  Effect.ignore(),
+);
 
-export const runDashboard = ({
+export const runDashboard = Effect.fn("runDashboard")(function* ({
   repoPath,
   port,
   open,
@@ -78,79 +83,78 @@ export const runDashboard = ({
   readonly repoPath: string;
   readonly port: number;
   readonly open: boolean;
-}): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function* () {
-    const repoRoot = yield* resolveRepoRoot(repoPath);
-    const config = yield* loadConfig(repoRoot);
-    const dataPath = path.join(config.catalogPath, "index", "dashboard.json");
-    if (!existsSync(dataPath)) {
-      return yield* new DashboardUnavailableError({
-        reason: `No dashboard data at ${dataPath} — run \`repo-dive scan\` and \`repo-dive index\` first.`,
-      });
-    }
+}): Effect.fn.Return<void, Error, ChildProcessSpawner.ChildProcessSpawner> {
+  const repoRoot = yield* resolveRepoRoot(repoPath);
+  const config = yield* loadConfig(repoRoot);
+  const dataPath = path.join(config.catalogPath, "index", "dashboard.json");
+  if (!existsSync(dataPath)) {
+    return yield* new DashboardUnavailableError({
+      reason: `No dashboard data at ${dataPath} — run \`repo-dive scan\` and \`repo-dive index\` first.`,
+    });
+  }
 
-    const assetsDir = resolveAssetsDir();
-    if (assetsDir === undefined) {
-      return yield* new DashboardUnavailableError({
-        reason:
-          "Dashboard assets not found — run `pnpm build` first (dist/dashboard is missing).",
-      });
-    }
+  const assetsDir = resolveAssetsDir();
+  if (assetsDir === undefined) {
+    return yield* new DashboardUnavailableError({
+      reason:
+        "Dashboard assets not found — run `pnpm build` first (dist/dashboard is missing).",
+    });
+  }
 
-    const server = http.createServer((request, response) => {
-      void (async () => {
-        const requestPath = new URL(request.url ?? "/", "http://localhost")
-          .pathname;
+  const server = http.createServer((request, response) => {
+    void (async () => {
+      const requestPath = new URL(request.url ?? "/", "http://localhost")
+        .pathname;
 
-        try {
-          if (requestPath === "/dashboard.json") {
-            response.writeHead(200, {
-              "content-type": "application/json",
-              "cache-control": "no-store",
-            });
-            response.end(await readFile(dataPath));
-            return;
-          }
-
-          const relativePath = requestPath === "/" ? "index.html" : requestPath;
-          const filePath = path.join(assetsDir, relativePath);
-          // Keep requests inside the assets dir; anything else gets the app shell.
-          const safePath =
-            filePath.startsWith(assetsDir) && existsSync(filePath)
-              ? filePath
-              : path.join(assetsDir, "index.html");
-
+      try {
+        if (requestPath === "/dashboard.json") {
           response.writeHead(200, {
-            "content-type":
-              mimeTypes[path.extname(safePath)] ?? "application/octet-stream",
+            "content-type": "application/json",
+            "cache-control": "no-store",
           });
-          response.end(await readFile(safePath));
-        } catch (error) {
-          response.writeHead(500, { "content-type": "text/plain" });
-          response.end(String(error));
+          response.end(await readFile(dataPath));
+          return;
         }
-      })();
-    });
 
-    // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- the callback effect genuinely succeeds with no value
-    yield* Effect.callback<void, ServerListenError>((resume) => {
-      server.on("error", (error) => {
-        resume(Effect.fail(new ServerListenError({ port, cause: error })));
-      });
-      server.listen(port, () => {
-        resume(Effect.void);
-      });
-    });
+        const relativePath = requestPath === "/" ? "index.html" : requestPath;
+        const filePath = path.join(assetsDir, relativePath);
+        // Keep requests inside the assets dir; anything else gets the app shell.
+        const safePath =
+          filePath.startsWith(assetsDir) && existsSync(filePath)
+            ? filePath
+            : path.join(assetsDir, "index.html");
 
-    const url = `http://localhost:${port}`;
-    yield* Console.log(
-      `Dashboard for ${repoRoot}\nServing on ${url} — press Ctrl+C to stop.`,
-    );
-
-    if (open) {
-      yield* openInBrowser(url);
-    }
-
-    // Keep the process alive until interrupted.
-    yield* Effect.never;
+        response.writeHead(200, {
+          "content-type":
+            mimeTypes[path.extname(safePath)] ?? "application/octet-stream",
+        });
+        response.end(await readFile(safePath));
+      } catch (error) {
+        response.writeHead(500, { "content-type": "text/plain" });
+        response.end(String(error));
+      }
+    })();
   });
+
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- the callback effect genuinely succeeds with no value
+  yield* Effect.callback<void, ServerListenError>((resume) => {
+    server.on("error", (error) => {
+      resume(Effect.fail(new ServerListenError({ port, cause: error })));
+    });
+    server.listen(port, () => {
+      resume(Effect.void);
+    });
+  });
+
+  const url = `http://localhost:${port}`;
+  yield* Console.log(
+    `Dashboard for ${repoRoot}\nServing on ${url} — press Ctrl+C to stop.`,
+  );
+
+  if (open) {
+    yield* openInBrowser(url);
+  }
+
+  // Keep the process alive until interrupted.
+  yield* Effect.never;
+});

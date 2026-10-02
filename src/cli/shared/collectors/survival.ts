@@ -62,63 +62,62 @@ export const survivalCollector: Collector = {
   version: "1",
   strategy: "tree",
   defaultSampling: "monthly",
-  collect: ({ repoRoot, sha }) =>
-    Effect.gen(function* () {
-      const fileList = yield* runGit([
-        "-C",
-        repoRoot,
-        "ls-tree",
-        "-r",
-        "--name-only",
-        sha,
-      ]);
-      const files = fileList.split("\n").filter(isScannableSourceFile);
+  collect: Effect.fnUntraced(function* ({ repoRoot, sha }) {
+    const fileList = yield* runGit([
+      "-C",
+      repoRoot,
+      "ls-tree",
+      "-r",
+      "--name-only",
+      sha,
+    ]);
+    const files = fileList.split("\n").filter(isScannableSourceFile);
 
-      const attributionsPerFile = yield* Effect.forEach(
-        files,
-        (filePath) =>
-          runGit([
-            "-C",
-            repoRoot,
-            "blame",
-            "--line-porcelain",
-            "-w",
-            sha,
-            "--",
-            filePath,
-          ]).pipe(
-            Effect.map((stdout) => ({
-              extension: extensionOf(filePath),
-              attributions: parseBlamePorcelain(stdout),
-            })),
-          ),
-        { concurrency: 8 },
-      );
+    const attributionsPerFile = yield* Effect.forEach(
+      files,
+      (filePath) =>
+        runGit([
+          "-C",
+          repoRoot,
+          "blame",
+          "--line-porcelain",
+          "-w",
+          sha,
+          "--",
+          filePath,
+        ]).pipe(
+          Effect.map((stdout) => ({
+            extension: extensionOf(filePath),
+            attributions: parseBlamePorcelain(stdout),
+          })),
+        ),
+      { concurrency: 8 },
+    );
 
-      const counts = new Map<string, number>();
-      let totalLines = 0;
-      for (const { extension, attributions } of attributionsPerFile) {
-        for (const attribution of attributions) {
-          const key = `${extension}\u{1F}${attribution.authorEmail}\u{1F}${attribution.cohortMonth}`;
-          counts.set(key, (counts.get(key) ?? 0) + 1);
-          totalLines += 1;
-        }
+    const counts = new Map<string, number>();
+    let totalLines = 0;
+    for (const { extension, attributions } of attributionsPerFile) {
+      for (const attribution of attributions) {
+        const key = `${extension}\u{1F}${attribution.authorEmail}\u{1F}${attribution.cohortMonth}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+        totalLines += 1;
       }
+    }
 
-      const rows: SurvivalRow[] = [...counts].map(([key, lines]) => {
-        const [extension = "", authorEmail = "", cohortMonth = ""] = key.split(
-          "\u{1F}",
-          3,
-        );
-        return { extension, authorEmail, cohortMonth, lines };
-      });
+    const rows: SurvivalRow[] = [...counts].map(([key, lines]) => {
+      const [extension = "", authorEmail = "", cohortMonth = ""] = key.split(
+        "\u{1F}",
+        3,
+      );
+      return { extension, authorEmail, cohortMonth, lines };
+    });
 
-      return {
-        rows,
-        totalLines,
-        fileCount: files.length,
-      } satisfies SurvivalOutput;
-    }),
+    return {
+      rows,
+      totalLines,
+      fileCount: files.length,
+    } satisfies SurvivalOutput;
+  }),
   normalize: (raw) => {
     const facts: Fact[] = Array.from(arrayAt(raw, "rows"), (row) => ({
       metric: "survival.lines",

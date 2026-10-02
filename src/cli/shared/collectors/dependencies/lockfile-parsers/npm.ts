@@ -1,4 +1,5 @@
-import { isRecord } from "./shared/helpers.ts";
+import { Predicate } from "effect";
+
 import type { LockfileParser, LockfileSummary } from "./shared/types.ts";
 
 const versionString = (value: unknown): string =>
@@ -6,13 +7,13 @@ const versionString = (value: unknown): string =>
 
 /** Recursively counts every resolved node in a legacy v1 `dependencies` tree. */
 const countTree = (dependencies: unknown): number => {
-  if (!isRecord(dependencies)) {
+  if (!Predicate.isObject(dependencies)) {
     return 0;
   }
   let total = 0;
   for (const entry of Object.values(dependencies)) {
     total += 1;
-    if (isRecord(entry)) {
+    if (Predicate.isObject(entry)) {
       total += countTree(entry["dependencies"]);
     }
   }
@@ -36,17 +37,17 @@ export const parseNpmLockfile = (
   } catch {
     return undefined;
   }
-  if (!isRecord(root)) {
+  if (!Predicate.isObject(root)) {
     return undefined;
   }
   const lockfileVersion = versionString(root["lockfileVersion"]);
 
   // v2/v3: the flat `packages` map — `node_modules/…` entries are the resolved
   // graph; `""` and workspace folders are importers (not counted here).
-  if (isRecord(root["packages"])) {
+  if (Predicate.isObject(root["packages"])) {
     let resolvedCount = 0;
     for (const [path, value] of Object.entries(root["packages"])) {
-      const entry = isRecord(value) ? value : {};
+      const entry = Predicate.isObject(value) ? value : {};
       // An installed package — unless it's a symlink to a local workspace.
       if (path.includes("node_modules/") && entry["link"] !== true) {
         resolvedCount += 1;
@@ -60,7 +61,7 @@ export const parseNpmLockfile = (
   }
 
   // v1: only the nested `dependencies` tree.
-  if (isRecord(root["dependencies"])) {
+  if (Predicate.isObject(root["dependencies"])) {
     return {
       packageManager: "npm",
       lockfileVersion: lockfileVersion || "1",
