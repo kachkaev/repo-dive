@@ -74,6 +74,25 @@ const readGrouping = (lines: readonly string[]): Grouping | undefined => {
 };
 
 /**
+ * The `#` run of the first comment that says something. A rule drawn in hashes
+ * (`##########`, `# ------`) frames a banner rather than shows how the file
+ * starts a comment — copying one would head the catalog with a row of them.
+ */
+const readCommentMarker = (lines: readonly string[]): string | undefined => {
+  for (const line of lines) {
+    const comment = line.trim();
+    const marker = /^#+/.exec(comment)?.[0];
+    if (
+      marker !== undefined &&
+      /[\p{L}\p{N}]/u.test(comment.slice(marker.length))
+    ) {
+      return marker;
+    }
+  }
+  return undefined;
+};
+
+/**
  * The line ending the file mostly uses. Counted rather than merely spotted: one
  * stray `\r\n` in a file otherwise written with `\n` is not a habit to copy.
  */
@@ -93,7 +112,7 @@ const readIgnoreFileStyle = (contents: string): IgnoreFileStyle => {
 
   return {
     eol: readEol(contents),
-    commentMarker: /^#+/.exec(lines.find(isComment)?.trim() ?? "")?.[0],
+    commentMarker: readCommentMarker(lines),
     grouping: readGrouping(lines),
     sorted:
       patterns.length >= 2 &&

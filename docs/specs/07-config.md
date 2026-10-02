@@ -174,4 +174,5 @@ Where the line goes depends on the file:
 - anything else — appended as a bare line at the end.
 
 A group is anything a comment heads: blank-line-separated sections, and equally a run of headings with no blank lines between them.
+The comment style is read off a comment that says something, so a banner framed in rows of `#` still gets a `## repo-dive catalog` heading where its headings start with `##`.
 Comments sitting above every pattern head the whole file rather than a group, and leave it a flat list.
