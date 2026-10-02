@@ -239,57 +239,54 @@ type FoundingGraft = {
  * merged eight): before the migration they were the project's parallel parts,
  * so composed timelines sum all of them until the assembly replaces them.
  */
-const findFoundingGraft = (
+const findFoundingGraft = Effect.fn("findFoundingGraft")(function* (
   repoRoot: string,
   chain: readonly ChainEntry[],
   alreadyClaimed: ReadonlySet<string>,
-): Effect.Effect<
+): Effect.fn.Return<
   FoundingGraft,
   CommandError,
   ChildProcessSpawner.ChildProcessSpawner
-> =>
-  Effect.gen(function* () {
-    const root = chain.at(-1);
-    if (root === undefined) {
-      return { absorbed: [], assemblyShas: [] };
-    }
-    const rootDate = Date.parse(root.committerDate);
+> {
+  const root = chain.at(-1);
+  if (root === undefined) {
+    return { absorbed: [], assemblyShas: [] };
+  }
+  const rootDate = Date.parse(root.committerDate);
 
-    const candidateTips: string[] = [];
-    const assemblyShas: string[] = [root.hash];
-    for (let index = chain.length - 2; index >= 0; index -= 1) {
-      const entry = chain[index];
-      if (entry === undefined || entry.parentHashes.length < 2) {
-        break;
-      }
-      candidateTips.push(...entry.parentHashes.slice(1));
-      assemblyShas.push(entry.hash);
+  const candidateTips: string[] = [];
+  const assemblyShas: string[] = [root.hash];
+  for (let index = chain.length - 2; index >= 0; index -= 1) {
+    const entry = chain[index];
+    if (entry === undefined || entry.parentHashes.length < 2) {
+      break;
     }
+    candidateTips.push(...entry.parentHashes.slice(1));
+    assemblyShas.push(entry.hash);
+  }
 
-    const absorbed: ChainEntry[][] = [];
-    for (const tip of candidateTips) {
-      if (alreadyClaimed.has(tip)) {
-        continue;
-      }
-      if (!(yield* haveUnrelatedHistories(repoRoot, root.hash, tip))) {
-        continue;
-      }
-      const candidate = yield* listFirstParentChain(repoRoot, tip);
-      const tipDate = Date.parse(candidate.at(0)?.committerDate ?? "");
-      const candidateRootDate = Date.parse(
-        candidate.at(-1)?.committerDate ?? "",
-      );
-      if (
-        Number.isNaN(tipDate) ||
-        Number.isNaN(candidateRootDate) ||
-        tipDate >= rootDate
-      ) {
-        continue;
-      }
-      absorbed.push(candidate);
+  const absorbed: ChainEntry[][] = [];
+  for (const tip of candidateTips) {
+    if (alreadyClaimed.has(tip)) {
+      continue;
     }
-    return { absorbed, assemblyShas };
-  });
+    if (!(yield* haveUnrelatedHistories(repoRoot, root.hash, tip))) {
+      continue;
+    }
+    const candidate = yield* listFirstParentChain(repoRoot, tip);
+    const tipDate = Date.parse(candidate.at(0)?.committerDate ?? "");
+    const candidateRootDate = Date.parse(candidate.at(-1)?.committerDate ?? "");
+    if (
+      Number.isNaN(tipDate) ||
+      Number.isNaN(candidateRootDate) ||
+      tipDate >= rootDate
+    ) {
+      continue;
+    }
+    absorbed.push(candidate);
+  }
+  return { absorbed, assemblyShas };
+});
 
 /**
  * One stretch of the project's history whose tree states are worth
@@ -318,57 +315,56 @@ export type Lineage = {
  * histories grafted mid-life stay excluded — their trees were never the
  * repository's state. See {@link describesTreeState} for what consumes this.
  */
-export const listLineages = (
+export const listLineages = Effect.fn("listLineages")(function* (
   repoRoot: string,
-): Effect.Effect<
+): Effect.fn.Return<
   Lineage[],
   CommandError,
   ChildProcessSpawner.ChildProcessSpawner
-> =>
-  Effect.gen(function* () {
-    const lineages: Lineage[] = [];
-    /** Every sha assigned to a lineage (or queued): overlap and cycle guard. */
-    const claimed = new Set<string>();
-    const initial = yield* listFirstParentChain(repoRoot);
-    const queue: Array<{ chain: ChainEntry[]; endsAtMs: number }> =
-      initial.length > 0 ? [{ chain: initial, endsAtMs: Infinity }] : [];
+> {
+  const lineages: Lineage[] = [];
+  /** Every sha assigned to a lineage (or queued): overlap and cycle guard. */
+  const claimed = new Set<string>();
+  const initial = yield* listFirstParentChain(repoRoot);
+  const queue: Array<{ chain: ChainEntry[]; endsAtMs: number }> =
+    initial.length > 0 ? [{ chain: initial, endsAtMs: Infinity }] : [];
 
-    while (queue.length > 0) {
-      const pending = queue.shift();
-      if (pending === undefined) {
-        break;
-      }
-      const { chain, endsAtMs } = pending;
-      for (const entry of chain) {
-        claimed.add(entry.hash);
-      }
+  while (queue.length > 0) {
+    const pending = queue.shift();
+    if (pending === undefined) {
+      break;
+    }
+    const { chain, endsAtMs } = pending;
+    for (const entry of chain) {
+      claimed.add(entry.hash);
+    }
 
-      const graft = yield* findFoundingGraft(repoRoot, chain, claimed);
-      const shas = new Set(chain.map((entry) => entry.hash));
-      let absorbedEndsAtMs = endsAtMs;
-      if (
-        graft.absorbed.length > 0 &&
-        // A degenerate chain that is nothing but assembly (HEAD is still a
-        // founding merge) keeps its commits: better a mid-assembly snapshot
-        // than none of the current era at all.
-        graft.assemblyShas.length < chain.length
-      ) {
-        for (const sha of graft.assemblyShas) {
-          shas.delete(sha);
-        }
-        const firstPostAssembly = chain.at(-1 - graft.assemblyShas.length);
-        if (firstPostAssembly !== undefined) {
-          absorbedEndsAtMs = Date.parse(firstPostAssembly.committerDate);
-        }
+    const graft = yield* findFoundingGraft(repoRoot, chain, claimed);
+    const shas = new Set(chain.map((entry) => entry.hash));
+    let absorbedEndsAtMs = endsAtMs;
+    if (
+      graft.absorbed.length > 0 &&
+      // A degenerate chain that is nothing but assembly (HEAD is still a
+      // founding merge) keeps its commits: better a mid-assembly snapshot
+      // than none of the current era at all.
+      graft.assemblyShas.length < chain.length
+    ) {
+      for (const sha of graft.assemblyShas) {
+        shas.delete(sha);
       }
-
-      lineages.push({ shas, endsAtMs });
-      for (const absorbedChain of graft.absorbed) {
-        queue.push({ chain: absorbedChain, endsAtMs: absorbedEndsAtMs });
+      const firstPostAssembly = chain.at(-1 - graft.assemblyShas.length);
+      if (firstPostAssembly !== undefined) {
+        absorbedEndsAtMs = Date.parse(firstPostAssembly.committerDate);
       }
     }
-    return lineages;
-  });
+
+    lineages.push({ shas, endsAtMs });
+    for (const absorbedChain of graft.absorbed) {
+      queue.push({ chain: absorbedChain, endsAtMs: absorbedEndsAtMs });
+    }
+  }
+  return lineages;
+});
 
 /**
  * Every sha on any lineage — what `scan` samples tree snapshots from, `gc`
@@ -498,7 +494,7 @@ type CommitOutcome = {
   readonly failures: readonly string[];
 };
 
-const collectCommit = ({
+const collectCommit = Effect.fn("collectCommit")(function* ({
   catalog,
   sha,
   collectors,
@@ -510,89 +506,86 @@ const collectCommit = ({
   readonly collectors: readonly Collector[];
   readonly cacheKeyOf: (collector: Collector) => string;
   readonly force: boolean;
-}): Effect.Effect<
+}): Effect.fn.Return<
   CommitOutcome,
   Error,
   ChildProcessSpawner.ChildProcessSpawner
-> =>
-  Effect.gen(function* () {
-    const pending: Collector[] = [];
-    let skipped = 0;
+> {
+  const pending: Collector[] = [];
+  let skipped = 0;
 
-    for (const collector of collectors) {
-      if (
-        !force &&
-        (yield* isCollected(catalog, sha, collector, cacheKeyOf(collector)))
-      ) {
-        skipped += 1;
-      } else {
-        pending.push(collector);
-      }
+  for (const collector of collectors) {
+    if (
+      !force &&
+      (yield* isCollected(catalog, sha, collector, cacheKeyOf(collector)))
+    ) {
+      skipped += 1;
+    } else {
+      pending.push(collector);
     }
+  }
 
-    const direct = pending.filter(
-      (collector) => collector.strategy !== "worktree",
-    );
-    const needingWorktree = pending.filter(
-      (collector) => collector.strategy === "worktree",
-    );
+  const direct = pending.filter(
+    (collector) => collector.strategy !== "worktree",
+  );
+  const needingWorktree = pending.filter(
+    (collector) => collector.strategy === "worktree",
+  );
 
-    let run = 0;
-    const failures: string[] = [];
-    for (const collector of direct) {
-      const failure = yield* runCollector({
-        catalog,
-        sha,
-        collector,
-        cacheKey: cacheKeyOf(collector),
-      }).pipe(
-        Effect.as(undefined),
-        Effect.catch((error) => Effect.succeed(error.message)),
-      );
+  let run = 0;
+  const failures: string[] = [];
+  for (const collector of direct) {
+    const failure = yield* runCollector({
+      catalog,
+      sha,
+      collector,
+      cacheKey: cacheKeyOf(collector),
+    }).pipe(
+      Effect.as(undefined),
+      Effect.catch((error) => Effect.succeed(error.message)),
+    );
+    if (failure === undefined) {
+      run += 1;
+    } else {
+      failures.push(failure);
+    }
+  }
+
+  if (needingWorktree.length > 0) {
+    const worktreeFailures = yield* withTemporaryWorktree(
+      catalog.repoRoot,
+      sha,
+      (worktreePath) =>
+        Effect.forEach(needingWorktree, (collector) =>
+          runCollector({
+            catalog,
+            sha,
+            collector,
+            cacheKey: cacheKeyOf(collector),
+            worktreePath,
+          }).pipe(
+            Effect.as(undefined),
+            Effect.catch((error) => Effect.succeed(error.message)),
+          ),
+        ),
+    ).pipe(
+      Effect.catch((error) =>
+        Effect.succeed([`Worktree for ${sha.slice(0, 10)}: ${error.message}`]),
+      ),
+    );
+    for (const failure of worktreeFailures) {
       if (failure === undefined) {
         run += 1;
       } else {
         failures.push(failure);
       }
     }
+  }
 
-    if (needingWorktree.length > 0) {
-      const worktreeFailures = yield* withTemporaryWorktree(
-        catalog.repoRoot,
-        sha,
-        (worktreePath) =>
-          Effect.forEach(needingWorktree, (collector) =>
-            runCollector({
-              catalog,
-              sha,
-              collector,
-              cacheKey: cacheKeyOf(collector),
-              worktreePath,
-            }).pipe(
-              Effect.as(undefined),
-              Effect.catch((error) => Effect.succeed(error.message)),
-            ),
-          ),
-      ).pipe(
-        Effect.catch((error) =>
-          Effect.succeed([
-            `Worktree for ${sha.slice(0, 10)}: ${error.message}`,
-          ]),
-        ),
-      );
-      for (const failure of worktreeFailures) {
-        if (failure === undefined) {
-          run += 1;
-        } else {
-          failures.push(failure);
-        }
-      }
-    }
+  return { run, skipped, failures };
+});
 
-    return { run, skipped, failures };
-  });
-
-export const runScan = ({
+export const runScan = Effect.fn("runScan")(function* ({
   repoPath,
   collectorNames,
   maxCommits,
@@ -604,216 +597,211 @@ export const runScan = ({
   readonly maxCommits?: number | undefined;
   readonly sample?: string | undefined;
   readonly force?: boolean | undefined;
-}): Effect.Effect<void, Error, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function* () {
-    const collectors = yield* Effect.fromResult(
-      resolveCollectors(collectorNames),
-    );
+}): Effect.fn.Return<void, Error, ChildProcessSpawner.ChildProcessSpawner> {
+  const collectors = yield* Effect.fromResult(
+    resolveCollectors(collectorNames),
+  );
 
-    let sampleOverride: SamplingPolicy | undefined;
-    if (sample !== undefined) {
-      sampleOverride = yield* Effect.fromResult(parseSamplingPolicy(sample));
-    }
+  let sampleOverride: SamplingPolicy | undefined;
+  if (sample !== undefined) {
+    sampleOverride = yield* Effect.fromResult(parseSamplingPolicy(sample));
+  }
 
-    const repoRoot = yield* resolveRepoRoot(repoPath);
-    const commits = yield* listCommits(repoRoot);
-    const selected =
-      maxCommits === undefined ? commits : commits.slice(0, maxCommits);
+  const repoRoot = yield* resolveRepoRoot(repoPath);
+  const commits = yield* listCommits(repoRoot);
+  const selected =
+    maxCommits === undefined ? commits : commits.slice(0, maxCommits);
 
-    // Loaded before the catalog is opened: the config decides where it lives.
-    // One fingerprint per collector for the whole run follows from it too — the
-    // config is fixed, so it decides re-collection uniformly across commits.
-    const config = yield* loadConfig(repoRoot);
-    const catalog = yield* openCatalog({
-      repoRoot,
-      catalogPath: config.catalogPath,
-    });
-    const summary = summarizeCommits(commits);
+  // Loaded before the catalog is opened: the config decides where it lives.
+  // One fingerprint per collector for the whole run follows from it too — the
+  // config is fixed, so it decides re-collection uniformly across commits.
+  const config = yield* loadConfig(repoRoot);
+  const catalog = yield* openCatalog({
+    repoRoot,
+    catalogPath: config.catalogPath,
+  });
+  const summary = summarizeCommits(commits);
 
-    const cacheKeys = new Map(
-      collectors.map((collector) => [
-        collector.name,
-        collectorCacheKey(collector, config),
-      ]),
-    );
-    const cacheKeyOf = (collector: Collector): string =>
-      cacheKeys.get(collector.name) ?? collectorCacheKey(collector, config);
+  const cacheKeys = new Map(
+    collectors.map((collector) => [
+      collector.name,
+      collectorCacheKey(collector, config),
+    ]),
+  );
+  const cacheKeyOf = (collector: Collector): string =>
+    cacheKeys.get(collector.name) ?? collectorCacheKey(collector, config);
 
-    const lineages = yield* listLineages(repoRoot);
+  const lineages = yield* listLineages(repoRoot);
 
-    const plans = collectors.map((collector) => {
-      const policy = sampleOverride ?? collector.defaultSampling;
-      return {
-        collector,
-        policy,
-        shas: describesTreeState(collector)
-          ? sampleTreeCommits(lineages, selected, policy)
-          : new Set(
-              sampleCommits(selected, policy).map((commit) => commit.hash),
-            ),
-      };
-    });
-
-    yield* Console.log(
-      `Plan: ${plans
-        .map(
-          (plan) =>
-            `${plan.collector.name} → ${plan.shas.size} commits (${samplingLabel(plan.policy)})`,
-        )
-        .join(", ")}`,
-    );
-
-    let totalRun = 0;
-    let totalSkipped = 0;
-    const failures: string[] = [];
-
-    // Batch phase: collectors that can cover many commits per subprocess do so
-    // up front; whatever they produced is excluded from the per-commit phase.
-    const batchDone = new Map<string, ReadonlySet<string>>();
-    for (const plan of plans) {
-      const { collector } = plan;
-      if (!collector.collectBatch) {
-        continue;
-      }
-      const pending = new Set<string>();
-      for (const sha of plan.shas) {
-        if (
-          force ||
-          !(yield* isCollected(catalog, sha, collector, cacheKeyOf(collector)))
-        ) {
-          pending.add(sha);
-        }
-      }
-      totalSkipped += plan.shas.size - pending.size;
-      if (pending.size === 0) {
-        batchDone.set(collector.name, plan.shas);
-        continue;
-      }
-
-      const [batchDuration, outputs] = yield* collector
-        .collectBatch({ repoRoot, shas: pending })
-        .pipe(
-          Effect.catch((error) => {
-            failures.push(`Batch ${collector.name}: ${error.message}`);
-            return Effect.succeed(new Map<string, unknown>());
-          }),
-          Effect.timed,
-        );
-      const durationMs = Math.max(
-        1,
-        Math.round(
-          Duration.toMillis(batchDuration) / Math.max(1, outputs.size),
-        ),
-      );
-
-      const written = new Set(
-        yield* Effect.forEach(
-          outputs.entries().toArray(),
-          ([sha, output]) =>
-            writeCollectorOutput({
-              catalog,
-              sha,
-              collector,
-              cacheKey: cacheKeyOf(collector),
-              output,
-              durationMs,
-            }).pipe(Effect.as(sha)),
-          { concurrency: 16 },
-        ),
-      );
-      totalRun += written.size;
-
-      const done = new Set(plan.shas);
-      for (const sha of pending) {
-        if (!written.has(sha)) {
-          done.delete(sha); // fall back to per-commit collect()
-        }
-      }
-      batchDone.set(collector.name, done);
-      if (written.size > 0) {
-        yield* Console.log(
-          `Batched ${collector.name}: ${written.size} commits in one pass.`,
-        );
-      }
-    }
-
-    const startedAt = yield* Clock.currentTimeMillis;
-
-    const formatEta = (processed: number, now: number): string => {
-      const elapsedSeconds = (now - startedAt) / 1000;
-      const rate = processed / Math.max(1, elapsedSeconds);
-      const remainingSeconds = Math.round(
-        (selected.length - processed) / Math.max(0.01, rate),
-      );
-      const minutes = Math.floor(remainingSeconds / 60);
-      const seconds = remainingSeconds % 60;
-      return `${Math.round(rate)}/s, ~${minutes > 0 ? `${minutes}m ` : ""}${seconds}s left`;
+  const plans = collectors.map((collector) => {
+    const policy = sampleOverride ?? collector.defaultSampling;
+    return {
+      collector,
+      policy,
+      shas: describesTreeState(collector)
+        ? sampleTreeCommits(lineages, selected, policy)
+        : new Set(sampleCommits(selected, policy).map((commit) => commit.hash)),
     };
+  });
 
-    const processedRef = yield* Ref.make(0);
-    const outcomes = yield* Effect.forEach(
-      selected,
-      (commit) =>
-        collectCommit({
-          catalog,
-          sha: commit.hash,
-          collectors: plans
-            .filter(
-              (plan) =>
-                plan.shas.has(commit.hash) &&
-                !batchDone.get(plan.collector.name)?.has(commit.hash),
-            )
-            .map((plan) => plan.collector),
-          cacheKeyOf,
-          force,
-        }).pipe(
-          Effect.tap(() =>
-            Effect.gen(function* () {
-              const processed = yield* Ref.updateAndGet(
-                processedRef,
-                (count) => count + 1,
-              );
-              if (processed % 250 === 0) {
-                const now = yield* Clock.currentTimeMillis;
-                yield* Console.log(
-                  `Scanned ${processed}/${selected.length} commits (${formatEta(processed, now)})…`,
-                );
-              }
-            }),
-          ),
-        ),
-      { concurrency: 4 },
-    );
+  yield* Console.log(
+    `Plan: ${plans
+      .map(
+        (plan) =>
+          `${plan.collector.name} → ${plan.shas.size} commits (${samplingLabel(plan.policy)})`,
+      )
+      .join(", ")}`,
+  );
 
-    for (const outcome of outcomes) {
-      totalRun += outcome.run;
-      totalSkipped += outcome.skipped;
-      failures.push(...outcome.failures);
+  let totalRun = 0;
+  let totalSkipped = 0;
+  const failures: string[] = [];
+
+  // Batch phase: collectors that can cover many commits per subprocess do so
+  // up front; whatever they produced is excluded from the per-commit phase.
+  const batchDone = new Map<string, ReadonlySet<string>>();
+  for (const plan of plans) {
+    const { collector } = plan;
+    if (!collector.collectBatch) {
+      continue;
+    }
+    const pending = new Set<string>();
+    for (const sha of plan.shas) {
+      if (
+        force ||
+        !(yield* isCollected(catalog, sha, collector, cacheKeyOf(collector)))
+      ) {
+        pending.add(sha);
+      }
+    }
+    totalSkipped += plan.shas.size - pending.size;
+    if (pending.size === 0) {
+      batchDone.set(collector.name, plan.shas);
+      continue;
     }
 
-    yield* Console.log(
+    const [batchDuration, outputs] = yield* collector
+      .collectBatch({ repoRoot, shas: pending })
+      .pipe(
+        Effect.catch((error) => {
+          failures.push(`Batch ${collector.name}: ${error.message}`);
+          return Effect.succeed(new Map<string, unknown>());
+        }),
+        Effect.timed,
+      );
+    const durationMs = Math.max(
+      1,
+      Math.round(Duration.toMillis(batchDuration) / Math.max(1, outputs.size)),
+    );
+
+    const written = new Set(
+      yield* Effect.forEach(
+        outputs.entries().toArray(),
+        ([sha, output]) =>
+          writeCollectorOutput({
+            catalog,
+            sha,
+            collector,
+            cacheKey: cacheKeyOf(collector),
+            output,
+            durationMs,
+          }).pipe(Effect.as(sha)),
+        { concurrency: 16 },
+      ),
+    );
+    totalRun += written.size;
+
+    const done = new Set(plan.shas);
+    for (const sha of pending) {
+      if (!written.has(sha)) {
+        done.delete(sha); // fall back to per-commit collect()
+      }
+    }
+    batchDone.set(collector.name, done);
+    if (written.size > 0) {
+      yield* Console.log(
+        `Batched ${collector.name}: ${written.size} commits in one pass.`,
+      );
+    }
+  }
+
+  const startedAt = yield* Clock.currentTimeMillis;
+
+  const formatEta = (processed: number, now: number): string => {
+    const elapsedSeconds = (now - startedAt) / 1000;
+    const rate = processed / Math.max(1, elapsedSeconds);
+    const remainingSeconds = Math.round(
+      (selected.length - processed) / Math.max(0.01, rate),
+    );
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = remainingSeconds % 60;
+    return `${Math.round(rate)}/s, ~${minutes > 0 ? `${minutes}m ` : ""}${seconds}s left`;
+  };
+
+  const processedRef = yield* Ref.make(0);
+  const outcomes = yield* Effect.forEach(
+    selected,
+    (commit) =>
+      collectCommit({
+        catalog,
+        sha: commit.hash,
+        collectors: plans
+          .filter(
+            (plan) =>
+              plan.shas.has(commit.hash) &&
+              !batchDone.get(plan.collector.name)?.has(commit.hash),
+          )
+          .map((plan) => plan.collector),
+        cacheKeyOf,
+        force,
+      }).pipe(
+        Effect.tap(() =>
+          Effect.gen(function* () {
+            const processed = yield* Ref.updateAndGet(
+              processedRef,
+              (count) => count + 1,
+            );
+            if (processed % 250 === 0) {
+              const now = yield* Clock.currentTimeMillis;
+              yield* Console.log(
+                `Scanned ${processed}/${selected.length} commits (${formatEta(processed, now)})…`,
+              );
+            }
+          }),
+        ),
+      ),
+    { concurrency: 4 },
+  );
+
+  for (const outcome of outcomes) {
+    totalRun += outcome.run;
+    totalSkipped += outcome.skipped;
+    failures.push(...outcome.failures);
+  }
+
+  yield* Console.log(
+    [
+      `Repository: ${repoRoot}`,
+      `Commits: ${summary.commitCount} (${summary.authorCount} authors, ${
+        summary.firstCommitDate ?? "n/a"
+      } — ${summary.lastCommitDate ?? "n/a"})`,
+      `Collector runs: ${totalRun} new, ${totalSkipped} already collected` +
+        (failures.length > 0 ? `, ${failures.length} failed` : ""),
+      `Catalog: ${catalog.rootPath}`,
+    ].join("\n"),
+  );
+
+  if (failures.length > 0) {
+    yield* Console.error(
       [
-        `Repository: ${repoRoot}`,
-        `Commits: ${summary.commitCount} (${summary.authorCount} authors, ${
-          summary.firstCommitDate ?? "n/a"
-        } — ${summary.lastCommitDate ?? "n/a"})`,
-        `Collector runs: ${totalRun} new, ${totalSkipped} already collected` +
-          (failures.length > 0 ? `, ${failures.length} failed` : ""),
-        `Catalog: ${catalog.rootPath}`,
+        `${failures.length} collector runs failed (re-run scan to retry):`,
+        ...failures.slice(0, 10).map((message) => `  ${message}`),
+        ...(failures.length > 10
+          ? [`  … and ${failures.length - 10} more`]
+          : []),
       ].join("\n"),
     );
+  }
 
-    if (failures.length > 0) {
-      yield* Console.error(
-        [
-          `${failures.length} collector runs failed (re-run scan to retry):`,
-          ...failures.slice(0, 10).map((message) => `  ${message}`),
-          ...(failures.length > 10
-            ? [`  … and ${failures.length - 10} more`]
-            : []),
-        ].join("\n"),
-      );
-    }
-
-    yield* warnAboutIgnoreFiles({ repoRoot, config });
-  });
+  yield* warnAboutIgnoreFiles({ repoRoot, config });
+});

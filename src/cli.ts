@@ -40,8 +40,8 @@ const cli = Command.make("repo-dive", {
     "Derive insights from a git repository's history. " +
       "Without a subcommand, runs the whole pipeline: scan → index → dashboard.",
   ),
-  Command.withHandler((config) =>
-    Effect.gen(function* () {
+  Command.withHandler(
+    Effect.fn("runPipeline")(function* (config) {
       yield* Console.log("Step 1/3 — scan: collecting per-commit snapshots…");
       yield* runScan({ repoPath: config.repoPath });
       yield* Console.log("\nStep 2/3 — index: rolling up the metrics cube…");

@@ -14,8 +14,8 @@ export const mcpCommand = Command.make("mcp", {
   Command.withDescription(
     "Serve the metrics cube over the Model Context Protocol (stdio) so AI agents can query it",
   ),
-  Command.withHandler((config) =>
-    Effect.gen(function* () {
+  Command.withHandler(
+    Effect.fn("runMcp")(function* (config) {
       const layer = yield* buildMcpLayer(config.repoPath);
       yield* Layer.launch(layer);
     }),

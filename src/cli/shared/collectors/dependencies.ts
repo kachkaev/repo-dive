@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 
 import { arrayAt, numberAt, recordAt, stringAt } from "../../../shared/json.ts";
 import {
@@ -11,9 +11,6 @@ import {
 } from "./dependencies/package-manifest.ts";
 import { scanTreeFilesWithBlobCache } from "./dependencies/tree-files.ts";
 import type { Collector, Fact } from "./shared/types.ts";
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const basenameOf = (filePath: string): string =>
   filePath.split("/").at(-1) ?? "";
@@ -81,7 +78,7 @@ export const dependenciesCollector: Collector = {
         const lockfiles: DependencyLockfile[] = [];
         const manifests: DependencyManifest[] = [];
         for (const file of files) {
-          if (!isRecord(file.result)) {
+          if (!Predicate.isObject(file.result)) {
             continue;
           }
           const summary = recordAt(file.result, "summary");

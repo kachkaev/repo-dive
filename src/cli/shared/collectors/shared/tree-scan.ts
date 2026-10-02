@@ -97,7 +97,7 @@ const parsedMemoCapacity = 400_000;
  * Computes a content-derived result for every source file in a commit's tree,
  * caching per blob: only blobs never seen before are read and scanned.
  */
-export const scanTreeWithBlobCache = ({
+export const scanTreeWithBlobCache = Effect.fnUntraced(function* ({
   repoRoot,
   catalogPath,
   sha,
@@ -113,57 +113,56 @@ export const scanTreeWithBlobCache = ({
   readonly cacheKey: string;
   /** Pure per-file scan; its JSON-encoded result is what gets cached. */
   readonly scanContent: (content: string) => unknown;
-}): Effect.Effect<
+}): Effect.fn.Return<
   Array<{ filePath: string; result: unknown }>,
   Error,
   ChildProcessSpawner.ChildProcessSpawner
-> =>
-  Effect.gen(function* () {
-    const blobs = yield* listSourceBlobs(repoRoot, sha);
-    const cache = getBlobCache(catalogPath);
+> {
+  const blobs = yield* listSourceBlobs(repoRoot, sha);
+  const cache = getBlobCache(catalogPath);
 
-    const memoKey = (blobSha: string) =>
-      `${collectorName}:${cacheKey}:${blobSha}`;
-    if (parsedMemo.size > parsedMemoCapacity) {
-      parsedMemo.clear();
+  const memoKey = (blobSha: string) =>
+    `${collectorName}:${cacheKey}:${blobSha}`;
+  if (parsedMemo.size > parsedMemoCapacity) {
+    parsedMemo.clear();
+  }
+
+  const unseenShas = [
+    ...new Set(
+      blobs
+        .map((blob) => blob.blobSha)
+        .filter((blobSha) => !parsedMemo.has(memoKey(blobSha))),
+    ),
+  ];
+
+  // Second level: the on-disk cache survives across runs.
+  const cachedRaw = cache.getMany(collectorName, cacheKey, unseenShas);
+  for (const [blobSha, raw] of cachedRaw) {
+    const parsed: unknown = JSON.parse(raw);
+    parsedMemo.set(memoKey(blobSha), parsed);
+  }
+
+  // Third level: read and scan blobs nobody has ever seen.
+  const missing = unseenShas.filter((blobSha) => !cachedRaw.has(blobSha));
+  if (missing.length > 0) {
+    const contents = yield* fetchBlobContents(repoRoot, missing);
+    const fresh = new Map<string, string>();
+    for (const [blobSha, content] of contents) {
+      const result = scanContent(content);
+      fresh.set(blobSha, JSON.stringify(result));
+      parsedMemo.set(memoKey(blobSha), result);
     }
+    cache.setMany(collectorName, cacheKey, fresh);
+  }
 
-    const unseenShas = [
-      ...new Set(
-        blobs
-          .map((blob) => blob.blobSha)
-          .filter((blobSha) => !parsedMemo.has(memoKey(blobSha))),
-      ),
-    ];
-
-    // Second level: the on-disk cache survives across runs.
-    const cachedRaw = cache.getMany(collectorName, cacheKey, unseenShas);
-    for (const [blobSha, raw] of cachedRaw) {
-      const parsed: unknown = JSON.parse(raw);
-      parsedMemo.set(memoKey(blobSha), parsed);
+  const results: Array<{ filePath: string; result: unknown }> = [];
+  for (const blob of blobs) {
+    if (parsedMemo.has(memoKey(blob.blobSha))) {
+      results.push({
+        filePath: blob.filePath,
+        result: parsedMemo.get(memoKey(blob.blobSha)),
+      });
     }
-
-    // Third level: read and scan blobs nobody has ever seen.
-    const missing = unseenShas.filter((blobSha) => !cachedRaw.has(blobSha));
-    if (missing.length > 0) {
-      const contents = yield* fetchBlobContents(repoRoot, missing);
-      const fresh = new Map<string, string>();
-      for (const [blobSha, content] of contents) {
-        const result = scanContent(content);
-        fresh.set(blobSha, JSON.stringify(result));
-        parsedMemo.set(memoKey(blobSha), result);
-      }
-      cache.setMany(collectorName, cacheKey, fresh);
-    }
-
-    const results: Array<{ filePath: string; result: unknown }> = [];
-    for (const blob of blobs) {
-      if (parsedMemo.has(memoKey(blob.blobSha))) {
-        results.push({
-          filePath: blob.filePath,
-          result: parsedMemo.get(memoKey(blob.blobSha)),
-        });
-      }
-    }
-    return results;
-  });
+  }
+  return results;
+});

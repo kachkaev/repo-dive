@@ -1,7 +1,6 @@
-/** Shared shape guards for the lockfile parsers. */
+/** Shared shape helpers for the lockfile parsers. */
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+import { Predicate } from "effect";
 
 export const countKeys = (value: unknown): number =>
-  isRecord(value) ? Object.keys(value).length : 0;
+  Predicate.isObject(value) ? Object.keys(value).length : 0;

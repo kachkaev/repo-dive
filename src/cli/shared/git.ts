@@ -1,4 +1,4 @@
-import { Data, Effect, type PlatformError, Stream } from "effect";
+import { Data, Effect, type PlatformError, type Scope, Stream } from "effect";
 import { ChildProcess, type ChildProcessSpawner } from "effect/process";
 
 class GitCommandError extends Data.TaggedError("GitCommandError")<{
@@ -23,103 +23,99 @@ const captureStream = <E, R>(stream: Stream.Stream<Uint8Array, E, R>) =>
  * The repo path is passed via `git -C` rather than a working directory to keep
  * the invocation explicit.
  */
-const runCommand = (
+const runCommand = Effect.fnUntraced(function* (
   command: string,
   args: readonly string[],
   options?: {
     /** Extra exit codes to treat as success (e.g. 1 for `git grep` with no matches). */
     readonly okExitCodes?: readonly number[];
   },
-): Effect.Effect<
+): Effect.fn.Return<
   string,
   CommandError,
-  ChildProcessSpawner.ChildProcessSpawner
-> =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const handle = yield* ChildProcess.make(command, [...args], {
-        stdin: "ignore",
-      });
+  ChildProcessSpawner.ChildProcessSpawner | Scope.Scope
+> {
+  const handle = yield* ChildProcess.make(command, [...args], {
+    stdin: "ignore",
+  });
 
-      const { stdout, stderr, exitCode } = yield* Effect.all(
-        {
-          stdout: captureStream(handle.stdout),
-          stderr: captureStream(handle.stderr),
-          exitCode: handle.exitCode,
-        },
-        { concurrency: "unbounded" },
-      );
-
-      if (exitCode !== 0 && !options?.okExitCodes?.includes(exitCode)) {
-        return yield* new GitCommandError({
-          args: [command, ...args],
-          exitCode,
-          stderr,
-        });
-      }
-
-      return stdout;
-    }),
+  const { stdout, stderr, exitCode } = yield* Effect.all(
+    {
+      stdout: captureStream(handle.stdout),
+      stderr: captureStream(handle.stderr),
+      exitCode: handle.exitCode,
+    },
+    { concurrency: "unbounded" },
   );
 
-export const runGit = (
+  if (exitCode !== 0 && !options?.okExitCodes?.includes(exitCode)) {
+    return yield* new GitCommandError({
+      args: [command, ...args],
+      exitCode,
+      stderr,
+    });
+  }
+
+  return stdout;
+}, Effect.scoped);
+
+export const runGit = Effect.fn("runGit")(function* (
   args: readonly string[],
   options?: { readonly okExitCodes?: readonly number[] },
-): Effect.Effect<
+): Effect.fn.Return<
   string,
   CommandError,
   ChildProcessSpawner.ChildProcessSpawner
-> => runCommand("git", args, options);
+> {
+  return yield* runCommand("git", args, options);
+});
 
 /**
  * Runs a command with `input` written to stdin and stdout captured as raw
  * bytes — needed for `git cat-file --batch`, whose framing is byte-length
  * based and must not pass through text decoding.
  */
-export const runCommandBytes = (
+export const runCommandBytes = Effect.fn("runCommandBytes")(function* (
   command: string,
   args: readonly string[],
   options: { readonly input: string },
-): Effect.Effect<
+): Effect.fn.Return<
   Uint8Array,
   CommandError,
-  ChildProcessSpawner.ChildProcessSpawner
-> =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const handle = yield* ChildProcess.make(command, [...args], {
-        stdin: Stream.make(new TextEncoder().encode(options.input)),
-      });
+  ChildProcessSpawner.ChildProcessSpawner | Scope.Scope
+> {
+  const handle = yield* ChildProcess.make(command, [...args], {
+    stdin: Stream.make(new TextEncoder().encode(options.input)),
+  });
 
-      const chunks: Uint8Array[] = [];
-      const { stderr, exitCode } = yield* Effect.all(
-        {
-          collect: Stream.runForEach(handle.stdout, (chunk) =>
-            Effect.sync(() => {
-              chunks.push(chunk);
-            }),
-          ),
-          stderr: captureStream(handle.stderr),
-          exitCode: handle.exitCode,
-        },
-        { concurrency: "unbounded" },
-      );
-
-      if (exitCode !== 0) {
-        return yield* new GitCommandError({
-          args: [command, ...args],
-          exitCode,
-          stderr,
-        });
-      }
-
-      const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const result = new Uint8Array(total);
-      let offset = 0;
-      for (const chunk of chunks) {
-        result.set(chunk, offset);
-        offset += chunk.length;
-      }
-      return result;
-    }),
+  const chunks: Uint8Array[] = [];
+  const { stderr, exitCode } = yield* Effect.all(
+    {
+      collect: Stream.runForEach(handle.stdout, (chunk) =>
+        Effect.sync(() => {
+          chunks.push(chunk);
+        }),
+      ),
+      stderr: captureStream(handle.stderr),
+      exitCode: handle.exitCode,
+    },
+    { concurrency: "unbounded" },
   );
+
+  if (exitCode !== 0) {
+    return yield* new GitCommandError({
+      args: [command, ...args],
+      exitCode,
+      stderr,
+    });
+  }
+
+  const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const result = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}, Effect.scoped);
