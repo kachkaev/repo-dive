@@ -41,6 +41,17 @@ test("withIgnoreEntry gives a file kept in commented groups one more", () => {
   );
 });
 
+test("withIgnoreEntry heads the group like a comment, not like a banner", () => {
+  // Rows of hashes frame the banners; the headings show how a comment starts.
+  expect(
+    add(
+      "#############\n## Linters\n#############\n\n*\n!*.md\n\n## Build\n/dist/\n",
+    ).contents,
+  ).toBe(
+    "#############\n## Linters\n#############\n\n*\n!*.md\n\n## Build\n/dist/\n\n## repo-dive catalog\n/.repo-dive/\n",
+  );
+});
+
 test("withIgnoreEntry does not open a group in a file that has none", () => {
   // Comments over the whole file, and blank lines without comments, both stay
   // plain: a heading over a single pattern is more ceremony than it deserves.
