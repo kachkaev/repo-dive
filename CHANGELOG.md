@@ -1,5 +1,15 @@
 # repo-dive
 
+## 0.16.2
+
+### Patch Changes
+
+- [#264](https://github.com/kachkaev/repo-dive/pull/264) [`c47d48a`](https://github.com/kachkaev/repo-dive/commit/c47d48a3c6a5c252ac18a1c9c8b2134bee0afd56) - Stop `repo-dive ignore` from copying a banner's row of hashes into the catalog heading.
+  An ignore file that opens with a `###########################` banner and uses `##` headings now gets `## repo-dive catalog`, not the whole row followed by the title.
+
+- [#260](https://github.com/kachkaev/repo-dive/pull/260) [`0049207`](https://github.com/kachkaev/repo-dive/commit/00492072f117eebde485ca7e8ffaa0b119503f68) - Upgrade Effect to the stable 4.0.0 release.
+  The CLI was previously built on a 4.0 release candidate; commands and flags work as before.
+
 ## 0.16.1
 
 ### Patch Changes
