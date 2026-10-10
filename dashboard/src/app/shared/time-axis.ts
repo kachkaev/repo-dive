@@ -131,26 +131,25 @@ export const timeAxisTicks = ({
 }): TimeTick[] => {
   const maxTicks = Math.max(2, Math.min(8, Math.floor(widthPx / 90)));
   const intervals = intervalsOf[pointUnit];
-  let fewest: TimeTick[] | undefined;
+  // Only the chosen step is labelled: the finest ones can run to thousands of
+  // ticks (daily over a decade-long history).
+  let fewest: { valuesMs: number[]; interval: TickInterval } | undefined;
   for (const interval of intervals) {
-    const ticks = labelTicks(
-      tickValuesOf(startMs, endMs, interval, pointUnit),
-      interval,
-    );
-    if (ticks.length > 0 && ticks.length <= maxTicks) {
-      return ticks;
+    const valuesMs = tickValuesOf(startMs, endMs, interval, pointUnit);
+    if (valuesMs.length === 0) {
+      continue;
     }
-    if (
-      ticks.length > 0 &&
-      (fewest === undefined || ticks.length < fewest.length)
-    ) {
-      fewest = ticks;
+    if (valuesMs.length <= maxTicks) {
+      return labelTicks(valuesMs, interval);
+    }
+    if (fewest === undefined || valuesMs.length < fewest.valuesMs.length) {
+      fewest = { valuesMs, interval };
     }
   }
   if (fewest !== undefined) {
     // No step fits: the finer ones overflow and the coarser ones miss the span
     // (Monday to Friday has no Sunday). Slightly crowded beats unlabelled.
-    return fewest;
+    return labelTicks(fewest.valuesMs, fewest.interval);
   }
   // A span shorter than the finest step that crosses none of its boundaries
   // (two commits an hour apart): name the point in its middle instead.
