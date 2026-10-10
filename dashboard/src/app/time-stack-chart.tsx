@@ -703,6 +703,11 @@ export function TimeSeriesChart(props: {
     pointUnit: resolvedPointUnit,
     widthPx: innerWidth,
   });
+  // Mapped here, not inline in the JSX: React Compiler can't tell what
+  // `timeAxisTicks` returns, so a `.map` on it down by the axis would count as
+  // a possible mutation late in render and fuse every derived value above —
+  // rows and scales included — into the hover-reactive scope.
+  const xTickValues = xTicks.map((tick) => tick.valueMs);
 
   let yPeak = 0;
   for (const row of rows) {
@@ -871,7 +876,7 @@ export function TimeSeriesChart(props: {
             <AxisBottom
               top={innerHeight}
               scale={xScale}
-              tickValues={xTicks.map((tick) => tick.valueMs)}
+              tickValues={xTickValues}
               tickFormat={(_, index) => xTicks[index]?.label}
               hideTicks
               stroke="var(--grid-line)"
