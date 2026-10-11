@@ -98,6 +98,19 @@ jobs:
             exit 1
           fi
 
+      - name: Run pnpm lint:effect-versions
+        if: ${{ success() || failure() }}
+        run: |
+          if ! pnpm lint:effect-versions; then
+            echo ''
+            echo ''
+            echo 'ℹ️ ℹ️ ℹ️'
+            echo 'Effect packages are released in lockstep and must share one version.'
+            echo 'If Renovate opened this PR, it updates the PR by itself once the lagging package becomes eligible.'
+            echo 'ℹ️ ℹ️ ℹ️'
+            exit 1
+          fi
+
       - name: Run pnpm lint:eslint
         if: ${{ success() || failure() }}
         run: |

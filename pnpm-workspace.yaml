@@ -21,5 +21,12 @@ minimumReleaseAge: 480
 minimumReleaseAgeExclude:
   - "@kachkaev/*"
 nodeLinker: isolated
+# Effect packages are released in lockstep and import each other's newest modules, so they must all
+# resolve to the same version. `@effect/platform-node` reaches `@effect/platform-node-shared` through
+# a caret range, which lets lock file maintenance float it ahead of the pinned `effect`, so it is pinned
+# here too. Renovate updates this override together with the rest of the effect monorepo group, and
+# `pnpm lint:effect-versions` fails if the versions drift apart.
+overrides:
+  "@effect/platform-node-shared": 4.0.2
 # Have `pnpm add` also add the matching `@types/*` package to devDependencies, when one exists
 saveTypes: true
