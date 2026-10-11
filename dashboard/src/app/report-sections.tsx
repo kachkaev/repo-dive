@@ -43,6 +43,7 @@ import { DataTable, Section, SectionSkeleton } from "./shared/primitives.tsx";
 import { PercentControl } from "./shared/segmented-control.tsx";
 import { shapeStacked } from "./shared/stacked-series.ts";
 import { StaleOverlay } from "./shared/stale-overlay.tsx";
+import { monthBucketMs } from "./shared/time-axis.ts";
 import { TimeSeriesChart } from "./time-stack-chart.tsx";
 
 /** Keeps every nth row so dense per-commit series stay light to render. */
@@ -457,7 +458,7 @@ export function ReportSections({
   );
   const commitsChart = {
     points: monthlyRows.map(([month, bucket]) => ({
-      dateMs: new Date(`${month}-15`).getTime(),
+      dateMs: monthBucketMs(month),
       values: Object.fromEntries(
         commitKindKeys.map((kind) => [commitKindSeries[kind], bucket[kind]]),
       ),

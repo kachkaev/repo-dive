@@ -9,6 +9,7 @@ import { useDeferredValue, useId, useState } from "react";
 import { formatCount, formatMonth, formatPercent } from "./shared/format.ts";
 import { DateStamp, Legend, Swatch } from "./shared/primitives.tsx";
 import { StaleOverlay } from "./shared/stale-overlay.tsx";
+import { type PointUnit, timeAxisTicks } from "./shared/time-axis.ts";
 import { useMeasuredWidth } from "./shared/use-measure.ts";
 
 export type TimePoint = {
@@ -17,14 +18,6 @@ export type TimePoint = {
 };
 
 export type LegendItem = { label: string; color: string; hatch?: string };
-
-/**
- * What a data point stands for on the time axis, and so how the tooltip names
- * the instant under the cursor: a day gets its date and weekday, a month gets
- * its name — a monthly bucket is pinned to a synthetic mid-month timestamp, and
- * "2025-06-15 · Sunday" would read as a claim about one particular Sunday.
- */
-export type PointUnit = "day" | "month";
 
 /**
  * Collapses several stacked sub-series (e.g. one contributor's per-year bands)
@@ -703,6 +696,18 @@ export function TimeSeriesChart(props: {
     domain: [xMin, xMax],
     range: [xInset, innerWidth - xInset],
   });
+  const resolvedPointUnit = pointUnit ?? "day";
+  const xTicks = timeAxisTicks({
+    startMs: xMin,
+    endMs: xMax,
+    pointUnit: resolvedPointUnit,
+    widthPx: innerWidth,
+  });
+  // Mapped here, not inline in the JSX: React Compiler can't tell what
+  // `timeAxisTicks` returns, so a `.map` on it down by the axis would count as
+  // a possible mutation late in render and fuse every derived value above —
+  // rows and scales included — into the hover-reactive scope.
+  const xTickValues = xTicks.map((tick) => tick.valueMs);
 
   let yPeak = 0;
   for (const row of rows) {
@@ -871,7 +876,8 @@ export function TimeSeriesChart(props: {
             <AxisBottom
               top={innerHeight}
               scale={xScale}
-              numTicks={Math.min(8, Math.floor(innerWidth / 90))}
+              tickValues={xTickValues}
+              tickFormat={(_, index) => xTicks[index]?.label}
               hideTicks
               stroke="var(--grid-line)"
               tickLabelProps={() => ({
@@ -901,7 +907,7 @@ export function TimeSeriesChart(props: {
         {crosshairMs !== undefined && (
           <HoverTooltip
             crosshairMs={crosshairMs}
-            pointUnit={pointUnit ?? "day"}
+            pointUnit={resolvedPointUnit}
             hovered={hovered}
             hoveredTotal={hoveredTotal}
             xScale={xScale}

@@ -6,6 +6,7 @@ import { useId, useState } from "react";
 
 import { formatCount, formatMonth } from "./shared/format.ts";
 import { Legend } from "./shared/primitives.tsx";
+import { monthBucketMs, timeAxisTicks } from "./shared/time-axis.ts";
 import { useMeasuredWidth } from "./shared/use-measure.ts";
 
 const margin = { top: 8, right: 12, bottom: 24, left: 52 };
@@ -51,7 +52,7 @@ export function DivergingBars({
   const innerWidth = Math.max(10, width - margin.left - margin.right);
   const innerHeight = height - margin.top - margin.bottom;
 
-  const dates = points.map((point) => new Date(`${point.month}-15`).getTime());
+  const dates = points.map((point) => monthBucketMs(point.month));
 
   // Bars are centred on their month, so pinning the first and last months to
   // the chart edges spills half a bar off each side. Inset the range by half a
@@ -67,6 +68,12 @@ export function DivergingBars({
   const xScale = scaleTime({
     domain: [xMin, xMax],
     range: [xInset, innerWidth - xInset],
+  });
+  const xTicks = timeAxisTicks({
+    startMs: xMin,
+    endMs: xMax,
+    pointUnit: "month",
+    widthPx: innerWidth,
   });
 
   const maxPositive = Math.max(1, ...points.map((point) => point.positive));
@@ -188,7 +195,8 @@ export function DivergingBars({
             <AxisBottom
               top={innerHeight}
               scale={xScale}
-              numTicks={Math.min(8, Math.floor(innerWidth / 90))}
+              tickValues={xTicks.map((tick) => tick.valueMs)}
+              tickFormat={(_, index) => xTicks[index]?.label}
               hideTicks
               stroke="var(--grid-line)"
               tickLabelProps={() => ({
