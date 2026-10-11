@@ -1,5 +1,12 @@
 # repo-dive
 
+## 0.16.3
+
+### Patch Changes
+
+- [#280](https://github.com/kachkaev/repo-dive/pull/280) [`239182c`](https://github.com/kachkaev/repo-dive/commit/239182c1ac2a1c9a31a2fc996230be7d7e2df27c) - Keep chart time axes no more granular than their data.
+  On a repo a few months old, "Commits per month" and "Churn per month" now label their bars `Jul 2026 · Aug · Sep · Oct` instead of weekly dates, and the per-commit charts never tick finer than a day.
+
 ## 0.16.2
 
 ### Patch Changes
