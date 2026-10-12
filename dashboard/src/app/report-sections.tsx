@@ -33,7 +33,12 @@ import {
   kindOrder,
 } from "./shared/contributor-kinds.tsx";
 import { formatCount, formatDate } from "./shared/format.ts";
-import { type HistoryRange, monthSpanOf } from "./shared/history-range.ts";
+import {
+  type DaySpan,
+  historyDaySpanOf,
+  type HistoryRange,
+  monthSpanOf,
+} from "./shared/history-range.ts";
 import { DataTable, Section, SectionSkeleton } from "./shared/primitives.tsx";
 import { PercentControl } from "./shared/segmented-control.tsx";
 import { shapeStacked } from "./shared/stacked-series.ts";
@@ -213,20 +218,14 @@ const multiYearSpansOf = (years: number): number[] => {
  */
 type CalendarHistory = { underAYear: boolean; years: number };
 
-const calendarHistoryOf = (
-  firstCommitDate: string | undefined,
-  generatedAt: string,
-): CalendarHistory => {
-  if (firstCommitDate === undefined) {
-    return { underAYear: true, years: 1 };
-  }
-  // ISO dates compare as strings, so "a year before the report" needs no date
-  // math beyond swapping the year in.
-  const aYearBefore = `${Number(generatedAt.slice(0, 4)) - 1}${generatedAt.slice(4, 10)}`;
+const calendarHistoryOf = (historyDays: DaySpan): CalendarHistory => {
+  // ISO dates compare as strings, so "a year before the last day" needs no
+  // date math beyond swapping the year in.
+  const lastYear = Number(historyDays.last.slice(0, 4));
+  const aYearBefore = `${lastYear - 1}${historyDays.last.slice(4)}`;
   return {
-    underAYear: firstCommitDate.slice(0, 10) > aYearBefore,
-    years:
-      Number(generatedAt.slice(0, 4)) - Number(firstCommitDate.slice(0, 4)) + 1,
+    underAYear: historyDays.first > aYearBefore,
+    years: lastYear - Number(historyDays.first.slice(0, 4)) + 1,
   };
 };
 
@@ -316,10 +315,15 @@ export function ReportSections({
 }) {
   const dependencies = data.dependencies;
   const annotations = data.config?.charts?.annotations;
-  const calendarHistory = calendarHistoryOf(
+  // The calendar and the contributors chart both draw the history as its
+  // authors' own days, so both take their ranges from these bounds rather
+  // than from the report's UTC date.
+  const historyDays = historyDaySpanOf(
+    data.commits,
     data.repo.firstCommitDate,
     data.generatedAt,
   );
+  const calendarHistory = calendarHistoryOf(historyDays);
 
   const [directDependenciesPercent, setDirectDependenciesPercent] =
     useState(false);
@@ -373,7 +377,7 @@ export function ReportSections({
     ? contributorsInRange(
         data.contributors,
         data.commits,
-        monthSpanOf(deferredContributorsRange, data.generatedAt),
+        monthSpanOf(deferredContributorsRange, historyDays.last),
         maxContributorsInCharts * 2,
       )
     : data.contributors.map((contributor) => ({
@@ -472,7 +476,7 @@ export function ReportSections({
     ...(calendarHistory.years > 1
       ? Array.from(
           { length: calendarHistory.years },
-          (_, index) => Number(data.generatedAt.slice(0, 4)) - index,
+          (_, index) => Number(historyDays.last.slice(0, 4)) - index,
         ).map((year) => ({
           value: `year-${year}` as const,
           label: String(year),
@@ -660,7 +664,7 @@ export function ReportSections({
       {data.repo.firstCommitDate !== undefined && data.commits.length > 0 && (
         <Section
           title="Commit calendar"
-          subtitle="commits per day; days bucketed by the committer's local date, i.e. when each commit landed"
+          subtitle="commits per day; days bucketed by the author's local date, i.e. when each commit was written"
           annotation={annotations?.["commit-calendar"]}
           controls={
             <>
@@ -686,8 +690,7 @@ export function ReportSections({
               // strips under the cursor are swapped).
               key={deferredCalendarRange}
               commits={data.commits}
-              generatedAt={data.generatedAt}
-              firstCommitDate={data.repo.firstCommitDate}
+              historyDays={historyDays}
               weekStartsOn={data.config?.charts?.weekStartsOn ?? "monday"}
               range={deferredCalendarRange}
               kindFilter={deferredCalendarKindFilter}

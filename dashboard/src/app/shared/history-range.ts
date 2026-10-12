@@ -10,8 +10,44 @@ export type HistoryRange =
   | "all-years"
   | `year-${number}`;
 
+/** Inclusive ISO `YYYY-MM-DD` bounds. */
+export type DaySpan = { first: string; last: string };
+
 /** Inclusive ISO `YYYY-MM` bounds. */
 export type MonthSpan = { first: string; last: string };
+
+/**
+ * The days the history covers on the clock every count of work bins by: the
+ * date part of each commit's author date, in the author's own UTC offset.
+ * `generatedAt` is in UTC and `firstCommitDate` in one commit's offset, so
+ * their dates alone can stop a day short of a commit made around someone
+ * else's midnight — a report generated at 23:45Z on the 12th ends on the 12th,
+ * yet a commit authored at 00:30+01:00 a quarter of an hour earlier counts
+ * towards the 13th. Each end stretches to the commits' own days instead. The
+ * last day only stretches for commits authored by the time the report was
+ * generated, though: an author clock that ran ahead says nothing about days
+ * that had not happened yet. An empty history covers just the report's day.
+ */
+export const historyDaySpanOf = (
+  commits: ReadonlyArray<{ date: string }>,
+  firstCommitDate: string | undefined,
+  generatedAt: string,
+): DaySpan => {
+  const generatedAtMs = Date.parse(generatedAt);
+  let first = (firstCommitDate ?? generatedAt).slice(0, 10);
+  let last = generatedAt.slice(0, 10);
+  for (const commit of commits) {
+    // ISO dates compare as strings.
+    const isoDate = commit.date.slice(0, 10);
+    if (isoDate < first) {
+      first = isoDate;
+    }
+    if (isoDate > last && Date.parse(commit.date) <= generatedAtMs) {
+      last = isoDate;
+    }
+  }
+  return { first, last };
+};
 
 const yearsSpan = (firstYear: number, lastYear: number): MonthSpan => ({
   first: `${firstYear}-01`,
@@ -19,15 +55,16 @@ const yearsSpan = (firstYear: number, lastYear: number): MonthSpan => ({
 });
 
 /**
- * The months a range covers, counted back from the month the report was
- * generated in — the very months the commit calendar draws for it — or
- * undefined for the whole history, which needs no bounds.
+ * The months a range covers, counted back from the month of the history's
+ * last day (see {@link historyDaySpanOf}) — the very months the commit
+ * calendar draws for it — or undefined for the whole history, which needs no
+ * bounds.
  */
 export const monthSpanOf = (
   range: HistoryRange,
-  generatedAt: string,
+  lastIsoDate: string,
 ): MonthSpan | undefined => {
-  const anchorMonth = generatedAt.slice(0, 7);
+  const anchorMonth = lastIsoDate.slice(0, 7);
   const anchorYear = Number(anchorMonth.slice(0, 4));
   switch (range) {
     case "all-years": {
