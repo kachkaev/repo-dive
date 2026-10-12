@@ -176,7 +176,9 @@ Implemented, in `src/cli/shared/collectors/` (strategy, then default sampling wh
 1.  **commit-meta** (`log`) — author/committer identities, dates, parents, subject and trailers incl. co-authors; the base everything else joins against. Batched.
 1.  **churn** (`log`) — lines added/deleted per commit vs first parent, by file extension. Batched.
 1.  **file-types** (`tree`) — file count and bytes per extension at the commit's tree, straight from `git ls-tree -l`.
-1.  **directives** (`tree`) — ESLint suppression comments by rule (block disables counted as gray areas) and `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck` counts. Blob-cached.
+1.  **directives** (`tree`) — ESLint and oxlint suppression comments by linter and rule (block disables counted as gray areas) and `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck` counts. Blob-cached.
+    Emits `directives.lint` (categories `linter`, `type`, `rule`), `directives.lintBlockCoveredLines` (category `linter`) and `directives.ts` (category `type`).
+    The `linter` category follows the comment's prefix (`eslint-` or `oxlint-`), not the tool that reads it: oxlint honours `eslint-disable` comments too.
 1.  **dependencies** (`tree`) — total resolved packages from package-manager lockfiles, per package manager (pnpm, npm, yarn; parser registry keyed by lockfile name generalizes to bun/cargo/…), plus direct/dev/optional dependencies and manifest counts read from `package.json` files (the authoritative source for what a project declares, so accurate even where a lockfile omits it).
     Blob-cached.
     Emits `dependencies.resolved`, `dependencies.direct` and `dependencies.manifest`.

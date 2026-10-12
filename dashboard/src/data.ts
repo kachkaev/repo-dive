@@ -65,6 +65,11 @@ type DirectivesRow = {
   eslintNextLine: number;
   eslintLine: number;
   eslintBlocks: number;
+  /** Optional: absent in dashboard.json written before oxlint disables were counted. */
+  oxlintNextLine?: number;
+  oxlintLine?: number;
+  oxlintBlocks?: number;
+  /** Lines inside block disables, eslint and oxlint ones alike. */
   blockCoveredLines: number;
   tsIgnore: number;
   tsExpectError: number;

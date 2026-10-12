@@ -72,7 +72,7 @@ const joinTerms = (terms: readonly string[]): string =>
  * directives row, how the subtitle names it, and whether it can exist at all in
  * a tree outside the JS/TS ecosystem.
  *
- * A Python or Go repo has no eslint disables and no `@ts-*` directives to have,
+ * A Python or Go repo has no lint disables and no `@ts-*` directives to have,
  * so lines for them would not read as "nothing suppressed here" but as a
  * finding about something the repo could never have carried — the same reason
  * the dependency charts wait for a lockfile rather than drawing a flat zero.
@@ -97,6 +97,19 @@ const looseEndsSeries: Array<{
     note: "block disables count as one each",
     color: "var(--series-6)",
     valueOf: (row) => row.eslintNextLine + row.eslintLine + row.eslintBlocks,
+    ecosystemSpecific: true,
+  },
+  {
+    key: "oxlint disables",
+    term: "oxlint disables",
+    note: "block disables count as one each",
+    // Not green: it would sit next to eslint's red, a pair red-green color
+    // blindness merges
+    color: "var(--series-5)",
+    valueOf: (row) =>
+      (row.oxlintNextLine ?? 0) +
+      (row.oxlintLine ?? 0) +
+      (row.oxlintBlocks ?? 0),
     ecosystemSpecific: true,
   },
   {
@@ -576,7 +589,8 @@ export function ReportSections({
   };
   const looseEndsSubtitle = [
     `${joinTerms(drawnLooseEnds.map((series) => series.term))} in the tree at each commit`,
-    ...drawnLooseEnds.flatMap((series) => series.note ?? []),
+    // Both linters' series carry the same note on block disables
+    ...new Set(drawnLooseEnds.flatMap((series) => series.note ?? [])),
   ].join("; ");
 
   const dependenciesChart = shapeStacked(
@@ -834,8 +848,9 @@ export function ReportSections({
 
       {data.topRules.length > 0 && (
         <Section
-          title="Most-suppressed eslint rules"
+          title="Most-suppressed lint rules"
           subtitle="at the latest commit; (all) = blanket disables without a rule list"
+          // The id predates oxlint counting and stays, so configs annotating it keep working
           annotation={annotations?.["most-suppressed-eslint-rules"]}
         >
           <BarList

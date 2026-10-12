@@ -532,6 +532,64 @@ test
   });
 
 test.concurrent(
+  "index splits lint disables by linter and merges their rules",
+  async () => {
+    const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-lint-"));
+    runGit(repoPath, "init", "-b", "main");
+    try {
+      writeFileSync(
+        path.join(repoPath, "index.ts"),
+        [
+          "// eslint-disable-next-line no-console",
+          "console.log(1);",
+          "// oxlint-disable-next-line no-console",
+          "console.log(2);",
+          "/* oxlint-disable typescript/no-explicit-any */",
+          "let a: any;",
+          "let b: any;",
+          "/* oxlint-enable typescript/no-explicit-any */",
+          "",
+        ].join("\n"),
+      );
+      runGit(repoPath, "add", ".");
+      runGit(repoPath, "commit", "-m", "Init");
+
+      await runCli(
+        "scan",
+        "--repo",
+        repoPath,
+        "--collectors",
+        "commit-meta,directives",
+      );
+      const indexRun = await runCli("index", "--repo", repoPath);
+      expect(indexRun.status, indexRun.stderr).toBe(0);
+
+      const dashboard: unknown = JSON.parse(
+        readFileSync(
+          path.join(repoPath, ".repo-dive", "index", "dashboard.json"),
+          "utf8",
+        ),
+      );
+      expect(arrayAt(dashboard, "directives").at(-1)).toMatchObject({
+        eslintNextLine: 1,
+        eslintLine: 0,
+        eslintBlocks: 0,
+        oxlintNextLine: 1,
+        oxlintLine: 0,
+        oxlintBlocks: 1,
+        blockCoveredLines: 2,
+      });
+      expect(arrayAt(dashboard, "topRules")).toStrictEqual([
+        { rule: "no-console", count: 2 },
+        { rule: "typescript/no-explicit-any", count: 1 },
+      ]);
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  },
+);
+
+test.concurrent(
   "index merges contributor aliases from repo-dive.config.ts",
   async () => {
     const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-alias-"));
