@@ -46,10 +46,12 @@ jobs:
       - name: Verify tests
         run: pnpm test
 
-      # npm stages a publish for a few minutes before the registry lists the
-      # version, so a run right after the one that published still sees it as
+      # npm scans a new version for malware for a few minutes before listing
+      # it, so a run right after the one that published sees the version as
       # unpublished and fails with 409 Conflict on publishing it again. The
-      # version's tag, which changesets pushes after publishing, does not lag
+      # version's tag, which changesets pushes after publishing, does not lag.
+      # Drop this check once changesets handles the scan window:
+      # https://github.com/changesets/changesets/issues/2195
       - name: Check if the current version is already tagged
         id: version-tag
         run: |
