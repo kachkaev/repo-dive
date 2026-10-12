@@ -444,6 +444,13 @@ export const summarizeCommits = (
   };
 };
 
+/**
+ * A scan's remaining time at the precision an estimate deserves: seconds only
+ * while under a minute, whole minutes from then on (`~1m`, not `~1m 52s`).
+ */
+export const formatTimeLeft = (seconds: number): string =>
+  seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`;
+
 const runCollector = ({
   catalog,
   sha,
@@ -733,9 +740,7 @@ export const runScan = Effect.fn("runScan")(function* ({
     const remainingSeconds = Math.round(
       (selected.length - processed) / Math.max(0.01, rate),
     );
-    const minutes = Math.floor(remainingSeconds / 60);
-    const seconds = remainingSeconds % 60;
-    return `${Math.round(rate)}/s, ~${minutes > 0 ? `${minutes}m ` : ""}${seconds}s left`;
+    return `${Math.round(rate)}/s, ~${formatTimeLeft(remainingSeconds)} left`;
   };
 
   const processedRef = yield* Ref.make(0);
