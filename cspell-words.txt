@@ -80,6 +80,7 @@ scriptable
 sed
 shadcn
 shm
+shortlog
 Sigstore
 simonw
 smol

@@ -18,6 +18,7 @@ function config(maxInCharts: number): ResolvedConfig {
       displayName: undefined,
       url: undefined,
       kind: "human",
+      aliased: false,
     }),
   };
 }

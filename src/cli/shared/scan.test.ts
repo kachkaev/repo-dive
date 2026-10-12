@@ -420,3 +420,35 @@ it.effect("listMainlineShas is empty for a repo without commits", () => {
     Effect.provide(NodeServices.layer),
   );
 });
+
+it.effect("listCommits reads authors through the repository's .mailmap", () => {
+  const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-mailmap-"));
+
+  return Effect.gen(function* () {
+    git(repoPath, ["init", "-b", "main"]);
+    commitFile(repoPath, "a.txt", "Before the mailmap");
+    writeFileSync(
+      path.join(repoPath, ".mailmap"),
+      "Proper Name <proper@example.com> <test@example.com>\n",
+    );
+    git(repoPath, ["add", ".mailmap"]);
+    git(repoPath, ["commit", "-m", "Add mailmap"]);
+
+    const commits = yield* listCommits(repoPath);
+    // Both commits, the one predating the file included — the mapping is
+    // applied when the history is read, not when it was written.
+    expect(
+      commits.map(({ authorName, authorEmail }) => [authorName, authorEmail]),
+    ).toStrictEqual([
+      ["Proper Name", "proper@example.com"],
+      ["Proper Name", "proper@example.com"],
+    ]);
+  }).pipe(
+    Effect.ensuring(
+      Effect.sync(() => {
+        rmSync(repoPath, { recursive: true, force: true });
+      }),
+    ),
+    Effect.provide(NodeServices.layer),
+  );
+});

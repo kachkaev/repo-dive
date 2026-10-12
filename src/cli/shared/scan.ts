@@ -71,7 +71,10 @@ class CollectorRunError extends Data.TaggedError("CollectorRunError")<{
 
 const fieldSeparator = "\u{1F}";
 
-const gitLogFormat = ["%H", "%an", "%ae", "%aI", "%cI", "%s"].join("%x1f");
+// %aN/%aE rather than %an/%ae: author identities go through the repository's
+// .mailmap, the way `git shortlog` and `git blame` — and so the survival
+// collector — already see them.
+const gitLogFormat = ["%H", "%aN", "%aE", "%aI", "%cI", "%s"].join("%x1f");
 
 export const parseGitLog = (stdout: string): CommitMeta[] => {
   const commits: CommitMeta[] = [];

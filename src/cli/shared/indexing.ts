@@ -21,6 +21,7 @@ import {
   composeLineageSeries,
   type LineageSnapshot,
 } from "./indexing/compose-lineage-series.ts";
+import { inferAliases } from "./indexing/infer-aliases.ts";
 import { readRemoteUrl } from "./indexing/remote.ts";
 import { languageOfExtension } from "./languages.ts";
 import { listCommits, listLineages, resolveRepoRoot } from "./scan.ts";
@@ -214,6 +215,16 @@ const buildDashboardData = (
    */
   lineageOf: (sha: string) => { index: number; endsAtMs: number } | undefined,
 ) => {
+  // Every identity resolves through here, so the alias groups the history
+  // spells out on its own reach every chart alike — see `infer-aliases.ts`.
+  const resolveContributor = inferAliases(
+    config.resolveContributor,
+    commits.map((commit) => ({
+      name: commit.authorName,
+      email: commit.authorEmail,
+    })),
+  );
+
   /**
    * Rows of one tree-state series: eligible snapshots tagged with their
    * lineage, summed across the lineages alive at each instant. For a repo
@@ -259,7 +270,7 @@ const buildDashboardData = (
     const { name, email } = parseIdentity(identity);
     return {
       name,
-      resolved: config.resolveContributor(email || name, name),
+      resolved: resolveContributor(email || name, name),
     };
   };
 
@@ -380,7 +391,7 @@ const buildDashboardData = (
    * spelled a name for.
    */
   const nameOf = (
-    resolved: ReturnType<typeof config.resolveContributor>,
+    resolved: ReturnType<typeof resolveContributor>,
     observedName: string,
   ): string =>
     resolved.displayName ??
@@ -400,10 +411,7 @@ const buildDashboardData = (
       continue;
     }
     nameByEmail.set(commit.authorEmail.toLowerCase(), commit.authorName);
-    const resolved = config.resolveContributor(
-      commit.authorEmail,
-      commit.authorName,
-    );
+    const resolved = resolveContributor(commit.authorEmail, commit.authorName);
     nameByCanonicalEmail.set(
       resolved.canonicalEmail.toLowerCase(),
       nameOf(resolved, commit.authorName),
@@ -411,7 +419,7 @@ const buildDashboardData = (
   }
 
   const survivalLabelOf = (email: string): string => {
-    const resolved = config.resolveContributor(
+    const resolved = resolveContributor(
       email,
       nameByEmail.get(email.toLowerCase()),
     );
@@ -510,7 +518,7 @@ const buildDashboardData = (
    * config merges them back into one.
    */
   const contributorFor = (
-    resolved: ReturnType<typeof config.resolveContributor>,
+    resolved: ReturnType<typeof resolveContributor>,
     observedName: string,
   ): Contributor => {
     const name = nameOf(resolved, observedName);
@@ -542,10 +550,7 @@ const buildDashboardData = (
   // Per-contributor totals are left to the dashboard on the same grounds.
   const commitRows = commits.map((commit) => {
     // Resolve first so aliases of one person land in a single entry.
-    const author = config.resolveContributor(
-      commit.authorEmail,
-      commit.authorName,
-    );
+    const author = resolveContributor(commit.authorEmail, commit.authorName);
     const contributor = contributorFor(author, commit.authorName).index;
     const coAuthors = coAuthorsOf(commit).map(resolveCoAuthor);
 
