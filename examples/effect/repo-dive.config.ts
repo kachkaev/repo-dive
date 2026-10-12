@@ -15,6 +15,37 @@ const monorepoAssembly =
   "The monorepo was [assembled in December 2023](https://github.com/Effect-TS/effect) from eight repositories; values before that sum the histories those repositories carried with them.";
 
 export default {
+  contributors: {
+    // People who committed under several identities, most active first
+    // cspell:disable
+    aliases: [
+      {
+        displayName: "Tim Smart",
+        emails: ["hello@timsmart.co", "tim.smart@arisechurch.com"],
+      },
+      {
+        displayName: "Michael Arnaldi",
+        emails: [
+          "arnaldimichael@gmail.com",
+          "michael.arnaldi@effectful.co",
+          "ma@matechs.com",
+        ],
+      },
+      {
+        displayName: "Mattia Manzati",
+        emails: ["mattia.manzati@gmail.com", "manzati.mattia@gmail.com"],
+      },
+      {
+        displayName: "Chris Wilkinson",
+        emails: ["chris@prereview.org", "c.wilkinson@elifesciences.org"],
+      },
+      {
+        displayName: "Julius Marminge",
+        emails: ["julius0216@outlook.com", "jmarminge@gmail.com"],
+      },
+    ],
+    // cspell:enable
+  },
   charts: {
     annotations: {
       "lines-of-code": `${monorepoAssembly} The dip through 2021–2023 is genuine: the project's core code lived in \`@effect/io\` and \`@effect/data\`, whose histories were discarded before the assembly — that code returned only with the Effect 2.0 rewrite landing in late 2023.`,
