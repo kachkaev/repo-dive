@@ -8,6 +8,7 @@ import { expect, it, test } from "@effect/vitest";
 import { Effect } from "effect";
 
 import {
+  formatTimeLeft,
   listCommits,
   listLineages,
   listMainlineShas,
@@ -54,6 +55,14 @@ test("parseGitLog extracts commit metadata", () => {
 
 test("parseGitLog skips blank lines", () => {
   expect(parseGitLog("\n\n")).toStrictEqual([]);
+});
+
+test("formatTimeLeft drops the seconds once a minute or more is left", () => {
+  expect(formatTimeLeft(0)).toBe("0s");
+  expect(formatTimeLeft(59)).toBe("59s");
+  expect(formatTimeLeft(60)).toBe("1m");
+  expect(formatTimeLeft(112)).toBe("1m");
+  expect(formatTimeLeft(88_755)).toBe("1479m");
 });
 
 test("summarizeCommits spans the outer edges of both clocks", () => {
