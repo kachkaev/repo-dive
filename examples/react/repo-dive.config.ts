@@ -62,7 +62,10 @@ export default {
         displayName: "Jim",
         emails: ["jsproch@fb.com", "jsfb@github", "none@no-reply.com"],
       },
-      { displayName: "Dominic Gannaway", emails: ["trueadm", "dg@domgan.com"] },
+      {
+        displayName: "Dominic Gannaway",
+        emails: ["trueadm", "dg@domgan.com"],
+      },
       {
         displayName: "Mofei Zhang",
         emails: [

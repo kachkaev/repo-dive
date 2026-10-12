@@ -7,12 +7,18 @@ export default {
         displayName: "Evan You",
         emails: ["yyx990803@gmail.com", "evan@vuejs.org", "evan@voidzero.dev"],
       },
-      { displayName: "翠", emails: ["green@sapphi.red", "sapphi-red"] },
+      {
+        displayName: "翠",
+        emails: ["green@sapphi.red", "sapphi-red"],
+      },
       {
         displayName: "Matias Capeletto",
         emails: ["matias.capeletto@gmail.com", "patak-dev"],
       },
-      { displayName: "Bjorn Lu", emails: ["bjornlu.dev@gmail.com", "bluwy"] },
+      {
+        displayName: "Bjorn Lu",
+        emails: ["bjornlu.dev@gmail.com", "bluwy"],
+      },
       {
         displayName: "underfin",
         emails: ["likui6666666@gmail.com", "2218301630@qq.com"],
@@ -37,7 +43,10 @@ export default {
         displayName: "sun0day",
         emails: ["sun_day500@163.com", "ivan.xu@applovin.com"],
       },
-      { displayName: "ygj6", emails: ["ygj6", "yuangongji@foxmail.com"] },
+      {
+        displayName: "ygj6",
+        emails: ["ygj6", "yuangongji@foxmail.com"],
+      },
       {
         displayName: "Vladimir",
         emails: ["sleuths.slews0s@icloud.com", "sheremet.va@icloud.com"],
@@ -46,7 +55,10 @@ export default {
         displayName: "Romuald Brillout",
         emails: ["git@brillout.com", "github.com@brillout.com"],
       },
-      { displayName: "OneNail", emails: ["onenail", "onenail@yeah.net"] },
+      {
+        displayName: "OneNail",
+        emails: ["onenail", "onenail@yeah.net"],
+      },
       {
         displayName: "Jeff Yang",
         emails: ["ydcjeff", "ydcjeff@outlook.com", "n2ya@duck.com"],

@@ -3,7 +3,10 @@ export default {
     // People who committed under several identities, most active first
     // cspell:disable
     aliases: [
-      { displayName: "Yih-Dar", emails: ["ydshieh", "chiapas"] },
+      {
+        displayName: "Yih-Dar",
+        emails: ["ydshieh", "chiapas"],
+      },
       {
         displayName: "Thomas Wolf",
         emails: ["thomwolf@gmail.com", "thomwolf"],
@@ -24,7 +27,10 @@ export default {
         displayName: "Joao Gante",
         emails: ["joaofranciscocardosogante@gmail.com", "joao@huggingface.co"],
       },
-      { displayName: "Stas Bekman", emails: ["stas00", "stas@stason.org"] },
+      {
+        displayName: "Stas Bekman",
+        emails: ["stas00", "stas@stason.org"],
+      },
       {
         displayName: "Raushan Turganbay",
         emails: [
