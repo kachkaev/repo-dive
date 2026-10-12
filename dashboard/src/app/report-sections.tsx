@@ -108,7 +108,7 @@ const looseEndsSeries: Array<{
     key: "oxlint disables",
     term: "oxlint disables",
     note: "block disables count as one each",
-    // Not green: it would sit next to eslint's red, a pair red-green colour
+    // Not green: it would sit next to eslint's red, a pair red-green color
     // blindness merges
     color: "var(--series-5)",
     valueOf: (row) =>
