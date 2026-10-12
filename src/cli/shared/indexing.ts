@@ -121,10 +121,11 @@ const sumMetric = (
   return total;
 };
 
-const groupMetric = (
+/** Sums a metric's values by a key derived from each fact's categories. */
+const groupMetricBy = (
   commit: CommitFacts,
   metric: string,
-  categoryKey: string,
+  keyOf: (categories: Readonly<Record<string, string>>) => string,
 ): Record<string, number> => {
   const grouped: Record<string, number> = {};
   for (const facts of commit.factsByCollector.values()) {
@@ -133,12 +134,23 @@ const groupMetric = (
         continue;
       }
 
-      const key = fact.categories?.[categoryKey] ?? "(unknown)";
+      const key = keyOf(fact.categories ?? {});
       grouped[key] = (grouped[key] ?? 0) + fact.value;
     }
   }
   return grouped;
 };
+
+const groupMetric = (
+  commit: CommitFacts,
+  metric: string,
+  categoryKey: string,
+): Record<string, number> =>
+  groupMetricBy(
+    commit,
+    metric,
+    (categories) => categories[categoryKey] ?? "(unknown)",
+  );
 
 const hasMetric = (commit: CommitFacts, metric: string): boolean =>
   commit.factsByCollector
@@ -299,17 +311,24 @@ const buildDashboardData = (
   const directives = composeSeries(
     (commit) => hasMetric(commit, "directives.ts"),
     (commit) => {
-      const byType = groupMetric(commit, "directives.eslint", "type");
+      const lint = groupMetricBy(
+        commit,
+        "directives.lint",
+        (categories) => `${categories["linter"]} ${categories["type"]}`,
+      );
       const ts = groupMetric(commit, "directives.ts", "type");
       return {
         sha: commit.sha.slice(0, 10),
         date: commit.committedAt,
-        eslintNextLine: byType["next-line"] ?? 0,
-        eslintLine: byType["line"] ?? 0,
-        eslintBlocks: byType["block"] ?? 0,
+        eslintNextLine: lint["eslint next-line"] ?? 0,
+        eslintLine: lint["eslint line"] ?? 0,
+        eslintBlocks: lint["eslint block"] ?? 0,
+        oxlintNextLine: lint["oxlint next-line"] ?? 0,
+        oxlintLine: lint["oxlint line"] ?? 0,
+        oxlintBlocks: lint["oxlint block"] ?? 0,
         blockCoveredLines: sumMetric(
           commit,
-          "directives.eslintBlockCoveredLines",
+          "directives.lintBlockCoveredLines",
         ),
         tsIgnore: ts["ignore"] ?? 0,
         tsExpectError: ts["expectError"] ?? 0,
@@ -349,11 +368,12 @@ const buildDashboardData = (
   );
 
   const latestWithDirectives = commits.findLast((commit) =>
-    hasMetric(commit, "directives.eslint"),
+    hasMetric(commit, "directives.lint"),
   );
+  // Same-named rules suppressed through both linters' comments add up
   const topRules = latestWithDirectives
     ? Object.entries(
-        groupMetric(latestWithDirectives, "directives.eslint", "rule"),
+        groupMetric(latestWithDirectives, "directives.lint", "rule"),
       )
         .toSorted(([, left], [, right]) => right - left)
         .slice(0, 20)
