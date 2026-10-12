@@ -2,6 +2,7 @@ import type { ContributorKind } from "../data.ts";
 import {
   kindBadge,
   kindColors,
+  type KindFilter,
   kindLabels,
   kindOrder,
 } from "./shared/contributor-kinds.tsx";
@@ -155,13 +156,31 @@ function CountCell({ value }: { value: number | undefined }) {
  * The two are inverses of each other, so a human and the agent that assists
  * them are measured on one shared scale.
  */
-export function ContributorBars({ items }: { items: ContributorBarsItem[] }) {
-  if (items.length === 0) {
+export function ContributorBars({
+  items,
+  kindFilter,
+  maxItems,
+}: {
+  /** Every contributor on the list, ranked. */
+  items: ContributorBarsItem[];
+  kindFilter: KindFilter;
+  /** How many of the filtered items get bars. */
+  maxItems: number;
+}) {
+  // Filtered here rather than by the caller: there, React Compiler fused the
+  // filter into one memo scope with the tally behind `items`, so every kind
+  // click re-tallied the whole history.
+  const shownItems = items
+    .filter((item) => kindFilter === "all" || item.kind === kindFilter)
+    .slice(0, maxItems);
+  if (shownItems.length === 0) {
     return <p className="text-sm text-muted-foreground">Nothing to show.</p>;
   }
 
   const max = Math.max(
-    ...items.map((item) => Math.max(item.authored, sumCounts(item.assisted))),
+    ...shownItems.map((item) =>
+      Math.max(item.authored, sumCounts(item.assisted)),
+    ),
     1,
   );
 
@@ -190,7 +209,7 @@ export function ContributorBars({ items }: { items: ContributorBarsItem[] }) {
       </div>
 
       <ul className="space-y-4">
-        {items.map((item) => {
+        {shownItems.map((item) => {
           const assistedTotal = sumCounts(item.assisted);
           const others = kindOrder.filter((kind) => kind !== item.kind);
           const badge =

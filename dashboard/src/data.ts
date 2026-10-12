@@ -14,7 +14,19 @@ type CommitRow = {
   sha: string;
   /** When the commit was authored, in the author's own timezone (git `%aI`). */
   date: string;
-  author: string;
+  /**
+   * The author's position in {@link DashboardData.contributors}. Missing in
+   * dashboard.json written before per-commit contributor refs landed — that
+   * list then holds whole-history totals instead, and only for the top
+   * contributors, so the contributors chart cannot be narrowed to a range.
+   */
+  contributor?: number;
+  /**
+   * Positions in {@link DashboardData.contributors} of the commit's
+   * co-authors of another kind than its author — the cross-kind help the
+   * contributors chart hatches. Absent when there are none.
+   */
+  helpers?: number[];
   /**
    * The author's contributor kind. Missing in dashboard.json written before
    * per-commit kinds landed — treat as "human".
@@ -114,18 +126,25 @@ export type ContributorKind = "human" | "bot" | "ai";
  * kinds with a non-zero count are present; a contributor's own kind never is
  * (same-kind co-authorship isn't tracked).
  */
-type CrossKindCounts = Partial<Record<ContributorKind, number>>;
+export type CrossKindCounts = Partial<Record<ContributorKind, number>>;
 
-type ContributorRow = {
+/**
+ * One person (or bot, or agent) who authored or co-authored commits. Commit
+ * rows refer to these by position, and the dashboard tallies them over the
+ * range on show — the counts below only come with dashboard.json written
+ * before per-commit contributor refs landed, where they cover the whole
+ * history.
+ */
+export type ContributorRow = {
   email: string;
   name: string;
   /** Optional profile URL from the config's contributor aliases. */
   url?: string;
   /** Missing in dashboard.json written before contributor kinds landed. */
   kind?: ContributorKind;
-  commits: number;
-  added: number;
-  deleted: number;
+  commits?: number;
+  added?: number;
+  deleted?: number;
   /**
    * Own commits carrying at least one co-author of that other kind — the
    * hatched tail of the "authored" bar. Counted once per commit per kind, so
