@@ -13,7 +13,6 @@ import {
 import type { ContributorKind, DashboardData } from "../data.ts";
 import {
   type CalendarKindFilter,
-  type CalendarRange,
   CommitCalendar,
 } from "./activity-calendar.tsx";
 import { BarList } from "./bar-list.tsx";
@@ -24,13 +23,7 @@ import {
 import { DivergingBars } from "./diverging-bars.tsx";
 import { FilesTimeline } from "./files-timeline.tsx";
 import { LinesTimeline } from "./lines-timeline.tsx";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./shared/@ui-primitive/select.tsx";
+import { contributorsInRange } from "./report-sections/contributors-in-range.ts";
 import {
   kindBadge,
   kindColors,
@@ -39,6 +32,8 @@ import {
   kindOrder,
 } from "./shared/contributor-kinds.tsx";
 import { formatCount, formatDate } from "./shared/format.ts";
+import { type HistoryRange, monthSpanOf } from "./shared/history-range.ts";
+import { HistoryRangeSelect } from "./shared/history-range-select.tsx";
 import { DataTable, Section, SectionSkeleton } from "./shared/primitives.tsx";
 import { PercentControl } from "./shared/segmented-control.tsx";
 import { shapeStacked } from "./shared/stacked-series.ts";
@@ -231,7 +226,7 @@ const calendarHistoryOf = (
  * twelve months only for a repo too young to fill even one calendar year,
  * where whole-year strips would be mostly empty.
  */
-const defaultCalendarRangeOf = (history: CalendarHistory): CalendarRange => {
+const defaultCalendarRangeOf = (history: CalendarHistory): HistoryRange => {
   // A repo spanning a single calendar year is a year old at most, so this is
   // the same branch twice over — but it also keeps the default off "all years",
   // which such a repo does not offer (it would duplicate "This year").
@@ -317,12 +312,16 @@ export function ReportSections({
     useState(false);
   const [dependenciesPercent, setDependenciesPercent] = useState(false);
   const [commitsPercent, setCommitsPercent] = useState(false);
-  const [calendarRange, setCalendarRange] = useState<CalendarRange>(
+  const [calendarRange, setCalendarRange] = useState<HistoryRange>(
     defaultCalendarRangeOf(calendarHistory),
   );
   // Lifted out of CommitCalendar so it survives the remount on range change.
   const [calendarKindFilter, setCalendarKindFilter] =
     useState<CalendarKindFilter>("all");
+  // The contributors chart opens on the whole history, as it read before it
+  // could be narrowed: who built the repo is its first question.
+  const [contributorsRange, setContributorsRange] =
+    useState<HistoryRange>("all-years");
   const [contributorKindFilter, setContributorKindFilter] =
     useState<KindFilter>("all");
   // The two monthly charts filter independently: reading "who commits" and
@@ -335,20 +334,37 @@ export function ReportSections({
   // calendar itself — laid out from scratch on each switch, and remounted on a
   // range change — re-renders from these deferred copies in an interruptible
   // follow-up pass, dimming while it lags (see StaleOverlay). Same deal for
-  // the contributor list.
+  // the contributor list, re-tallied from every commit on a range change.
   const deferredCalendarRange = useDeferredValue(calendarRange);
   const deferredCalendarKindFilter = useDeferredValue(calendarKindFilter);
   const calendarStale =
     deferredCalendarRange !== calendarRange ||
     deferredCalendarKindFilter !== calendarKindFilter;
+  const deferredContributorsRange = useDeferredValue(contributorsRange);
   const deferredContributorKindFilter = useDeferredValue(contributorKindFilter);
   const contributorsStale =
+    deferredContributorsRange !== contributorsRange ||
     deferredContributorKindFilter !== contributorKindFilter;
 
-  // The contributor list spans the whole history: it is already sampled by
-  // contributor (capped per kind at index time), so sampling it by time too
-  // would only blur what the bars are for.
-  const contributorItems: ContributorBarsItem[] = data.contributors.map(
+  // Commit rows name their author and cross-kind helpers, so the contributor
+  // list can be tallied over any range. A dashboard.json written before they
+  // did ships the list pre-tallied over the whole history (and pre-capped per
+  // kind) instead, and every row comes from one run, so the first one tells.
+  const contributorsTallied = data.commits[0]?.contributor !== undefined;
+  // Every range draws the same thing as the whole history while the repo
+  // spans a single calendar year — the one case the range list leaves out
+  // "All … years", the range the chart opens on.
+  const contributorsRangeOffered =
+    contributorsTallied && calendarHistory.years > 1;
+  const listedContributors = contributorsTallied
+    ? contributorsInRange(
+        data.contributors,
+        data.commits,
+        monthSpanOf(deferredContributorsRange, data.generatedAt),
+        maxContributorsInCharts * 2,
+      )
+    : data.contributors;
+  const contributorItems: ContributorBarsItem[] = listedContributors.map(
     (contributor) => ({
       // Email alone isn't unique: bots and AI agents are identified by name too
       // (several Claude releases share noreply@anthropic.com), matching how
@@ -357,16 +373,19 @@ export function ReportSections({
       label: contributor.name || contributor.email,
       href: contributor.url,
       kind: contributor.kind ?? "human",
-      authored: contributor.commits,
+      authored: contributor.commits ?? 0,
       assistedBy: contributor.assistedBy ?? {},
       assisted: contributor.assisted ?? {},
     }),
   );
+  // Over the whole list rather than the range on show, so narrowing the range
+  // never takes a kind's button out from under the cursor.
   const contributorKinds = new Set<ContributorKind>(
-    contributorItems.map((item) => item.kind),
+    data.contributors.map((contributor) => contributor.kind ?? "human"),
   );
   // Kinds that ever committed — drives the calendar's filter; the contributor
-  // list can differ (it is capped per kind at index time).
+  // list can differ (it lists co-authors too, and dashboard.json written
+  // before per-commit contributor refs caps it per kind).
   const commitKinds = new Set<ContributorKind>(
     data.commits.map((commit) => commit.kind ?? "human"),
   );
@@ -378,14 +397,15 @@ export function ReportSections({
     )
     .slice(0, maxContributorsInCharts * 2);
 
-  // Fixed ranges first, then one entry per year of history, newest first. A
-  // range only earns its row once the repo outlives it (multiYearSpansOf for
-  // the multi-year ones), and inside a single calendar year "All …" and that
-  // year's own entry would both draw what "This year" draws. The whole-history
-  // option names its own span ("All 7 years") rather than saying "All years":
-  // how much history the repo holds is the one thing the reader cannot infer
-  // from the label, and it decides whether the option is worth a click.
-  const calendarRangeItems: Array<{ value: CalendarRange; label: string }> = [
+  // Shared by the calendar and the contributors chart. Fixed ranges first,
+  // then one entry per year of history, newest first. A range only earns its
+  // row once the repo outlives it (multiYearSpansOf for the multi-year ones),
+  // and inside a single calendar year "All …" and that year's own entry would
+  // both draw what "This year" draws. The whole-history option names its own
+  // span ("All 7 years") rather than saying "All years": how much history the
+  // repo holds is the one thing the reader cannot infer from the label, and it
+  // decides whether the option is worth a click.
+  const rangeItems: Array<{ value: HistoryRange; label: string }> = [
     { value: "last-12-months", label: "Last 12 months" },
     { value: "this-year", label: "This year" },
     ...multiYearSpansOf(calendarHistory.years).map((span) => ({
@@ -600,40 +620,12 @@ export function ReportSections({
                 onChange={setCalendarKindFilter}
                 presentKinds={commitKinds}
               />
-              {/* A fixed-width slot for the trigger, which keeps hugging its
-                  own value: the options differ by ~60px ("2019" against the
-                  widest, "Last 12 months", which needs 128px at this size), and
-                  a trigger claiming a different slice of the row on every change
-                  hopped between rows once the row wraps on a narrow viewport. */}
-              <div className="w-36">
-                <Select
-                  value={calendarRange}
-                  onValueChange={(value) => {
-                    // null is the "cleared" value; the range select always has one.
-                    if (value !== null) {
-                      setCalendarRange(value);
-                    }
-                  }}
-                  items={calendarRangeItems}
-                >
-                  {/* The options ("Last 12 months", …) make the purpose plain,
-                      so the label is a11y-only. */}
-                  <SelectTrigger size="xs" aria-label="Calendar range">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {calendarRangeItems.map((item) => (
-                      <SelectItem
-                        key={item.value}
-                        value={item.value}
-                        className="text-xs"
-                      >
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <HistoryRangeSelect
+                label="Calendar range"
+                value={calendarRange}
+                onChange={setCalendarRange}
+                items={rangeItems}
+              />
             </>
           }
         >
@@ -823,21 +815,31 @@ export function ReportSections({
 
       <Section
         title="Contributors"
-        subtitle="whole history; per contributor: commits authored above, commits co-authored for others below — hatching marks cross-kind collaboration"
+        subtitle={`${contributorsRangeOffered ? "commits in range by the author's date" : "whole history"}; per contributor: commits authored above, commits co-authored for others below — hatching marks cross-kind collaboration`}
         annotation={annotations?.contributors}
         controls={
-          <KindFilterControl
-            label="Filter contributors by kind"
-            value={contributorKindFilter}
-            onChange={setContributorKindFilter}
-            presentKinds={contributorKinds}
-          />
+          <>
+            <KindFilterControl
+              label="Filter contributors by kind"
+              value={contributorKindFilter}
+              onChange={setContributorKindFilter}
+              presentKinds={contributorKinds}
+            />
+            {contributorsRangeOffered && (
+              <HistoryRangeSelect
+                label="Contributors range"
+                value={contributorsRange}
+                onChange={setContributorsRange}
+                items={rangeItems}
+              />
+            )}
+          </>
         }
         footer={
           <DataTable
-            caption={`All ${data.contributors.length} listed contributors`}
+            caption={`All ${listedContributors.length} listed contributors`}
             header={["contributor", "commits", "added", "deleted"]}
-            rows={data.contributors.map((contributor) => [
+            rows={listedContributors.map((contributor) => [
               <>
                 {contributor.kind && contributor.kind !== "human" ? (
                   <span
@@ -867,9 +869,9 @@ export function ReportSections({
                   &lt;{contributor.email}&gt;
                 </span>
               </>,
-              contributor.commits,
-              formatCount(contributor.added),
-              formatCount(contributor.deleted),
+              contributor.commits ?? 0,
+              formatCount(contributor.added ?? 0),
+              formatCount(contributor.deleted ?? 0),
             ])}
           />
         }

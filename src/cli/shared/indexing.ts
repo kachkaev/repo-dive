@@ -253,27 +253,6 @@ const buildDashboardData = (
 
   const span = spanOf(commits);
 
-  // A histogram over commits, so it bins by the author date: the calendar,
-  // the monthly bars and the churn bars all count work, and churn in
-  // particular has to line up with the survival cohorts below, which `git
-  // blame` reports on that same clock.
-  const commitRows = commits.map((commit) => ({
-    sha: commit.sha.slice(0, 10),
-    date: commit.authoredAt,
-    author: commit.authorEmail,
-    kind: config.resolveContributor(commit.authorEmail, commit.authorName).kind,
-    ai: coAuthorsOf(commit).some(
-      (identity) => resolveCoAuthor(identity).resolved.kind === "ai",
-    ),
-    added: sumMetric(commit, "churn.added"),
-    deleted: sumMetric(commit, "churn.deleted"),
-  }));
-
-  // No monthly rollup is written: every field of one (commits, AI-assisted
-  // commits, added, deleted) is a group-by-month sum over `commitRows`, which
-  // the dashboard already loads in full for the commit calendar. Shipping both
-  // meant two aggregations to keep in step for no data the second one added.
-
   const languages = composeSeries(
     (commit) => hasMetric(commit, "languages.lines"),
     (commit) => ({
@@ -484,27 +463,25 @@ const buildDashboardData = (
   const survival = survivalSeriesOf("survival.lines");
   const fileSurvival = survivalSeriesOf("survival.files");
 
-  // One bucket per person, whether they authored commits, only ever helped
-  // with someone else's, or both — humans, bots and AI agents all measured the
-  // same way. `assistedBy` / `assisted` are the two halves of the same
-  // cross-kind edge, recorded from each end.
-  type ContributorBucket = {
+  // One entry per person, whether they authored commits, only ever helped
+  // with someone else's, or both — humans, bots and AI agents alike. The list
+  // holds identities and nothing else: commit rows point into it, and the
+  // dashboard tallies, ranks and caps contributors over whatever range of the
+  // history it shows — totals precomputed here would only fit one range of
+  // them. For the same reason nobody is left out: whoever leads the last
+  // twelve months is often nowhere near the top of the whole history.
+  type Contributor = {
+    /** Position in the list — what commit rows refer to this entry by. */
+    index: number;
     email: string;
     name: string;
     url: string | undefined;
     kind: ContributorKind;
-    commits: number;
-    added: number;
-    deleted: number;
-    /** Own commits carrying at least one co-author of that (other) kind. */
-    assistedBy: Partial<Record<ContributorKind, number>>;
-    /** Commits by an author of that (other) kind that this person co-authored. */
-    assisted: Partial<Record<ContributorKind, number>>;
   };
-  const contributorMap = new Map<string, ContributorBucket>();
+  const contributorMap = new Map<string, Contributor>();
 
   /**
-   * Fetches or creates a contributor's bucket.
+   * Fetches or creates a contributor's entry.
    *
    * Humans key off their canonical email alone, so an alias group folds every
    * spelling of one person together. Bots and AI agents key off their name too:
@@ -513,107 +490,77 @@ const buildDashboardData = (
    * identity worth telling apart. Giving such a group a `displayName` in the
    * config merges them back into one.
    */
-  const bucketFor = (
+  const contributorFor = (
     resolved: ReturnType<typeof config.resolveContributor>,
     observedName: string,
-  ): ContributorBucket => {
+  ): Contributor => {
     const name = nameOf(resolved, observedName);
     const email = resolved.canonicalEmail.toLowerCase();
     const key =
       resolved.kind === "human" ? email : `${name.toLowerCase()}\u{1F}${email}`;
-    const bucket = contributorMap.get(key) ?? {
+    const contributor = contributorMap.get(key) ?? {
+      index: contributorMap.size,
       email: resolved.canonicalEmail,
       name,
       url: resolved.url,
       kind: resolved.kind,
-      commits: 0,
-      added: 0,
-      deleted: 0,
-      assistedBy: {},
-      assisted: {},
     };
     // Humans keep the latest spelling; a non-human's is pinned by its key.
-    bucket.name = name;
-    contributorMap.set(key, bucket);
-    return bucket;
+    contributor.name = name;
+    contributorMap.set(key, contributor);
+    return contributor;
   };
 
-  for (const [index, commit] of commits.entries()) {
-    const row = commitRows[index];
-    if (!row) {
-      continue;
-    }
-    // Resolve first so aliases of one person land in a single bucket.
+  // A histogram over commits, so it bins by the author date: the calendar,
+  // the monthly bars and the churn bars all count work, and churn in
+  // particular has to line up with the survival cohorts above, which `git
+  // blame` reports on that same clock.
+  //
+  // No monthly rollup is written: every field of one (commits, AI-assisted
+  // commits, added, deleted) is a group-by-month sum over these rows, which
+  // the dashboard already loads in full for the commit calendar. Shipping both
+  // meant two aggregations to keep in step for no data the second one added.
+  // Per-contributor totals are left to the dashboard on the same grounds.
+  const commitRows = commits.map((commit) => {
+    // Resolve first so aliases of one person land in a single entry.
     const author = config.resolveContributor(
       commit.authorEmail,
       commit.authorName,
     );
-    const authorBucket = bucketFor(author, commit.authorName);
-    authorBucket.commits += 1;
-    authorBucket.added += row.added;
-    authorBucket.deleted += row.deleted;
+    const contributor = contributorFor(author, commit.authorName).index;
+    const coAuthors = coAuthorsOf(commit).map(resolveCoAuthor);
 
     // Only cross-kind help is recorded: a human thanking a human (or one agent
-    // crediting another) is ordinary collaboration, and what these bars show is
-    // the traffic *between* kinds. Crediting yourself is same-kind by
-    // definition, so that one check covers it too. The set dedupes a trailer
-    // repeated within one commit — help given twice is still one commit helped.
-    const helpers = new Set<ContributorBucket>();
-    for (const identity of coAuthorsOf(commit)) {
-      const { name, resolved } = resolveCoAuthor(identity);
+    // crediting another) is ordinary collaboration, and what the contributors
+    // chart shows is the traffic *between* kinds. Crediting yourself is
+    // same-kind by definition, so that one check covers it too. The set dedupes
+    // a trailer repeated within one commit — help given twice is still one
+    // commit helped.
+    const helpers = new Set<number>();
+    for (const { name, resolved } of coAuthors) {
       if (resolved.kind !== author.kind) {
-        helpers.add(bucketFor(resolved, name));
+        helpers.add(contributorFor(resolved, name).index);
       }
     }
 
-    const helperKinds = new Set<ContributorKind>();
-    for (const helper of helpers) {
-      helper.assisted[author.kind] = (helper.assisted[author.kind] ?? 0) + 1;
-      helperKinds.add(helper.kind);
-    }
-    // Counted once per helper *kind*, so one commit credited to two agents is
-    // one AI-assisted commit rather than two.
-    for (const kind of helperKinds) {
-      authorBucket.assistedBy[kind] = (authorBucket.assistedBy[kind] ?? 0) + 1;
-    }
-  }
+    return {
+      sha: commit.sha.slice(0, 10),
+      date: commit.authoredAt,
+      contributor,
+      kind: author.kind,
+      ai: coAuthors.some(({ resolved }) => resolved.kind === "ai"),
+      added: sumMetric(commit, "churn.added"),
+      deleted: sumMetric(commit, "churn.deleted"),
+      // Left out when empty, which is most commits, so the JSON stays lean.
+      ...(helpers.size > 0 && { helpers: [...helpers] }),
+    };
+  });
 
-  const sumCounts = (
-    counts: Partial<Record<ContributorKind, number>>,
-  ): number => Object.values(counts).reduce((total, count) => total + count, 0);
-  /** Ranking weight: authoring and helping both count as taking part. */
-  const involvementOf = (bucket: ContributorBucket): number =>
-    bucket.commits + sumCounts(bucket.assisted);
-  /** Emitted as absent rather than `{}` so the JSON stays lean. */
-  const countsOrUndefined = (
-    counts: Partial<Record<ContributorKind, number>>,
-  ) => (Object.keys(counts).length === 0 ? undefined : counts);
-
-  // Capped per kind rather than overall, at exactly what the dashboard's bar
-  // list shows: a repo with hundreds of humans would otherwise crowd out the
-  // handful of agents and bots the kind filter exists to reveal.
-  const perKindCap = config.maxInCharts * 2;
-  const keptPerKind: Record<ContributorKind, number> = {
-    human: 0,
-    bot: 0,
-    ai: 0,
-  };
+  // Map order is insertion order, which is index order.
   const contributors = contributorMap
     .values()
-    .toArray()
-    .toSorted((left, right) => involvementOf(right) - involvementOf(left))
-    .filter((bucket) => {
-      if (keptPerKind[bucket.kind] >= perKindCap) {
-        return false;
-      }
-      keptPerKind[bucket.kind] += 1;
-      return true;
-    })
-    .map((bucket) => ({
-      ...bucket,
-      assistedBy: countsOrUndefined(bucket.assistedBy),
-      assisted: countsOrUndefined(bucket.assisted),
-    }));
+    .map(({ email, name, url, kind }) => ({ email, name, url, kind }))
+    .toArray();
 
   return {
     generatedAt: new Date().toISOString(),
