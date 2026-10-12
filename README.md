@@ -68,7 +68,7 @@ Collectors so far:
 - **commit-meta** — identities, dates, parents, subject and trailers (incl. AI co-authors)
 - **churn** — lines added/deleted per commit, by file extension
 - **file-types** — file count and bytes per extension at each commit's tree
-- **directives** — eslint-disable comments by rule (block disables tracked as gray areas) and `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck`
+- **directives** — `eslint-disable` and `oxlint-disable` comments by linter and rule (block disables tracked as gray areas) and `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck`
 - **dependencies** — resolved package totals from lockfiles, per package manager (pnpm, npm, yarn classic and yarn berry), plus direct/dev/optional dependencies and manifest counts read straight from `package.json` files; version-aware, monorepo-aware and extensible to more managers
 - **todo-comments** — TODO/FIXME/HACK/XXX counts
 - **languages** — lines and file count per language across a commit's source files (lockfiles, minified bundles and generated data excluded)

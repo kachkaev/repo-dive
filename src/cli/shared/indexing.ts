@@ -299,17 +299,26 @@ const buildDashboardData = (
   const directives = composeSeries(
     (commit) => hasMetric(commit, "directives.ts"),
     (commit) => {
-      const byType = groupMetric(commit, "directives.eslint", "type");
+      const lintCount = (linter: string, type: string) =>
+        sumMetric(
+          commit,
+          "directives.lint",
+          (categories) =>
+            categories["linter"] === linter && categories["type"] === type,
+        );
       const ts = groupMetric(commit, "directives.ts", "type");
       return {
         sha: commit.sha.slice(0, 10),
         date: commit.committedAt,
-        eslintNextLine: byType["next-line"] ?? 0,
-        eslintLine: byType["line"] ?? 0,
-        eslintBlocks: byType["block"] ?? 0,
+        eslintNextLine: lintCount("eslint", "next-line"),
+        eslintLine: lintCount("eslint", "line"),
+        eslintBlocks: lintCount("eslint", "block"),
+        oxlintNextLine: lintCount("oxlint", "next-line"),
+        oxlintLine: lintCount("oxlint", "line"),
+        oxlintBlocks: lintCount("oxlint", "block"),
         blockCoveredLines: sumMetric(
           commit,
-          "directives.eslintBlockCoveredLines",
+          "directives.lintBlockCoveredLines",
         ),
         tsIgnore: ts["ignore"] ?? 0,
         tsExpectError: ts["expectError"] ?? 0,
@@ -349,11 +358,12 @@ const buildDashboardData = (
   );
 
   const latestWithDirectives = commits.findLast((commit) =>
-    hasMetric(commit, "directives.eslint"),
+    hasMetric(commit, "directives.lint"),
   );
+  // Same-named rules suppressed through both linters' comments add up
   const topRules = latestWithDirectives
     ? Object.entries(
-        groupMetric(latestWithDirectives, "directives.eslint", "rule"),
+        groupMetric(latestWithDirectives, "directives.lint", "rule"),
       )
         .toSorted(([, left], [, right]) => right - left)
         .slice(0, 20)
