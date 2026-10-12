@@ -1,5 +1,23 @@
 # repo-dive
 
+## 0.18.0
+
+### Minor Changes
+
+- [#299](https://github.com/kachkaev/repo-dive/pull/299) [`19bdfc6`](https://github.com/kachkaev/repo-dive/commit/19bdfc6ec230e745e026135a091de8120008c6f7) - Fold a contributor's identities using the repository's `.mailmap` and links GitHub makes certain.
+  Commit authors are now read through `.mailmap`, the way `git blame` already credited surviving lines, and two noreply addresses of one GitHub account — or a single-word name matching a noreply handle in the history — become one contributor without an alias group.
+  In a repository with a `.mailmap`, alias groups match the mapped addresses, so a group listing only a pre-mailmap one needs the mapped one too.
+  Re-run `repo-dive index` to see it — no re-scan needed.
+
+### Patch Changes
+
+- [#302](https://github.com/kachkaev/repo-dive/pull/302) [`b2a3325`](https://github.com/kachkaev/repo-dive/commit/b2a3325f410acd97fc74623c1cce2b65870bf8c7) - Keep commits made around midnight in the commit calendar.
+  Commits fall on their author's local day, which at the edges of the history can be a day past the report's UTC date or a day before the first commit's own date.
+  Such a day used to read "After this report was generated" or "Before the first commit", leaving its commits out of the calendar's totals and the contributors chart's ranges.
+
+- [#297](https://github.com/kachkaev/repo-dive/pull/297) [`6ee74f1`](https://github.com/kachkaev/repo-dive/commit/6ee74f1ccb2c046d1e821dd0bf21adeb39a4f4da) - Fix the commit calendar subtitle to name the author's date.
+  Since 0.9.0 it said days were bucketed by the committer's local date, but the calendar has always counted each commit on the day it was written, in the author's timezone, so the counts are unchanged.
+
 ## 0.17.0
 
 ### Minor Changes
