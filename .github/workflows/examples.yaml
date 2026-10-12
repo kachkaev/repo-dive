@@ -127,14 +127,14 @@ jobs:
           fi
 
       - name: Run repo-dive scan
-        # Stopped by `timeout` rather than by a step timeout: when a step times
-        # out, the runner goes straight on to the cache save below while the
-        # scan keeps writing into the catalog being archived (it is only
-        # killed at job cleanup). `timeout` waits for the scan to wind down
-        # first. Either way the step fails and the cache below is still saved;
-        # the step timeout stays as a backstop
+        # Interrupted by `timeout` (as in action.yml) rather than by a step
+        # timeout: when a step times out, the runner goes straight on to the
+        # cache save below while the scan is still writing into the catalog
+        # being archived. `timeout` lets the scan wind down first. Either way
+        # the step fails and the cache below is still saved; the step timeout
+        # stays as a backstop
         timeout-minutes: 305
-        run: timeout --kill-after=2m 300m node dist/cli.js scan --repo analyzed
+        run: timeout --signal=INT --kill-after=60 300m node dist/cli.js scan --repo analyzed
 
       - name: Save the catalog cache
         # Saved before `index` adds the heavy metrics.sqlite to the catalog

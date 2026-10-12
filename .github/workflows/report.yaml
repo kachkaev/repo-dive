@@ -58,9 +58,14 @@ jobs:
             ${{ steps.name.outputs.cache-prefix }}-
 
       - name: Run repo-dive scan
-        # The step (not job) times out, so the cache below is saved either way
-        timeout-minutes: 300
-        run: node dist/cli.js scan --repo analyzed
+        # Interrupted by `timeout` (as in action.yml) rather than by a step
+        # timeout: when a step times out, the runner goes straight on to the
+        # cache save below while the scan is still writing into the catalog
+        # being archived. `timeout` lets the scan wind down first. Either way
+        # the step fails and the cache below is still saved; the step timeout
+        # stays as a backstop
+        timeout-minutes: 305
+        run: timeout --signal=INT --kill-after=60 300m node dist/cli.js scan --repo analyzed
 
       - name: Save the catalog cache
         # Saved before `index` adds the heavy metrics.sqlite to the catalog
