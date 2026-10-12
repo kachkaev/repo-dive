@@ -121,7 +121,7 @@ export type ContributorKind = "human" | "bot" | "ai";
  * kinds with a non-zero count are present; a contributor's own kind never is
  * (same-kind co-authorship isn't tracked).
  */
-type CrossKindCounts = Partial<Record<ContributorKind, number>>;
+export type CrossKindCounts = Partial<Record<ContributorKind, number>>;
 
 /**
  * One person (or bot, or agent) who authored or co-authored commits. Commit

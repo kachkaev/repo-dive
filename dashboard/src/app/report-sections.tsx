@@ -24,6 +24,7 @@ import { DivergingBars } from "./diverging-bars.tsx";
 import { FilesTimeline } from "./files-timeline.tsx";
 import { LinesTimeline } from "./lines-timeline.tsx";
 import { contributorsInRange } from "./report-sections/contributors-in-range.ts";
+import { HistoryRangeSelect } from "./report-sections/history-range-select.tsx";
 import {
   kindBadge,
   kindColors,
@@ -33,7 +34,6 @@ import {
 } from "./shared/contributor-kinds.tsx";
 import { formatCount, formatDate } from "./shared/format.ts";
 import { type HistoryRange, monthSpanOf } from "./shared/history-range.ts";
-import { HistoryRangeSelect } from "./shared/history-range-select.tsx";
 import { DataTable, Section, SectionSkeleton } from "./shared/primitives.tsx";
 import { PercentControl } from "./shared/segmented-control.tsx";
 import { shapeStacked } from "./shared/stacked-series.ts";
@@ -363,7 +363,14 @@ export function ReportSections({
         monthSpanOf(deferredContributorsRange, data.generatedAt),
         maxContributorsInCharts * 2,
       )
-    : data.contributors;
+    : data.contributors.map((contributor) => ({
+        ...contributor,
+        commits: contributor.commits ?? 0,
+        added: contributor.added ?? 0,
+        deleted: contributor.deleted ?? 0,
+        assistedBy: contributor.assistedBy ?? {},
+        assisted: contributor.assisted ?? {},
+      }));
   const contributorItems: ContributorBarsItem[] = listedContributors.map(
     (contributor) => ({
       // Email alone isn't unique: bots and AI agents are identified by name too
@@ -373,11 +380,48 @@ export function ReportSections({
       label: contributor.name || contributor.email,
       href: contributor.url,
       kind: contributor.kind ?? "human",
-      authored: contributor.commits ?? 0,
-      assistedBy: contributor.assistedBy ?? {},
-      assisted: contributor.assisted ?? {},
+      authored: contributor.commits,
+      assistedBy: contributor.assistedBy,
+      assisted: contributor.assisted,
     }),
   );
+  // Built here rather than inline in the footer's JSX: handing a row's field
+  // to formatCount reads to React Compiler as a possible mutation of the
+  // list, which stretched the list's memo scope over the whole section's
+  // markup — where the compiler dropped it, re-tallying every commit on every
+  // render.
+  const contributorTableRows = listedContributors.map((contributor) => [
+    <>
+      {contributor.kind && contributor.kind !== "human" ? (
+        <span
+          title={kindBadge[contributor.kind].title}
+          className="mr-1 select-none"
+        >
+          <span
+            className="mr-1 inline-block size-2.5 rounded-xs"
+            style={{ background: kindColors[contributor.kind] }}
+          />
+          {kindBadge[contributor.kind].icon}
+        </span>
+      ) : undefined}
+      {contributor.url ? (
+        <a
+          href={contributor.url}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium hover:underline"
+        >
+          {contributor.name}
+        </a>
+      ) : (
+        contributor.name
+      )}{" "}
+      <span className="text-(--text-muted)">&lt;{contributor.email}&gt;</span>
+    </>,
+    contributor.commits,
+    formatCount(contributor.added),
+    formatCount(contributor.deleted),
+  ]);
   // Over the whole list rather than the range on show, so narrowing the range
   // never takes a kind's button out from under the cursor.
   const contributorKinds = new Set<ContributorKind>(
@@ -389,14 +433,6 @@ export function ReportSections({
   const commitKinds = new Set<ContributorKind>(
     data.commits.map((commit) => commit.kind ?? "human"),
   );
-  const filteredContributorItems = contributorItems
-    .filter(
-      (item) =>
-        deferredContributorKindFilter === "all" ||
-        item.kind === deferredContributorKindFilter,
-    )
-    .slice(0, maxContributorsInCharts * 2);
-
   // Shared by the calendar and the contributors chart. Fixed ranges first,
   // then one entry per year of history, newest first. A range only earns its
   // row once the repo outlives it (multiYearSpansOf for the multi-year ones),
@@ -839,45 +875,16 @@ export function ReportSections({
           <DataTable
             caption={`All ${listedContributors.length} listed contributors`}
             header={["contributor", "commits", "added", "deleted"]}
-            rows={listedContributors.map((contributor) => [
-              <>
-                {contributor.kind && contributor.kind !== "human" ? (
-                  <span
-                    title={kindBadge[contributor.kind].title}
-                    className="mr-1 select-none"
-                  >
-                    <span
-                      className="mr-1 inline-block size-2.5 rounded-xs"
-                      style={{ background: kindColors[contributor.kind] }}
-                    />
-                    {kindBadge[contributor.kind].icon}
-                  </span>
-                ) : undefined}
-                {contributor.url ? (
-                  <a
-                    href={contributor.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-medium hover:underline"
-                  >
-                    {contributor.name}
-                  </a>
-                ) : (
-                  contributor.name
-                )}{" "}
-                <span className="text-(--text-muted)">
-                  &lt;{contributor.email}&gt;
-                </span>
-              </>,
-              contributor.commits ?? 0,
-              formatCount(contributor.added ?? 0),
-              formatCount(contributor.deleted ?? 0),
-            ])}
+            rows={contributorTableRows}
           />
         }
       >
         <StaleOverlay stale={contributorsStale}>
-          <ContributorBars items={filteredContributorItems} />
+          <ContributorBars
+            items={contributorItems}
+            kindFilter={deferredContributorKindFilter}
+            maxItems={maxContributorsInCharts * 2}
+          />
         </StaleOverlay>
       </Section>
     </RevealSequentially>

@@ -342,8 +342,7 @@ const buildDashboardData = (
   // Non-human contributors fold into one series per kind in the survival
   // charts: individual bots/agents rarely matter there, and grouping them
   // server-side lets the dashboard color the bands with the reserved kind
-  // colors without needing a label → kind mapping of its own (the contributors
-  // list is truncated, so it cannot serve as one).
+  // colors without needing a label → kind mapping of its own.
   //
   // Survival facts carry only the author's email, so both halves of a band's
   // label have to come back from the commits. Kind derivation reads the name —

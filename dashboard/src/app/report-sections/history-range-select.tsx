@@ -4,8 +4,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./@ui-primitive/select.tsx";
-import type { HistoryRange } from "./history-range.ts";
+} from "../shared/@ui-primitive/select.tsx";
+import type { HistoryRange } from "../shared/history-range.ts";
 
 /** A dropdown of history ranges, sized for a section's control row. */
 export function HistoryRangeSelect({

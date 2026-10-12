@@ -1,11 +1,10 @@
 import type {
   ContributorKind,
   ContributorRow,
+  CrossKindCounts,
   DashboardData,
 } from "../../data.ts";
 import type { MonthSpan } from "../shared/history-range.ts";
-
-type CrossKindCounts = Partial<Record<ContributorKind, number>>;
 
 type Tally = {
   commits: number;
@@ -17,6 +16,9 @@ type Tally = {
 
 const sumCounts = (counts: CrossKindCounts): number =>
   Object.values(counts).reduce((total, count) => total + count, 0);
+
+/** A contributor with every count in place, whichever range they cover. */
+export type ListedContributor = ContributorRow & Tally;
 
 /** Ranking weight: authoring and helping both count as taking part. */
 const involvementOf = (tally: Tally): number =>
@@ -33,14 +35,17 @@ const involvementOf = (tally: Tally): number =>
  * filter exists to reveal.
  *
  * Commits are placed by their author-dated month, the clock the commit
- * calendar uses too; `span` is undefined for the whole history.
+ * calendar uses too; `span` is undefined for the whole history. Unlike the
+ * calendar, which draws no day past the report's own, this keeps a commit
+ * whose author clock ran ahead: it is still somebody's work, and the whole
+ * history has to add up to every commit.
  */
 export const contributorsInRange = (
   contributors: readonly ContributorRow[],
   commits: DashboardData["commits"],
   span: MonthSpan | undefined,
   perKindCap: number,
-): ContributorRow[] => {
+): ListedContributor[] => {
   const tallies = new Map<number, Tally>();
   const tallyOf = (index: number): Tally => {
     const existing = tallies.get(index);
