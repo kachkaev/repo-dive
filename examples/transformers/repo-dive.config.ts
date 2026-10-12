@@ -1,12 +1,27 @@
 export default {
   contributors: {
-    // People .mailmap and GitHub noreply links leave split or misnamed, most
-    // active first
+    // People .mailmap and GitHub noreply links leave split or misnamed
     // cspell:disable
     aliases: [
       {
-        displayName: "Yih-Dar",
-        emails: ["ydshieh", "chiapas"],
+        displayName: "Amy Sartran",
+        emails: ["amyeroberts"],
+      },
+      {
+        displayName: "Arthur Zucker",
+        emails: ["arthurzucker", "arthur.zucker@gmail.com"],
+      },
+      {
+        displayName: "Cyril Vallez",
+        emails: ["cyril.vallez@huggingface.co", "cyril.vallez@gmail.com"],
+      },
+      {
+        displayName: "Joao Gante",
+        emails: ["joaofranciscocardosogante@gmail.com", "joao@huggingface.co"],
+      },
+      {
+        displayName: "Julien Chaumond",
+        emails: ["chaumond@gmail.com", "julien@huggingface.co"],
       },
       {
         displayName: "Lysandre Debut",
@@ -17,12 +32,12 @@ export default {
         ],
       },
       {
-        displayName: "Joao Gante",
-        emails: ["joaofranciscocardosogante@gmail.com", "joao@huggingface.co"],
+        displayName: "Matthew Carrigan",
+        emails: ["rocketknight1"],
       },
       {
-        displayName: "Stas Bekman",
-        emails: ["stas00", "stas@stason.org"],
+        displayName: "Nicolas Patry",
+        emails: ["patry.nicolas@protonmail.com", "patry.nicolas@gmail.com"],
       },
       {
         displayName: "Raushan Turganbay",
@@ -32,28 +47,12 @@ export default {
         ],
       },
       {
-        displayName: "Arthur Zucker",
-        emails: ["arthurzucker", "arthur.zucker@gmail.com"],
+        displayName: "Stas Bekman",
+        emails: ["stas00", "stas@stason.org"],
       },
       {
-        displayName: "Matthew Carrigan",
-        emails: ["rocketknight1"],
-      },
-      {
-        displayName: "Cyril Vallez",
-        emails: ["cyril.vallez@huggingface.co", "cyril.vallez@gmail.com"],
-      },
-      {
-        displayName: "Julien Chaumond",
-        emails: ["chaumond@gmail.com", "julien@huggingface.co"],
-      },
-      {
-        displayName: "Amy Sartran",
-        emails: ["amyeroberts"],
-      },
-      {
-        displayName: "Nicolas Patry",
-        emails: ["patry.nicolas@protonmail.com", "patry.nicolas@gmail.com"],
+        displayName: "Yih-Dar",
+        emails: ["ydshieh", "chiapas"],
       },
     ],
     // cspell:enable

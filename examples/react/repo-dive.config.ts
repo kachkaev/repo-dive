@@ -1,21 +1,8 @@
 export default {
   contributors: {
-    // People .mailmap and GitHub noreply links leave split or misnamed, most
-    // active first
+    // People .mailmap and GitHub noreply links leave split or misnamed
     // cspell:disable
     aliases: [
-      {
-        displayName: "Brian Vaughn",
-        emails: ["bvaughn@fb.com", "brian.david.vaughn@gmail.com"],
-      },
-      {
-        displayName: "Dan Abramov",
-        emails: [
-          "dan.abramov@gmail.com",
-          "dan.abramov@me.com",
-          "gaearon@fb.com",
-        ],
-      },
       {
         displayName: "Andrew Clark",
         emails: [
@@ -26,31 +13,56 @@ export default {
         ],
       },
       {
-        displayName: "Sophie Alpert",
-        emails: ["git@sophiebits.com", "sophiebits@humu.com"],
+        displayName: "Brian Vaughn",
+        emails: ["bvaughn@fb.com", "brian.david.vaughn@gmail.com"],
       },
       {
-        displayName: "Joseph Savona",
-        emails: ["joesavona@fb.com", "josephsavona"],
+        displayName: "Christopher Chedeau",
+        emails: ["vjeuxx@gmail.com"],
       },
       {
-        displayName: "Lauren Tan",
-        emails: ["poteto", "laurentan@laurentan-mbp.dhcp.thefacebook.com"],
-      },
-      {
-        displayName: 'Sebastian "Sebbie" Silbermann',
+        displayName: "Dan Abramov",
         emails: [
-          "sebastian.silbermann@vercel.com",
-          "silbermann.sebastian@gmail.com",
+          "dan.abramov@gmail.com",
+          "dan.abramov@me.com",
+          "gaearon@fb.com",
         ],
+      },
+      {
+        displayName: "Dominic Gannaway",
+        emails: ["trueadm", "dg@domgan.com"],
+      },
+      {
+        displayName: "Jan Kassens",
+        emails: ["jkassens@meta.com", "jan@kassens.net"],
       },
       {
         displayName: "Jim",
         emails: ["jsproch@fb.com"],
       },
       {
-        displayName: "Dominic Gannaway",
-        emails: ["trueadm", "dg@domgan.com"],
+        displayName: "Joseph Savona",
+        emails: ["joesavona@fb.com", "josephsavona"],
+      },
+      {
+        displayName: "Josh Story",
+        emails: [
+          "story@hey.com",
+          "gnoff@storyposted.com",
+          "josh.c.story@gmail.com",
+        ],
+      },
+      {
+        displayName: "Lauren Tan",
+        emails: ["poteto", "laurentan@laurentan-mbp.dhcp.thefacebook.com"],
+      },
+      {
+        displayName: "Luna Ruan",
+        emails: [
+          "lunaris.ruan@gmail.com",
+          "luna@fb.com",
+          "eloquent.mayhem@gmail.com",
+        ],
       },
       {
         displayName: "Mofei Zhang",
@@ -62,24 +74,19 @@ export default {
         ],
       },
       {
-        displayName: "Jan Kassens",
-        emails: ["jkassens@meta.com", "jan@kassens.net"],
-      },
-      {
         displayName: "Ruslan Lesiutin",
         emails: ["rdlesyutin@gmail.com", "hoxyq", "react@heyruslan.com"],
       },
       {
-        displayName: "Josh Story",
+        displayName: 'Sebastian "Sebbie" Silbermann',
         emails: [
-          "story@hey.com",
-          "gnoff@storyposted.com",
-          "josh.c.story@gmail.com",
+          "sebastian.silbermann@vercel.com",
+          "silbermann.sebastian@gmail.com",
         ],
       },
       {
-        displayName: "Christopher Chedeau",
-        emails: ["vjeuxx@gmail.com"],
+        displayName: "Sophie Alpert",
+        emails: ["git@sophiebits.com", "sophiebits@humu.com"],
       },
       {
         displayName: "Timothy Yung",
@@ -87,14 +94,6 @@ export default {
           "yungsters@fb.com",
           "yungsters@gmail.com",
           "yungsters@meta.com",
-        ],
-      },
-      {
-        displayName: "Luna Ruan",
-        emails: [
-          "lunaris.ruan@gmail.com",
-          "luna@fb.com",
-          "eloquent.mayhem@gmail.com",
         ],
       },
     ],

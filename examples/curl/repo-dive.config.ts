@@ -1,7 +1,6 @@
 export default {
   contributors: {
-    // People .mailmap and GitHub noreply links leave split or misnamed, most
-    // active first
+    // People .mailmap and GitHub noreply links leave split or misnamed
     // cspell:disable
     aliases: [
       {
