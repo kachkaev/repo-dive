@@ -1,5 +1,17 @@
 # repo-dive
 
+## 0.16.4
+
+### Patch Changes
+
+- [#291](https://github.com/kachkaev/repo-dive/pull/291) [`6a8985e`](https://github.com/kachkaev/repo-dive/commit/6a8985e92d13c1fadf32f2e13c1483aba544fa56) - Show scan time estimates over a minute in whole minutes.
+  Progress lines now read `Scanned 3000/24276 commits (190/s, ~1m left)…` instead of `~1m 52s left`; seconds appear only in the last minute.
+
+- [#290](https://github.com/kachkaev/repo-dive/pull/290) [`0998c7a`](https://github.com/kachkaev/repo-dive/commit/0998c7a1c0edc5cb6cdf47c32c4ee5894c372013) - Recover from half-written catalog files.
+  A scan cut short, or a copy of the catalog taken while one ran (such as a CI cache save), could leave a truncated file behind that failed every later `scan` with "An error occurred in Effect.tryPromise".
+  Catalog files are now written atomically, `scan` collects a commit again when its record of a past run does not parse, and `index` skips outputs that are missing or cut off.
+  Errors like that one now also name their cause, e.g. "Unexpected end of JSON input".
+
 ## 0.16.3
 
 ### Patch Changes
