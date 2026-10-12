@@ -46,13 +46,26 @@ jobs:
       - name: Verify tests
         run: pnpm test
 
+      # npm stages a publish for a few minutes before the registry lists the
+      # version, so a run right after the one that published still sees it as
+      # unpublished and fails with 409 Conflict on publishing it again. The
+      # version's tag, which changesets pushes after publishing, does not lag
+      - name: Check if the current version is already tagged
+        id: version-tag
+        run: |
+          version=$(node --print "require('./package.json').version")
+          if git rev-parse --quiet --verify "refs/tags/v$version" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create release pull request or publish to npm
         id: changesets
         uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           pr-title: Version packages
           version-script: pnpm changesets:version
-          publish-script: pnpm changesets:publish
+          # An empty script makes the action skip publishing
+          publish-script: ${{ steps.version-tag.outputs.exists != 'true' && 'pnpm changesets:publish' || '' }}
 
       - name: Rebuild the example dashboards
         # The release the step above publishes is created with GITHUB_TOKEN, so
