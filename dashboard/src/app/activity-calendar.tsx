@@ -495,8 +495,8 @@ export function CommitCalendar({
   const [tooltipOpen, setTooltipOpen] = useState(false);
 
   // Author-local day bucketing: the ISO timestamp carries the author's UTC
-  // offset, so its date part is the day the work was written where it was
-  // written.
+  // offset, so its date part is the day the commit was written, in the
+  // author's own timezone.
   const dayTotals = new Map<string, DayTotal>();
   for (const commit of commits) {
     const isoDate = commit.date.slice(0, 10);
