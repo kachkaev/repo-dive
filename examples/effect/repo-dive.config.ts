@@ -16,7 +16,8 @@ const monorepoAssembly =
 
 export default {
   contributors: {
-    // People who committed under several identities, most active first
+    // People .mailmap and GitHub noreply links leave split or misnamed, most
+    // active first
     // cspell:disable
     aliases: [
       {

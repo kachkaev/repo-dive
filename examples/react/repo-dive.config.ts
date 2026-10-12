@@ -1,16 +1,9 @@
 export default {
   contributors: {
-    // People who committed under several identities, most active first
+    // People .mailmap and GitHub noreply links leave split or misnamed, most
+    // active first
     // cspell:disable
     aliases: [
-      {
-        displayName: "Sebastian Markbåge",
-        emails: ["sebastian@calyptus.eu", "sema@fb.com"],
-      },
-      {
-        displayName: "Paul O’Shannessy",
-        emails: ["paul@oshannessy.com", "poshannessy@fb.com"],
-      },
       {
         displayName: "Brian Vaughn",
         emails: ["bvaughn@fb.com", "brian.david.vaughn@gmail.com"],
@@ -34,14 +27,7 @@ export default {
       },
       {
         displayName: "Sophie Alpert",
-        emails: [
-          "git@sophiebits.com",
-          "ben@benalpert.com",
-          "spicyjalapeno@gmail.com",
-          "balpert@fb.com",
-          "sophiebits@fb.com",
-          "sophiebits@humu.com",
-        ],
+        emails: ["git@sophiebits.com", "sophiebits@humu.com"],
       },
       {
         displayName: "Joseph Savona",
@@ -60,7 +46,7 @@ export default {
       },
       {
         displayName: "Jim",
-        emails: ["jsproch@fb.com", "jsfb@github", "none@no-reply.com"],
+        emails: ["jsproch@fb.com"],
       },
       {
         displayName: "Dominic Gannaway",
@@ -77,20 +63,7 @@ export default {
       },
       {
         displayName: "Jan Kassens",
-        emails: ["jkassens@meta.com", "jkassens@fb.com", "jan@kassens.net"],
-      },
-      {
-        displayName: "Pete Hunt",
-        emails: [
-          "pete@instagram.com",
-          "floydophone@gmail.com",
-          "pete.hunt@fb.com",
-          "phunt@instagram.com",
-        ],
-      },
-      {
-        displayName: "Rick Hanlon",
-        emails: ["rickhanlonii@gmail.com", "rickhanlonii@fb.com"],
+        emails: ["jkassens@meta.com", "jan@kassens.net"],
       },
       {
         displayName: "Ruslan Lesiutin",
@@ -105,12 +78,8 @@ export default {
         ],
       },
       {
-        displayName: "Cheng Lou",
-        emails: ["chenglou92@gmail.com", "chenglou@fb.com"],
-      },
-      {
         displayName: "Christopher Chedeau",
-        emails: ["vjeuxx@gmail.com", "vjeux@fb.com"],
+        emails: ["vjeuxx@gmail.com"],
       },
       {
         displayName: "Timothy Yung",
@@ -119,14 +88,6 @@ export default {
           "yungsters@gmail.com",
           "yungsters@meta.com",
         ],
-      },
-      {
-        displayName: "Ben Newman",
-        emails: ["bn@cs.stanford.edu", "benjamn@fb.com"],
-      },
-      {
-        displayName: "Jeff Morrison",
-        emails: ["jeffmo@fb.com", "jeff@anafx.com", "lbljeffmo@gmail.com"],
       },
       {
         displayName: "Luna Ruan",

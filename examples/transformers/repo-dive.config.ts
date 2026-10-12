@@ -1,19 +1,12 @@
 export default {
   contributors: {
-    // People who committed under several identities, most active first
+    // People .mailmap and GitHub noreply links leave split or misnamed, most
+    // active first
     // cspell:disable
     aliases: [
       {
         displayName: "Yih-Dar",
         emails: ["ydshieh", "chiapas"],
-      },
-      {
-        displayName: "Thomas Wolf",
-        emails: ["thomwolf@gmail.com", "thomwolf"],
-      },
-      {
-        displayName: "Sylvain Gugger",
-        emails: ["sgugger", "sylvain.gugger@gmail.com"],
       },
       {
         displayName: "Lysandre Debut",
@@ -44,7 +37,7 @@ export default {
       },
       {
         displayName: "Matthew Carrigan",
-        emails: ["rocketknight1", "rocketknight1@gmail.com"],
+        emails: ["rocketknight1"],
       },
       {
         displayName: "Cyril Vallez",
@@ -56,19 +49,11 @@ export default {
       },
       {
         displayName: "Amy Sartran",
-        emails: [
-          "amyeroberts",
-          "amy@huggingface.co",
-          "aeroberts4444@gmail.com",
-        ],
+        emails: ["amyeroberts"],
       },
       {
         displayName: "Nicolas Patry",
         emails: ["patry.nicolas@protonmail.com", "patry.nicolas@gmail.com"],
-      },
-      {
-        displayName: "Anton Vlasjuk",
-        emails: ["vasqu", "antonprogamer@gmail.com"],
       },
     ],
     // cspell:enable

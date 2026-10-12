@@ -1,6 +1,7 @@
 export default {
   contributors: {
-    // People who committed under several identities, most active first
+    // People .mailmap and GitHub noreply links leave split or misnamed, most
+    // active first
     // cspell:disable
     aliases: [
       {
@@ -8,16 +9,8 @@ export default {
         emails: ["yyx990803@gmail.com", "evan@vuejs.org", "evan@voidzero.dev"],
       },
       {
-        displayName: "翠",
-        emails: ["green@sapphi.red", "sapphi-red"],
-      },
-      {
         displayName: "Matias Capeletto",
-        emails: ["matias.capeletto@gmail.com", "patak-dev"],
-      },
-      {
-        displayName: "Bjorn Lu",
-        emails: ["bjornlu.dev@gmail.com", "bluwy"],
+        emails: ["matias.capeletto@gmail.com"],
       },
       {
         displayName: "underfin",
@@ -37,15 +30,11 @@ export default {
       },
       {
         displayName: "yoho",
-        emails: ["panyoho@gmail.com", "907415276@qq.com", "poyoho"],
+        emails: ["panyoho@gmail.com", "poyoho"],
       },
       {
         displayName: "sun0day",
         emails: ["sun_day500@163.com", "ivan.xu@applovin.com"],
-      },
-      {
-        displayName: "ygj6",
-        emails: ["ygj6", "yuangongji@foxmail.com"],
       },
       {
         displayName: "Vladimir",
@@ -54,10 +43,6 @@ export default {
       {
         displayName: "Romuald Brillout",
         emails: ["git@brillout.com", "github.com@brillout.com"],
-      },
-      {
-        displayName: "OneNail",
-        emails: ["onenail", "onenail@yeah.net"],
       },
       {
         displayName: "Jeff Yang",

@@ -1,6 +1,7 @@
 export default {
   contributors: {
-    // People who committed under several identities, most active first
+    // People .mailmap and GitHub noreply links leave split or misnamed, most
+    // active first
     // cspell:disable
     aliases: [
       {
@@ -14,10 +15,6 @@ export default {
       {
         displayName: "Lucas Azzola",
         emails: ["derflatulator@gmail.com", "lucas.azzola@iress.com"],
-      },
-      {
-        displayName: "Evilebot Tnawi",
-        emails: ["evilebottnawi", "alexander.krasnoyarov@itgalaxy.company"],
       },
       {
         displayName: "Konv Suu",
