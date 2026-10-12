@@ -129,6 +129,8 @@ type ResolvedContributor = {
   readonly url: string | undefined;
   /** Explicit or auto-derived contributor kind. */
   readonly kind: ContributorKind;
+  /** Whether one of the config's alias groups lists this identity. */
+  readonly aliased: boolean;
 };
 
 export type ResolvedConfig = {
@@ -187,6 +189,7 @@ const bareResolveContributor = (
     displayName: entry?.displayName,
     url: entry?.url,
     kind: entry?.kind ?? deriveContributorKind(`${name ?? ""} <${email}>`),
+    aliased: entry !== undefined,
   };
 };
 

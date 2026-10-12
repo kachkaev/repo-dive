@@ -285,6 +285,16 @@ test("resolveConfig rejects malformed config", () => {
   );
 });
 
+test("resolveContributor says whether an alias group listed the identity", () => {
+  const resolved = resolveInRepo({
+    contributors: { aliases: [["alice@work.example", "alice"]] },
+  });
+  expect(
+    resolved.resolveContributor("12345+alice@users.noreply.github.com").aliased,
+  ).toBe(true);
+  expect(resolved.resolveContributor("carol@example.com").aliased).toBe(false);
+});
+
 test("resolveConfig defaults charts.weekStartsOn to monday", () => {
   expect(resolveInRepo({}).weekStartsOn).toBe(defaultWeekStartsOn);
   expect(resolveInRepo({ charts: {} }).weekStartsOn).toBe("monday");

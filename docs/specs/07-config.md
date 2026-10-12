@@ -67,6 +67,26 @@ Emails are matched against each commit author's email — and against the email 
 - `url` makes that name a link (e.g. to a GitHub profile).
 - `kind` is one of `"human"`, `"bot"` or `"ai"` (see below).
 
+### `.mailmap`
+
+Commit authors are read through the repository's [`.mailmap`](https://git-scm.com/docs/gitmailmap), the way `git shortlog` and `git blame` read them, so identities a project already maps need no alias group.
+Alias groups match the mapped emails.
+
+### Identities that fold on their own
+
+A few links between a person's identities are certain enough to need no alias group.
+Two human identities are one contributor when:
+
+- they are GitHub noreply addresses of **one account** — `12345+alice@users.noreply.github.com` and `12345+alice-old@users.noreply.github.com`, from after and before a rename;
+- one committed under a **single word that is the other's noreply handle** — `alice <alice@example.com>` and `Alice Example <alice@users.noreply.github.com>`, since handles are unique on GitHub.
+
+A shared name is not such a link, however full: one repository can hold two people called `Jason Miller`.
+Each folded contributor takes the address they committed under most as their canonical email.
+
+Folding is transitive and reaches alias groups too: an email no group lists joins the group it is linked to, so a group need not list the addresses that fold on their own.
+Two alias groups are never merged with each other, and an email linked to more than one is left out of both.
+Bots and AI agents are never folded this way.
+
 ### How a contributor is named
 
 Charts name people rather than their addresses: a group's `displayName` if it has one, otherwise the name git recorded on their commits — the newest spelling, with a bot's `[bot]` suffix dropped, since the badge already says as much.
