@@ -1,5 +1,19 @@
 # repo-dive
 
+## 0.17.0
+
+### Minor Changes
+
+- [#294](https://github.com/kachkaev/repo-dive/pull/294) [`f04f89d`](https://github.com/kachkaev/repo-dive/commit/f04f89dca205c7fb70576ac4695eaf0f68e2e4c9) - Add a time range select to the contributors chart.
+  Like the commit calendar, the chart can now be narrowed to the last 12 months, this year, the last 5 years or a single year, and it ranks contributors by what they did in that range.
+  `dashboard.json` now lists every contributor and points each commit row at its author and cross-kind co-authors, in place of the per-contributor totals and the commit rows' `author` email.
+  Run `repo-dive index` again to get the select on an existing catalog.
+
+- [#293](https://github.com/kachkaev/repo-dive/pull/293) [`0833d72`](https://github.com/kachkaev/repo-dive/commit/0833d72e089c71302c9b7cd18c062e6157f7186a) - Count `oxlint-disable` comments alongside `eslint-disable` ones.
+  The directives collector now tallies `oxlint-disable`, `oxlint-disable-next-line`, `oxlint-disable-line` and `oxlint-enable` too, and the dashboard's "Loose ends" chart gains an "oxlint disables" line wherever a repo has any.
+  The `directives.eslint` metric is now `directives.lint` with a `linter` category (`eslint` or `oxlint`), and `directives.eslintBlockCoveredLines` is now `directives.lintBlockCoveredLines`, also split by `linter`; update any `query` that names them.
+  The next `scan` re-collects directives across the whole history to pick up oxlint comments.
+
 ## 0.16.4
 
 ### Patch Changes
