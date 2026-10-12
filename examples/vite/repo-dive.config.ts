@@ -1,0 +1,57 @@
+export default {
+  contributors: {
+    // People who committed under several identities, most active first
+    // cspell:disable
+    aliases: [
+      {
+        displayName: "Evan You",
+        emails: ["yyx990803@gmail.com", "evan@vuejs.org", "evan@voidzero.dev"],
+      },
+      { displayName: "翠", emails: ["green@sapphi.red", "sapphi-red"] },
+      {
+        displayName: "Matias Capeletto",
+        emails: ["matias.capeletto@gmail.com", "patak-dev"],
+      },
+      { displayName: "Bjorn Lu", emails: ["bjornlu.dev@gmail.com", "bluwy"] },
+      {
+        displayName: "underfin",
+        emails: ["likui6666666@gmail.com", "2218301630@qq.com"],
+      },
+      {
+        displayName: "Jerry Zhao",
+        emails: ["shulaoda", "laipichan@qq.com", "shulaoda@foxmail.com"],
+      },
+      {
+        displayName: "Arnaud Barré",
+        emails: [
+          "arnaud.barre@carbometrix.com",
+          "arnaud.barre72@gmail.com",
+          "arnaud@nabla.com",
+        ],
+      },
+      {
+        displayName: "yoho",
+        emails: ["panyoho@gmail.com", "907415276@qq.com", "poyoho"],
+      },
+      {
+        displayName: "sun0day",
+        emails: ["sun_day500@163.com", "ivan.xu@applovin.com"],
+      },
+      { displayName: "ygj6", emails: ["ygj6", "yuangongji@foxmail.com"] },
+      {
+        displayName: "Vladimir",
+        emails: ["sleuths.slews0s@icloud.com", "sheremet.va@icloud.com"],
+      },
+      {
+        displayName: "Romuald Brillout",
+        emails: ["git@brillout.com", "github.com@brillout.com"],
+      },
+      { displayName: "OneNail", emails: ["onenail", "onenail@yeah.net"] },
+      {
+        displayName: "Jeff Yang",
+        emails: ["ydcjeff", "ydcjeff@outlook.com", "n2ya@duck.com"],
+      },
+    ],
+    // cspell:enable
+  },
+};
