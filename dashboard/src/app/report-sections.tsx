@@ -660,7 +660,7 @@ export function ReportSections({
       {data.repo.firstCommitDate !== undefined && data.commits.length > 0 && (
         <Section
           title="Commit calendar"
-          subtitle="commits per day; days bucketed by the committer's local date, i.e. when each commit landed"
+          subtitle="commits per day; days bucketed by the author's local date, i.e. when each commit was written"
           annotation={annotations?.["commit-calendar"]}
           controls={
             <>
