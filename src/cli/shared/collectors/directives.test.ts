@@ -64,7 +64,8 @@ test("directives scanning counts oxlint comments apart from eslint ones", () => 
       "/* oxlint-disable typescript/no-explicit-any */",
       "let a: any;",
       "/* oxlint-enable typescript/no-explicit-any */",
-      "// oxlint-disable-next-line no-console -- why",
+      // The rationale naming eslint's directive must not steal the comment
+      "// oxlint-disable-next-line no-console -- eslint-disable-next-line kept for editors",
       "console.log(a);",
       "debugger; // oxlint-disable-line no-debugger",
     ].join("\n"),
@@ -95,6 +96,16 @@ test("directives scanning counts oxlint comments apart from eslint ones", () => 
   });
   expect(output.eslintNextLine.count).toBe(0);
   expect(output.eslintLine.count).toBe(0);
+
+  const merged = mergeDirectives([
+    output,
+    scanFileForDirectives("// oxlint-disable-next-line no-console"),
+  ]);
+  expect(merged.oxlintNextLine).toStrictEqual({
+    count: 2,
+    byRule: { "no-console": 2 },
+  });
+  expect(merged.oxlintBlocks).toStrictEqual(output.oxlintBlocks);
 });
 
 test("directives collector tags lint facts by linter, also for outputs collected before oxlint was counted", () => {

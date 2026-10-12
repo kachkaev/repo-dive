@@ -13,7 +13,9 @@ type DirectiveCounts = { count: number; byRule: RuleCounts };
  * a block are unknowable without running the linter, so blocks are counted as
  * "gray areas" (one hit per rule per block), separately from line-level
  * directives. `coveredLines` sums lines strictly between matched pairs;
- * unmatched disables run to end of file and are only counted.
+ * unmatched disables run to end of file and are only counted. A disable pairs
+ * only with its own linter's enable, so `eslint-disable` … `oxlint-enable`
+ * stays unbounded.
  */
 type BlockCounts = {
   count: number;
@@ -82,13 +84,9 @@ const emptyOutput = (): DirectivesOutput => ({
   tsDirectives: { ignore: 0, expectError: 0, nocheck: 0 },
 });
 
-/** Extracts rule names following a directive keyword, stopping at a comment terminator or `--`. */
-const parseRules = (content: string, keyword: string): string[] => {
-  const keywordIndex = content.indexOf(keyword);
-  if (keywordIndex === -1) {
-    return [];
-  }
-  let rest = content.slice(keywordIndex + keyword.length);
+/** Extracts the rule names after a directive, stopping at a comment terminator or `--`. */
+const parseRules = (afterDirective: string): string[] => {
+  let rest = afterDirective;
   for (const terminator of ["*/", "-->", "--"]) {
     const terminatorIndex = rest.indexOf(terminator);
     if (terminatorIndex !== -1) {
@@ -110,12 +108,13 @@ const addRules = (byRule: RuleCounts, rules: readonly string[]) => {
 const quickPattern =
   /(?:eslint|oxlint)-(?:disable|enable)|@ts-(?:ignore|expect-error|nocheck)/;
 
-/** The linter whose disable or enable comment a line holds, if any. */
-const linterOf = (line: string): Linter | undefined =>
-  linters.find(
-    (linter) =>
-      line.includes(`${linter}-disable`) || line.includes(`${linter}-enable`),
-  );
+/**
+ * A lint directive and its kind. The first match on a line wins, so a comment
+ * that mentions the other linter's directive in its rationale is still
+ * attributed to the linter it opens with.
+ */
+const lintDirectivePattern =
+  /(eslint|oxlint)-(disable-next-line|disable-line|disable|enable)/;
 
 /** Scans one file's content; results are cached per blob by the tree scanner. */
 export const scanFileForDirectives = (content: string): DirectivesOutput => {
@@ -131,43 +130,49 @@ export const scanFileForDirectives = (content: string): DirectivesOutput => {
     if (!quickPattern.test(line)) {
       continue;
     }
-    const linter = linterOf(line);
+    const lintDirective = lintDirectivePattern.exec(line);
     if (line.includes("@ts-ignore")) {
       output.tsDirectives.ignore += 1;
     } else if (line.includes("@ts-expect-error")) {
       output.tsDirectives.expectError += 1;
     } else if (line.includes("@ts-nocheck")) {
       output.tsDirectives.nocheck += 1;
-    } else if (linter !== undefined) {
+    } else if (lintDirective !== null) {
+      const [directive, prefix, kind] = lintDirective;
+      const linter: Linter = prefix === "oxlint" ? "oxlint" : "eslint";
       const keys = outputKeys[linter];
-      const openBlockLine = openBlockLines.get(linter);
-      if (line.includes(`${linter}-disable-next-line`)) {
-        output[keys.nextLine].count += 1;
-        addRules(
-          output[keys.nextLine].byRule,
-          parseRules(line, `${linter}-disable-next-line`),
-        );
-      } else if (line.includes(`${linter}-disable-line`)) {
-        output[keys.line].count += 1;
-        addRules(
-          output[keys.line].byRule,
-          parseRules(line, `${linter}-disable-line`),
-        );
-      } else if (line.includes(`${linter}-disable`)) {
-        output[keys.blocks].count += 1;
-        addRules(
-          output[keys.blocks].byRule,
-          parseRules(line, `${linter}-disable`),
-        );
-        openBlockLines.set(linter, index);
-      } else if (openBlockLine !== undefined) {
-        // What is left is an enable comment, which closes the open block
-        output[keys.blocks].closedCount += 1;
-        output[keys.blocks].coveredLines += Math.max(
-          0,
-          index - openBlockLine - 1,
-        );
-        openBlockLines.delete(linter);
+      const rules = parseRules(
+        line.slice(lintDirective.index + directive.length),
+      );
+      switch (kind) {
+        case "disable-next-line": {
+          output[keys.nextLine].count += 1;
+          addRules(output[keys.nextLine].byRule, rules);
+          break;
+        }
+        case "disable-line": {
+          output[keys.line].count += 1;
+          addRules(output[keys.line].byRule, rules);
+          break;
+        }
+        case "disable": {
+          output[keys.blocks].count += 1;
+          addRules(output[keys.blocks].byRule, rules);
+          openBlockLines.set(linter, index);
+          break;
+        }
+        case "enable": {
+          const openBlockLine = openBlockLines.get(linter);
+          if (openBlockLine !== undefined) {
+            output[keys.blocks].closedCount += 1;
+            output[keys.blocks].coveredLines += Math.max(
+              0,
+              index - openBlockLine - 1,
+            );
+            openBlockLines.delete(linter);
+          }
+          break;
+        }
       }
     }
   }

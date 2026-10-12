@@ -121,10 +121,11 @@ const sumMetric = (
   return total;
 };
 
-const groupMetric = (
+/** Sums a metric's values by a key derived from each fact's categories. */
+const groupMetricBy = (
   commit: CommitFacts,
   metric: string,
-  categoryKey: string,
+  keyOf: (categories: Readonly<Record<string, string>>) => string,
 ): Record<string, number> => {
   const grouped: Record<string, number> = {};
   for (const facts of commit.factsByCollector.values()) {
@@ -133,12 +134,23 @@ const groupMetric = (
         continue;
       }
 
-      const key = fact.categories?.[categoryKey] ?? "(unknown)";
+      const key = keyOf(fact.categories ?? {});
       grouped[key] = (grouped[key] ?? 0) + fact.value;
     }
   }
   return grouped;
 };
+
+const groupMetric = (
+  commit: CommitFacts,
+  metric: string,
+  categoryKey: string,
+): Record<string, number> =>
+  groupMetricBy(
+    commit,
+    metric,
+    (categories) => categories[categoryKey] ?? "(unknown)",
+  );
 
 const hasMetric = (commit: CommitFacts, metric: string): boolean =>
   commit.factsByCollector
@@ -299,23 +311,21 @@ const buildDashboardData = (
   const directives = composeSeries(
     (commit) => hasMetric(commit, "directives.ts"),
     (commit) => {
-      const lintCount = (linter: string, type: string) =>
-        sumMetric(
-          commit,
-          "directives.lint",
-          (categories) =>
-            categories["linter"] === linter && categories["type"] === type,
-        );
+      const lint = groupMetricBy(
+        commit,
+        "directives.lint",
+        (categories) => `${categories["linter"]} ${categories["type"]}`,
+      );
       const ts = groupMetric(commit, "directives.ts", "type");
       return {
         sha: commit.sha.slice(0, 10),
         date: commit.committedAt,
-        eslintNextLine: lintCount("eslint", "next-line"),
-        eslintLine: lintCount("eslint", "line"),
-        eslintBlocks: lintCount("eslint", "block"),
-        oxlintNextLine: lintCount("oxlint", "next-line"),
-        oxlintLine: lintCount("oxlint", "line"),
-        oxlintBlocks: lintCount("oxlint", "block"),
+        eslintNextLine: lint["eslint next-line"] ?? 0,
+        eslintLine: lint["eslint line"] ?? 0,
+        eslintBlocks: lint["eslint block"] ?? 0,
+        oxlintNextLine: lint["oxlint next-line"] ?? 0,
+        oxlintLine: lint["oxlint line"] ?? 0,
+        oxlintBlocks: lint["oxlint block"] ?? 0,
         blockCoveredLines: sumMetric(
           commit,
           "directives.lintBlockCoveredLines",
