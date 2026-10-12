@@ -1,5 +1,5 @@
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Console, Data, Effect, Runtime } from "effect";
+import { Cause, Console, Data, Effect, Runtime } from "effect";
 import { CliError, Command, Flag } from "effect/cli";
 
 import packageJson from "../package.json" with { type: "json" };
@@ -77,6 +77,20 @@ class ReportedCliFailure extends Data.TaggedError("ReportedCliFailure") {
   override readonly [Runtime.errorReported] = false;
 }
 
+/**
+ * The one line a domain failure prints as. `Effect.try` / `Effect.tryPromise`
+ * failures only say "An error occurred in Effect.tryPromise", so the error
+ * they wrap is what tells the user what went wrong.
+ */
+const describeFailure = (error: unknown): string => {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+  return Cause.isUnknownError(error) && error.cause instanceof Error
+    ? `${error.message}: ${error.cause.message}`
+    : error.message;
+};
+
 Command.run(cli, { version: packageJson.version }).pipe(
   // Domain failures print as one friendly line on stderr. CLI-internal errors
   // (--help rendering, Ctrl-C quits) keep the framework's own handling and
@@ -84,9 +98,9 @@ Command.run(cli, { version: packageJson.version }).pipe(
   Effect.catchIf(
     (error) => !CliError.isCliError(error),
     (error) =>
-      Console.error(
-        error instanceof Error ? error.message : String(error),
-      ).pipe(Effect.andThen(Effect.fail(new ReportedCliFailure()))),
+      Console.error(describeFailure(error)).pipe(
+        Effect.andThen(Effect.fail(new ReportedCliFailure())),
+      ),
   ),
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,

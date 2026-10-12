@@ -777,6 +777,7 @@ export const runIndex = Effect.fn("runIndex")(function* ({
         const factsByCollector = new Map<string, readonly Fact[]>();
         let unknownCollectorDirs = 0;
         let offMainlineSnapshots = 0;
+        let incompleteOutputs = 0;
         for (const collectorName of await readdir(commitDir)) {
           const collector = registry.get(collectorName);
           if (!collector) {
@@ -791,12 +792,29 @@ export const runIndex = Effect.fn("runIndex")(function* ({
             offMainlineSnapshots += 1;
             continue;
           }
-          const raw: unknown = JSON.parse(
-            await readFile(
-              path.join(commitDir, collectorName, "output.json"),
-              "utf8",
-            ),
-          );
+          let raw: unknown;
+          try {
+            raw = JSON.parse(
+              await readFile(
+                path.join(commitDir, collectorName, "output.json"),
+                "utf8",
+              ),
+            );
+          } catch (error) {
+            // A scan cut short can leave a collector folder without its
+            // output, and catalogs from before writes became atomic can hold
+            // a truncated one. Neither should cost the rest of the cube.
+            if (
+              error instanceof SyntaxError ||
+              (error instanceof Error &&
+                "code" in error &&
+                error.code === "ENOENT")
+            ) {
+              incompleteOutputs += 1;
+              continue;
+            }
+            throw error;
+          }
           factsByCollector.set(collectorName, collector.normalize(raw));
         }
         const facts: CommitFacts = {
@@ -807,7 +825,12 @@ export const runIndex = Effect.fn("runIndex")(function* ({
           authorName: commit.authorName,
           factsByCollector,
         };
-        return { facts, unknownCollectorDirs, offMainlineSnapshots };
+        return {
+          facts,
+          unknownCollectorDirs,
+          offMainlineSnapshots,
+          incompleteOutputs,
+        };
       }),
     { concurrency: 16 },
   );
@@ -819,6 +842,10 @@ export const runIndex = Effect.fn("runIndex")(function* ({
   );
   const offMainlineSnapshots = readOutcomes.reduce(
     (total, outcome) => total + outcome.offMainlineSnapshots,
+    0,
+  );
+  const incompleteOutputs = readOutcomes.reduce(
+    (total, outcome) => total + outcome.incompleteOutputs,
     0,
   );
 
@@ -854,6 +881,11 @@ export const runIndex = Effect.fn("runIndex")(function* ({
       ...(offMainlineSnapshots > 0
         ? [
             `Skipped ${offMainlineSnapshots} tree snapshots taken off the lineages.`,
+          ]
+        : []),
+      ...(incompleteOutputs > 0
+        ? [
+            `Skipped ${incompleteOutputs} incomplete outputs left by an interrupted scan.`,
           ]
         : []),
     ].join("\n"),

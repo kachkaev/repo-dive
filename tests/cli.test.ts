@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -189,6 +190,59 @@ test.concurrent(
       expect(secondRun.status, secondRun.stderr).toBe(0);
       expect(secondRun.stdout).toMatch(
         /Collector runs: 0 new, 14 already collected/,
+      );
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  },
+);
+
+test.concurrent(
+  "scan and index get past files an interrupted scan left half-written",
+  async () => {
+    const repoPath = createFixtureRepo();
+
+    try {
+      await runCli("scan", "--repo", repoPath, "--collectors", e2eCollectors);
+
+      const catalogPath = path.join(repoPath, ".repo-dive");
+      const headSha = runGit(repoPath, "rev-parse", "HEAD").trim();
+      const headDir = path.join(catalogPath, "commits", headSha);
+      // What a copy of the catalog taken mid-write holds: a sidecar emptied by
+      // the open-for-writing that never got its contents, beside a cut-off
+      // output.
+      writeFileSync(path.join(headDir, "file-types", "collector.json"), "");
+      writeFileSync(path.join(headDir, "file-types", "output.json"), '{"tot');
+
+      const secondRun = await runCli(
+        "scan",
+        "--repo",
+        repoPath,
+        "--collectors",
+        e2eCollectors,
+      );
+      expect(secondRun.status, secondRun.stderr).toBe(0);
+      expect(secondRun.stdout).toMatch(
+        /Collector runs: 1 new, 13 already collected/,
+      );
+      expect(
+        readFileSync(path.join(headDir, "file-types", "output.json"), "utf8"),
+      ).toMatch(/"totalFiles": 2/);
+      // Writes go through a temporary file renamed into place
+      expect(
+        readdirSync(catalogPath, { encoding: "utf8", recursive: true }).filter(
+          (entry) => entry.endsWith(".tmp"),
+        ),
+      ).toStrictEqual([]);
+
+      // A scan killed between creating a collector's folder and writing into it
+      rmSync(path.join(headDir, "churn"), { force: true, recursive: true });
+      mkdirSync(path.join(headDir, "churn"));
+
+      const indexRun = await runCli("index", "--repo", repoPath);
+      expect(indexRun.status, indexRun.stderr).toBe(0);
+      expect(indexRun.stdout).toMatch(
+        /Skipped 1 incomplete outputs left by an interrupted scan\./,
       );
     } finally {
       rmSync(repoPath, { force: true, recursive: true });
