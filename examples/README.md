@@ -22,8 +22,9 @@ The directory name becomes the URL slug, so keep it short and lowercase.
 ## Contributor aliases
 
 Most large repositories have people who committed under several emails — work and personal addresses, GitHub `noreply` handles, a renamed account.
-The examples fold those identities for everyone who would otherwise reach the dashboard's charts: roughly the 25 most active people by commits.
-Each group lists only emails confirmed to belong to one person — GitHub links them to the same account, the repository's own `.mailmap` says so, or the name and timeline leave no doubt.
+repo-dive folds some of them on its own, through the repository's `.mailmap` and the links GitHub noreply addresses make certain (see [docs/specs/07-config.md](../docs/specs/07-config.md)).
+The examples' alias groups cover the rest for everyone who would otherwise reach the dashboard's charts: roughly the 25 most active people by commits.
+Each group lists only emails confirmed to belong to one person — GitHub links them to the same account, or the name and timeline leave no doubt — and leaves out the ones repo-dive folds by itself.
 
 Every group sets a `displayName`, so a stray spelling on a later commit or `Co-authored-by:` trailer cannot rename the person.
 Where the emails disagree on a spelling, the name is the one on the person's GitHub profile if it is a full name, and otherwise the fullest name they commit under.

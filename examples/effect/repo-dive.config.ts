@@ -16,12 +16,20 @@ const monorepoAssembly =
 
 export default {
   contributors: {
-    // People who committed under several identities, most active first
+    // People .mailmap and GitHub noreply links leave split or misnamed
     // cspell:disable
     aliases: [
       {
-        displayName: "Tim Smart",
-        emails: ["hello@timsmart.co", "tim.smart@arisechurch.com"],
+        displayName: "Chris Wilkinson",
+        emails: ["chris@prereview.org", "c.wilkinson@elifesciences.org"],
+      },
+      {
+        displayName: "Julius Marminge",
+        emails: ["julius0216@outlook.com", "jmarminge@gmail.com"],
+      },
+      {
+        displayName: "Mattia Manzati",
+        emails: ["mattia.manzati@gmail.com", "manzati.mattia@gmail.com"],
       },
       {
         displayName: "Michael Arnaldi",
@@ -32,16 +40,8 @@ export default {
         ],
       },
       {
-        displayName: "Mattia Manzati",
-        emails: ["mattia.manzati@gmail.com", "manzati.mattia@gmail.com"],
-      },
-      {
-        displayName: "Chris Wilkinson",
-        emails: ["chris@prereview.org", "c.wilkinson@elifesciences.org"],
-      },
-      {
-        displayName: "Julius Marminge",
-        emails: ["julius0216@outlook.com", "jmarminge@gmail.com"],
+        displayName: "Tim Smart",
+        emails: ["hello@timsmart.co", "tim.smart@arisechurch.com"],
       },
     ],
     // cspell:enable

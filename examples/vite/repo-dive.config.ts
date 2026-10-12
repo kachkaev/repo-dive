@@ -1,32 +1,8 @@
 export default {
   contributors: {
-    // People who committed under several identities, most active first
+    // People .mailmap and GitHub noreply links leave split or misnamed
     // cspell:disable
     aliases: [
-      {
-        displayName: "Evan You",
-        emails: ["yyx990803@gmail.com", "evan@vuejs.org", "evan@voidzero.dev"],
-      },
-      {
-        displayName: "翠",
-        emails: ["green@sapphi.red", "sapphi-red"],
-      },
-      {
-        displayName: "Matias Capeletto",
-        emails: ["matias.capeletto@gmail.com", "patak-dev"],
-      },
-      {
-        displayName: "Bjorn Lu",
-        emails: ["bjornlu.dev@gmail.com", "bluwy"],
-      },
-      {
-        displayName: "underfin",
-        emails: ["likui6666666@gmail.com", "2218301630@qq.com"],
-      },
-      {
-        displayName: "Jerry Zhao",
-        emails: ["shulaoda", "laipichan@qq.com", "shulaoda@foxmail.com"],
-      },
       {
         displayName: "Arnaud Barré",
         emails: [
@@ -36,32 +12,40 @@ export default {
         ],
       },
       {
-        displayName: "yoho",
-        emails: ["panyoho@gmail.com", "907415276@qq.com", "poyoho"],
+        displayName: "Evan You",
+        emails: ["yyx990803@gmail.com", "evan@vuejs.org", "evan@voidzero.dev"],
       },
       {
-        displayName: "sun0day",
-        emails: ["sun_day500@163.com", "ivan.xu@applovin.com"],
+        displayName: "Jeff Yang",
+        emails: ["ydcjeff", "ydcjeff@outlook.com", "n2ya@duck.com"],
       },
       {
-        displayName: "ygj6",
-        emails: ["ygj6", "yuangongji@foxmail.com"],
+        displayName: "Jerry Zhao",
+        emails: ["shulaoda", "laipichan@qq.com", "shulaoda@foxmail.com"],
       },
       {
-        displayName: "Vladimir",
-        emails: ["sleuths.slews0s@icloud.com", "sheremet.va@icloud.com"],
+        displayName: "Matias Capeletto",
+        emails: ["matias.capeletto@gmail.com"],
       },
       {
         displayName: "Romuald Brillout",
         emails: ["git@brillout.com", "github.com@brillout.com"],
       },
       {
-        displayName: "OneNail",
-        emails: ["onenail", "onenail@yeah.net"],
+        displayName: "sun0day",
+        emails: ["sun_day500@163.com", "ivan.xu@applovin.com"],
       },
       {
-        displayName: "Jeff Yang",
-        emails: ["ydcjeff", "ydcjeff@outlook.com", "n2ya@duck.com"],
+        displayName: "underfin",
+        emails: ["likui6666666@gmail.com", "2218301630@qq.com"],
+      },
+      {
+        displayName: "Vladimir",
+        emails: ["sleuths.slews0s@icloud.com", "sheremet.va@icloud.com"],
+      },
+      {
+        displayName: "yoho",
+        emails: ["panyoho@gmail.com", "poyoho"],
       },
     ],
     // cspell:enable
