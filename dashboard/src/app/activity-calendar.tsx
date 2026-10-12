@@ -13,7 +13,7 @@ import {
   formatMonth,
   monthShortNames,
 } from "./shared/format.ts";
-import type { HistoryRange } from "./shared/history-range.ts";
+import type { DaySpan, HistoryRange } from "./shared/history-range.ts";
 import { DateStamp } from "./shared/primitives.tsx";
 
 export type WeekStart = "monday" | "sunday";
@@ -471,17 +471,18 @@ function CalendarStrip({
 
 export function CommitCalendar({
   commits,
-  generatedAt,
-  firstCommitDate,
+  historyDays,
   weekStartsOn,
   range,
   kindFilter,
 }: {
   commits: readonly CalendarCommit[];
-  /** ISO timestamp the data was generated at — the calendar's "today". */
-  generatedAt: string;
-  /** ISO timestamp of the repo's first commit. */
-  firstCommitDate: string;
+  /**
+   * The days the whole history covers, in its authors' own calendars — the
+   * last one is the calendar's "today". Days outside it are drawn as "no
+   * data", so it has to reach every day the commits bucket into.
+   */
+  historyDays: DaySpan;
   weekStartsOn: WeekStart;
   range: HistoryRange;
   kindFilter: CalendarKindFilter;
@@ -531,8 +532,8 @@ export function CommitCalendar({
       ? 0
       : 1 + thresholds.filter((threshold) => value > threshold).length;
 
-  const minIsoDate = firstCommitDate.slice(0, 10);
-  const maxIsoDate = generatedAt.slice(0, 10);
+  const minIsoDate = historyDays.first;
+  const maxIsoDate = historyDays.last;
   const anchorMonth = maxIsoDate.slice(0, 7);
   const anchorYear = Number(anchorMonth.slice(0, 4));
   const firstYear = Number(minIsoDate.slice(0, 4));
