@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { Data, DateTime, Effect } from "effect";
@@ -59,24 +59,55 @@ class CatalogFormatError extends Data.TaggedError("CatalogFormatError")<{
   }
 }
 
+/**
+ * Writes beside the target, then renames over it. A scan cut short (Ctrl+C, a
+ * CI step timeout) or a copy of the catalog taken mid-scan (a CI cache save)
+ * then sees either the previous file or the complete new one, never a
+ * truncated one. A temporary file a cut-short write leaves behind is reused by
+ * the next write of the same file.
+ */
 const writeJson = (filePath: string, value: unknown) =>
-  Effect.tryPromise(() =>
-    writeFile(filePath, `${JSON.stringify(value, undefined, 2)}\n`, "utf8"),
-  );
+  Effect.tryPromise(async () => {
+    const temporaryPath = `${filePath}.tmp`;
+    await writeFile(
+      temporaryPath,
+      `${JSON.stringify(value, undefined, 2)}\n`,
+      "utf8",
+    );
+    await rename(temporaryPath, filePath);
+  });
+
+const readTextIfExists = async (
+  filePath: string,
+): Promise<string | undefined> => {
+  try {
+    return await readFile(filePath, "utf8");
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return undefined;
+    }
+    throw error;
+  }
+};
 
 const readJsonIfExists = (filePath: string) =>
   Effect.tryPromise(async (): Promise<unknown> => {
+    const raw = await readTextIfExists(filePath);
+    return raw === undefined ? undefined : JSON.parse(raw);
+  });
+
+/**
+ * Like {@link readJsonIfExists}, but a file that does not parse reads as
+ * missing too. Catalogs written before writes became atomic can hold
+ * truncated files, and failing on one would fail every scan from then on.
+ */
+const readJsonIfIntact = (filePath: string) =>
+  Effect.tryPromise(async (): Promise<unknown> => {
+    const raw = await readTextIfExists(filePath);
     try {
-      return JSON.parse(await readFile(filePath, "utf8"));
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "ENOENT"
-      ) {
-        return undefined;
-      }
-      throw error;
+      return raw === undefined ? undefined : JSON.parse(raw);
+    } catch {
+      return undefined;
     }
   });
 
@@ -175,13 +206,16 @@ export const openCatalog = Effect.fn("openCatalog")(function* ({
 const collectorDir = (catalog: Catalog, sha: string, collectorName: string) =>
   path.join(catalog.rootPath, "commits", sha, collectorName);
 
-/** Reads the cache fingerprint recorded in a collector's sidecar, if any. */
+/**
+ * Reads the cache fingerprint recorded in a collector's sidecar, if any. A
+ * truncated sidecar has none, so the commit is collected afresh.
+ */
 export const readCollectorCacheKey = (
   catalog: Catalog,
   sha: string,
   collectorName: string,
 ): Effect.Effect<unknown, Error> =>
-  readJsonIfExists(
+  readJsonIfIntact(
     path.join(collectorDir(catalog, sha, collectorName), "collector.json"),
   ).pipe(Effect.map(cacheKeyOf));
 
