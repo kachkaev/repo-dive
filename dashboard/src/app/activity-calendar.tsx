@@ -13,6 +13,7 @@ import {
   formatMonth,
   monthShortNames,
 } from "./shared/format.ts";
+import type { HistoryRange } from "./shared/history-range.ts";
 import { DateStamp } from "./shared/primitives.tsx";
 
 export type WeekStart = "monday" | "sunday";
@@ -26,13 +27,6 @@ export type CalendarCommit = {
   /** At least one AI co-author trailer on the commit. */
   ai: boolean;
 };
-
-export type CalendarRange =
-  | "last-12-months"
-  | "this-year"
-  | `last-${number}-years`
-  | "all-years"
-  | `year-${number}`;
 
 /** Which author kind the calendar shows; "all" stacks every kind per cell. */
 export type CalendarKindFilter = KindFilter;
@@ -489,7 +483,7 @@ export function CommitCalendar({
   /** ISO timestamp of the repo's first commit. */
   firstCommitDate: string;
   weekStartsOn: WeekStart;
-  range: CalendarRange;
+  range: HistoryRange;
   kindFilter: CalendarKindFilter;
 }) {
   // The hovered cell outlives its hover so the tooltip has something to render

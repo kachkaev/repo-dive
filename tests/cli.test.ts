@@ -699,42 +699,55 @@ test.concurrent(
       expect(stringAt(repo, "lastCommitSha")).toMatch(/^[\da-f]{10}$/);
 
       const contributors = arrayAt(dashboard, "contributors");
-      const alice = contributors.find(
+      expect(
+        contributors,
+        "every contributor is listed, not just the top ones",
+      ).toHaveLength(contributorCount);
+      const aliceIndex = contributors.findIndex(
         (row) => stringAt(row, "email") === "alice@work.example",
       );
-      expect(alice, "Alice should be present").toBeTruthy();
+      expect(aliceIndex, "Alice should be present").not.toBe(-1);
+      const alice = contributors[aliceIndex];
       expect(stringAt(alice, "name")).toBe("Alice A.");
       expect(stringAt(alice, "url")).toBe("https://github.com/alice");
       expect(stringAt(alice, "kind")).toBe("human");
-      expect(numberAt(alice, "commits")).toBe(2);
-
-      const bot = contributors.find((row) => stringAt(row, "kind") === "bot");
-      expect(bot, "renovate should be auto-classified as a bot").toBeTruthy();
-      expect(stringAt(bot, "email")).toBe("renovate[bot]");
-
-      // Cross-kind co-authorship, recorded from both ends of the same edge.
-      expect(
-        recordAt(alice, "assistedBy"),
-        "one of Alice's commits was co-authored by an AI agent",
-      ).toEqual({ ai: 1 });
       expect(
         alice,
-        "human-to-human credit (here, an alias of herself) is not cross-kind",
-      ).not.toHaveProperty("assisted");
+        "the dashboard tallies contributors over the range it shows",
+      ).not.toHaveProperty("commits");
 
-      const agent = contributors.find((row) => stringAt(row, "kind") === "ai");
+      const botIndex = contributors.findIndex(
+        (row) => stringAt(row, "kind") === "bot",
+      );
+      expect(botIndex, "renovate should be auto-classified as a bot").not.toBe(
+        -1,
+      );
+      expect(stringAt(contributors[botIndex], "email")).toBe("renovate[bot]");
+      const agentIndex = contributors.findIndex(
+        (row) => stringAt(row, "kind") === "ai",
+      );
+      expect(agentIndex, "Claude should be classified as an AI agent").not.toBe(
+        -1,
+      );
+
+      // Commit rows point at their author and their cross-kind co-authors, so
+      // the dashboard can tally either end of the same edge over any range.
+      const commitRows = arrayAt(dashboard, "commits");
+      for (const row of commitRows) {
+        expect(row).toHaveProperty("contributor");
+      }
+      const aliceCommits = commitRows.filter(
+        (row) => numberAt(row, "contributor") === aliceIndex,
+      );
+      expect(aliceCommits, "Alice's aliases collapse").toHaveLength(2);
       expect(
-        recordAt(agent, "assisted"),
-        "the agent helped a human once",
-      ).toEqual({ human: 1 });
+        aliceCommits.map((row) => arrayAt(row, "helpers")),
+        "one of Alice's commits was co-authored by an AI agent",
+      ).toContainEqual([agentIndex]);
       expect(
-        agent,
-        "nobody co-authored the agent's own commit",
-      ).not.toHaveProperty("assistedBy");
-      expect(
-        bot,
-        "the bot neither gave nor received cross-kind help",
-      ).not.toHaveProperty("assisted");
+        commitRows.flatMap((row) => arrayAt(row, "helpers")),
+        "that is the only cross-kind help: Alice crediting an alias of herself is human-to-human, and the bot neither gave nor received any",
+      ).toEqual([agentIndex]);
 
       // Each commit row carries its author's kind, so the dashboard can split
       // the calendar and monthly charts without re-deriving kinds client-side.
