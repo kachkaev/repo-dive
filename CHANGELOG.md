@@ -1,5 +1,16 @@
 # repo-dive
 
+## 0.18.1
+
+### Patch Changes
+
+- [#312](https://github.com/kachkaev/repo-dive/pull/312) [`f91d9ef`](https://github.com/kachkaev/repo-dive/commit/f91d9efde9a0c6a42d1d26fa0ea75e51c1e03383) - Align the churn chart's axes with the other charts.
+  Its x axis line now runs the full plot width instead of stopping half a bar short of each edge, and its zero baseline uses the same faint gray as every other chart's x axis.
+
+- [#311](https://github.com/kachkaev/repo-dive/pull/311) [`a864787`](https://github.com/kachkaev/repo-dive/commit/a8647875606736d7c72fd9e95bac9be8b7b9c616) - Apply `.mailmap` to survival and co-author identities.
+  Commit authors have gone through `.mailmap` since 0.18.0, but a person it maps could still appear under their old address in surviving files split by contributor, in line survival snapshots collected before the `.mailmap`, or as an extra contributor when credited in a `Co-authored-by:` trailer.
+  `repo-dive index` now maps these through the current `.mailmap` as well, so re-running it is enough.
+
 ## 0.18.0
 
 ### Minor Changes
