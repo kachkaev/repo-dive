@@ -169,12 +169,14 @@ export function DivergingBars({
                 </g>
               );
             })}
+            {/* Drawn over the bars like the other charts' x axis, in the same
+                recessive stroke. */}
             <line
               x1={0}
               x2={innerWidth}
               y1={yScale(0)}
               y2={yScale(0)}
-              stroke="var(--text-muted)"
+              stroke="var(--grid-line)"
               strokeWidth={1}
             />
             <AxisLeft
@@ -195,6 +197,9 @@ export function DivergingBars({
             <AxisBottom
               top={innerHeight}
               scale={xScale}
+              // The axis line spans the scale's range, which `xInset` shrinks;
+              // pad it back out so the line runs the full plot width.
+              rangePadding={xInset}
               tickValues={xTicks.map((tick) => tick.valueMs)}
               tickFormat={(_, index) => xTicks[index]?.label}
               hideTicks
