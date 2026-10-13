@@ -876,6 +876,10 @@ export function TimeSeriesChart(props: {
             <AxisBottom
               top={innerHeight}
               scale={xScale}
+              // The axis line spans the scale's range, which `xInset` shrinks
+              // for bars; pad it back out so the line runs the full plot width
+              // rather than relying on the zero grid line to cover the gap.
+              rangePadding={xInset}
               tickValues={xTickValues}
               tickFormat={(_, index) => xTicks[index]?.label}
               hideTicks
