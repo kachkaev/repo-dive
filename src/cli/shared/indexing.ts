@@ -22,6 +22,8 @@ import {
   type LineageSnapshot,
 } from "./indexing/compose-lineage-series.ts";
 import { inferAliases } from "./indexing/infer-aliases.ts";
+import { parseIdentity } from "./indexing/parse-identity.ts";
+import { readMailmap } from "./indexing/read-mailmap.ts";
 import { readRemoteUrl } from "./indexing/remote.ts";
 import { languageOfExtension } from "./languages.ts";
 import { listCommits, listLineages, resolveRepoRoot } from "./scan.ts";
@@ -42,29 +44,6 @@ class NoCollectedCommitsError extends Data.TaggedError(
  * reserved kind colors, so change them in both places or not at all.
  */
 const kindGroupLabels = { bot: "Bots", ai: "AI agents" } as const;
-
-/**
- * Splits a `Co-authored-by:` trailer into its parts:
- * `"Claude Fable 5 <noreply@anthropic.com>"` → name + email.
- *
- * Keeping the email (rather than the display name alone) is what lets a
- * co-author resolve through the very same `resolveContributor` an author goes
- * through — so alias groups, `displayName`/`url` overrides and kind derivation
- * apply identically whether a person wrote a commit or helped with one.
- */
-export const parseIdentity = (
-  identity: string,
-): { name: string; email: string } => {
-  const open = identity.indexOf("<");
-  const close = identity.lastIndexOf(">");
-  if (open === -1 || close < open) {
-    return { name: identity.trim(), email: "" };
-  }
-  return {
-    name: identity.slice(0, open).trim(),
-    email: identity.slice(open + 1, close).trim(),
-  };
-};
 
 /**
  * Which of a commit's two dates a series uses comes down to the series' shape,
@@ -521,8 +500,13 @@ const buildDashboardData = (
     resolved: ReturnType<typeof resolveContributor>,
     observedName: string,
   ): Contributor => {
-    const name = nameOf(resolved, observedName);
     const email = resolved.canonicalEmail.toLowerCase();
+    // A human goes by the name on their own commits, as their survival bands
+    // do, so a trailer that spells it differently doesn't rename them.
+    const name =
+      (resolved.kind === "human"
+        ? nameByCanonicalEmail.get(email)
+        : undefined) ?? nameOf(resolved, observedName);
     const key =
       resolved.kind === "human" ? email : `${name.toLowerCase()}\u{1F}${email}`;
     const contributor = contributorMap.get(key) ?? {
@@ -532,7 +516,8 @@ const buildDashboardData = (
       url: resolved.url,
       kind: resolved.kind,
     };
-    // Humans keep the latest spelling; a non-human's is pinned by its key.
+    // Someone who only ever co-authored keeps the latest spelling of the
+    // trailers; a non-human's is pinned by its key.
     contributor.name = name;
     contributorMap.set(key, contributor);
     return contributor;
@@ -806,7 +791,34 @@ export const runIndex = Effect.fn("runIndex")(function* ({
     { concurrency: 16 },
   );
 
-  const commitFacts = readOutcomes.map((outcome) => outcome.facts);
+  // Facts keep identities as they were collected; they go through the current
+  // `.mailmap` here, the way `listCommits` reads commit authors through it —
+  // see `read-mailmap.ts`.
+  const remapIdentities = yield* readMailmap(
+    repoRoot,
+    readOutcomes
+      .values()
+      .flatMap(({ facts }) =>
+        facts.factsByCollector
+          .values()
+          .flatMap((collectorFacts) => collectorFacts.values()),
+      ),
+  );
+  const commitFacts = readOutcomes.map(({ facts }): CommitFacts =>
+    remapIdentities === undefined
+      ? facts
+      : {
+          ...facts,
+          factsByCollector: new Map(
+            facts.factsByCollector
+              .entries()
+              .map(([collector, collectorFacts]) => [
+                collector,
+                collectorFacts.map(remapIdentities),
+              ]),
+          ),
+        },
+  );
   const unknownCollectorDirs = readOutcomes.reduce(
     (total, outcome) => total + outcome.unknownCollectorDirs,
     0,

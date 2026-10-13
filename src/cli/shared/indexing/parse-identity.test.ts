@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 
-import { deriveContributorKind } from "./config.ts";
-import { parseIdentity } from "./indexing.ts";
+import { deriveContributorKind } from "../config.ts";
+import { parseIdentity } from "./parse-identity.ts";
 
 test("parseIdentity splits a co-author trailer into name and email", () => {
   expect(parseIdentity("Claude Fable 5 <noreply@anthropic.com>")).toEqual({

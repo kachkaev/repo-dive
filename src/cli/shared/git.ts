@@ -29,6 +29,8 @@ const runCommand = Effect.fnUntraced(function* (
   options?: {
     /** Extra exit codes to treat as success (e.g. 1 for `git grep` with no matches). */
     readonly okExitCodes?: readonly number[];
+    /** Written to stdin, which otherwise reads as empty. */
+    readonly input?: string;
   },
 ): Effect.fn.Return<
   string,
@@ -36,7 +38,10 @@ const runCommand = Effect.fnUntraced(function* (
   ChildProcessSpawner.ChildProcessSpawner | Scope.Scope
 > {
   const handle = yield* ChildProcess.make(command, [...args], {
-    stdin: "ignore",
+    stdin:
+      options?.input === undefined
+        ? "ignore"
+        : Stream.make(new TextEncoder().encode(options.input)),
   });
 
   const { stdout, stderr, exitCode } = yield* Effect.all(
@@ -61,7 +66,10 @@ const runCommand = Effect.fnUntraced(function* (
 
 export const runGit = Effect.fn("runGit")(function* (
   args: readonly string[],
-  options?: { readonly okExitCodes?: readonly number[] },
+  options?: {
+    readonly okExitCodes?: readonly number[];
+    readonly input?: string;
+  },
 ): Effect.fn.Return<
   string,
   CommandError,

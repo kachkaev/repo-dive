@@ -70,6 +70,9 @@ Emails are matched against each commit author's email — and against the email 
 ### `.mailmap`
 
 Commit authors are read through the repository's [`.mailmap`](https://git-scm.com/docs/gitmailmap), the way `git shortlog` and `git blame` read them, so identities a project already maps need no alias group.
+So are `Co-authored-by:` trailers and the authors of surviving lines and files: `repo-dive index` maps what the catalog holds through the current `.mailmap`, so a new entry needs no re-scan.
+Line survival collected earlier still holds the addresses `git blame` mapped back then, though, so an entry removed or changed since takes `repo-dive scan --collectors survival --force` to undo there.
+Survival records an author's email alone, so an entry that also names the old identity reaches line survival only through `git blame` at scan time, and file survival not at all.
 Alias groups match the mapped emails.
 
 ### Identities that fold on their own
