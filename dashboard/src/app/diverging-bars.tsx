@@ -195,6 +195,9 @@ export function DivergingBars({
             <AxisBottom
               top={innerHeight}
               scale={xScale}
+              // The axis line spans the scale's range, which `xInset` shrinks;
+              // pad it back out so the line runs the full plot width.
+              rangePadding={xInset}
               tickValues={xTicks.map((tick) => tick.valueMs)}
               tickFormat={(_, index) => xTicks[index]?.label}
               hideTicks
