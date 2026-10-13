@@ -500,8 +500,13 @@ const buildDashboardData = (
     resolved: ReturnType<typeof resolveContributor>,
     observedName: string,
   ): Contributor => {
-    const name = nameOf(resolved, observedName);
     const email = resolved.canonicalEmail.toLowerCase();
+    // A human goes by the name on their own commits, as their survival bands
+    // do, so a trailer that spells it differently doesn't rename them.
+    const name =
+      (resolved.kind === "human"
+        ? nameByCanonicalEmail.get(email)
+        : undefined) ?? nameOf(resolved, observedName);
     const key =
       resolved.kind === "human" ? email : `${name.toLowerCase()}\u{1F}${email}`;
     const contributor = contributorMap.get(key) ?? {
@@ -511,7 +516,8 @@ const buildDashboardData = (
       url: resolved.url,
       kind: resolved.kind,
     };
-    // Humans keep the latest spelling; a non-human's is pinned by its key.
+    // Someone who only ever co-authored keeps the latest spelling of the
+    // trailers; a non-human's is pinned by its key.
     contributor.name = name;
     contributorMap.set(key, contributor);
     return contributor;
@@ -785,26 +791,34 @@ export const runIndex = Effect.fn("runIndex")(function* ({
     { concurrency: 16 },
   );
 
-  // Facts hold identities as git reported them when they were collected, so a
-  // `.mailmap` added or edited since would reach the commits (`listCommits`
-  // reads it afresh) but not the snapshots or trailers — see `read-mailmap.ts`.
+  // Facts keep identities as they were collected; they go through the current
+  // `.mailmap` here, the way `listCommits` reads commit authors through it —
+  // see `read-mailmap.ts`.
   const remapIdentities = yield* readMailmap(
     repoRoot,
-    readOutcomes.flatMap(({ facts }) =>
-      facts.factsByCollector.values().toArray().flat(),
-    ),
+    readOutcomes
+      .values()
+      .flatMap(({ facts }) =>
+        facts.factsByCollector
+          .values()
+          .flatMap((collectorFacts) => collectorFacts.values()),
+      ),
   );
-  const commitFacts = readOutcomes.map(({ facts }): CommitFacts => ({
-    ...facts,
-    factsByCollector: new Map(
-      facts.factsByCollector
-        .entries()
-        .map(([collector, collectorFacts]) => [
-          collector,
-          collectorFacts.map(remapIdentities),
-        ]),
-    ),
-  }));
+  const commitFacts = readOutcomes.map(({ facts }): CommitFacts =>
+    remapIdentities === undefined
+      ? facts
+      : {
+          ...facts,
+          factsByCollector: new Map(
+            facts.factsByCollector
+              .entries()
+              .map(([collector, collectorFacts]) => [
+                collector,
+                collectorFacts.map(remapIdentities),
+              ]),
+          ),
+        },
+  );
   const unknownCollectorDirs = readOutcomes.reduce(
     (total, outcome) => total + outcome.unknownCollectorDirs,
     0,

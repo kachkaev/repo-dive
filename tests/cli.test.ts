@@ -856,9 +856,22 @@ test.concurrent(
         ),
       );
       expect(
-        arrayAt(dashboard, "contributors").map((row) => stringAt(row, "email")),
-        "the human co-author on the bot's commit is the one Alice",
-      ).toStrictEqual(["alice@work.example", "renovate[bot]"]);
+        arrayAt(dashboard, "contributors").map((row) => [
+          stringAt(row, "name"),
+          stringAt(row, "email"),
+        ]),
+        "the human co-author on the bot's commit is no contributor of her own",
+      ).toStrictEqual([
+        ["Alice Example", "alice@work.example"],
+        ["Renovate", "renovate[bot]"],
+      ]);
+      const botCommit = arrayAt(dashboard, "commits").find(
+        (row) => stringAt(row, "kind") === "bot",
+      );
+      expect(
+        arrayAt(botCommit, "helpers"),
+        "the bot's commit credits the one Alice",
+      ).toStrictEqual([0]);
 
       for (const key of ["survival", "fileSurvival"]) {
         const labels = new Set(

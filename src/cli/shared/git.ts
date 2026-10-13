@@ -29,7 +29,7 @@ const runCommand = Effect.fnUntraced(function* (
   options?: {
     /** Extra exit codes to treat as success (e.g. 1 for `git grep` with no matches). */
     readonly okExitCodes?: readonly number[];
-    /** Written to stdin, which is otherwise closed. */
+    /** Written to stdin, which otherwise reads as empty. */
     readonly input?: string;
   },
 ): Effect.fn.Return<
