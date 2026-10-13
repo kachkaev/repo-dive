@@ -775,6 +775,109 @@ test.concurrent(
 );
 
 test.concurrent(
+  "index reads survival and co-authors through the current .mailmap",
+  async () => {
+    const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-mailmap-"));
+    runGit(repoPath, "init", "-b", "main");
+
+    function commitAs(
+      name: string,
+      email: string,
+      isoDate: string,
+      file: string,
+      message: string,
+      content = "export const value = 1;\n",
+    ) {
+      const identity = {
+        GIT_AUTHOR_NAME: name,
+        GIT_AUTHOR_EMAIL: email,
+        GIT_COMMITTER_NAME: name,
+        GIT_COMMITTER_EMAIL: email,
+        GIT_AUTHOR_DATE: isoDate,
+        GIT_COMMITTER_DATE: isoDate,
+      };
+      writeFileSync(path.join(repoPath, file), content);
+      runGitAs(repoPath, identity, "add", ".");
+      runGitAs(repoPath, identity, "commit", "-m", message);
+    }
+
+    async function scan() {
+      const scanRun = await runCli(
+        "scan",
+        "--repo",
+        repoPath,
+        "--collectors",
+        "commit-meta,survival,file-survival",
+      );
+      expect(scanRun.status, scanRun.stderr).toBe(0);
+    }
+
+    try {
+      commitAs(
+        "alice",
+        "alice@personal.example",
+        "2026-01-10T12:00:00Z",
+        "personal.ts",
+        "Add personal.ts",
+      );
+      commitAs(
+        "Alice Example",
+        "alice@work.example",
+        "2026-02-10T12:00:00Z",
+        "work.ts",
+        "Add work.ts",
+      );
+      // Snapshots collected before the .mailmap existed keep the raw email.
+      await scan();
+
+      commitAs(
+        "renovate[bot]",
+        "29139614+renovate[bot]@users.noreply.github.com",
+        "2026-03-10T12:00:00Z",
+        "bot.ts",
+        "Add bot.ts\n\nCo-authored-by: alice <alice@personal.example>",
+      );
+      commitAs(
+        "Alice Example",
+        "alice@work.example",
+        "2026-04-10T12:00:00Z",
+        ".mailmap",
+        "Add .mailmap",
+        "Alice Example <alice@work.example> <alice@personal.example>\n",
+      );
+      await scan();
+      const indexRun = await runCli("index", "--repo", repoPath);
+      expect(indexRun.status, indexRun.stderr).toBe(0);
+
+      const dashboard: unknown = JSON.parse(
+        readFileSync(
+          path.join(repoPath, ".repo-dive", "index", "dashboard.json"),
+          "utf8",
+        ),
+      );
+      expect(
+        arrayAt(dashboard, "contributors").map((row) => stringAt(row, "email")),
+        "the human co-author on the bot's commit is the one Alice",
+      ).toStrictEqual(["alice@work.example", "renovate[bot]"]);
+
+      for (const key of ["survival", "fileSurvival"]) {
+        const labels = new Set(
+          arrayAt(dashboard, key).flatMap((row) =>
+            Object.keys(recordAt(row, "byContributor")),
+          ),
+        );
+        expect(
+          [...labels].toSorted(),
+          `${key} names Alice one way, snapshots from before the .mailmap included`,
+        ).toStrictEqual(["Alice Example", "Bots"]);
+      }
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  },
+);
+
+test.concurrent(
   "index sums founding-graft lineages into the tree timelines",
   async () => {
     const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-lineage-"));
