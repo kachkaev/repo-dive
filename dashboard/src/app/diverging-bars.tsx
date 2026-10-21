@@ -4,13 +4,179 @@ import { Group } from "@visx/group";
 import { scaleLinear, scaleTime } from "@visx/scale";
 import { useId, useState } from "react";
 
+import { barPath } from "./shared/bar-path.ts";
+import { CrosshairLine } from "./shared/crosshair-line.tsx";
 import { formatCount, formatMonth } from "./shared/format.ts";
-import { Legend } from "./shared/primitives.tsx";
+import { Legend, Swatch } from "./shared/primitives.tsx";
 import { monthBucketMs, timeAxisTicks } from "./shared/time-axis.ts";
 import { useMeasuredWidth } from "./shared/use-measure.ts";
 
 const margin = { top: 8, right: 12, bottom: 24, left: 52 };
 const height = 240;
+
+type TimeScale = ReturnType<typeof scaleTime<number>>;
+type LinearScale = ReturnType<typeof scaleLinear<number>>;
+
+type DivergingPoint = {
+  month: string;
+  positive: number;
+  negative: number;
+  /** A sub-part of `positive`, drawn as a hatched band from the baseline up. */
+  positiveSecondary?: number;
+};
+
+/**
+ * The bars, grid and baseline. Split out so none of its props depend on the
+ * cursor: React Compiler then reuses the element on every mouse move, which
+ * only updates the crosshair and card (see the editing-react skill).
+ */
+function DivergingMarks({
+  points,
+  dates,
+  xScale,
+  yScale,
+  innerWidth,
+  barWidth,
+  hatchFill,
+}: {
+  points: DivergingPoint[];
+  dates: number[];
+  xScale: TimeScale;
+  yScale: LinearScale;
+  innerWidth: number;
+  barWidth: number;
+  /** `url(#…)` of the hatch pattern, when the secondary band is drawn. */
+  hatchFill: string | undefined;
+}) {
+  const zero = yScale(0);
+  return (
+    <>
+      <GridRows
+        scale={yScale}
+        width={innerWidth}
+        numTicks={4}
+        stroke="var(--grid-line)"
+      />
+      {points.map((point, index) => {
+        const x = xScale(dates[index] ?? 0) - barWidth / 2;
+        const positiveTop = yScale(point.positive);
+        const secondary = point.positiveSecondary ?? 0;
+        const secondaryTop = yScale(secondary);
+        return (
+          <g key={point.month}>
+            <path
+              d={barPath({
+                x,
+                y: positiveTop,
+                width: barWidth,
+                height: Math.max(0, zero - positiveTop),
+                roundTop: true,
+                roundBottom: true,
+              })}
+              fill="var(--diverge-pos)"
+            />
+            {hatchFill !== undefined && secondary > 0 && (
+              // The assisted share of "added", anchored to the baseline. Its
+              // top is a seam inside the bar unless it fills the whole bar.
+              <path
+                d={barPath({
+                  x,
+                  y: secondaryTop,
+                  width: barWidth,
+                  height: Math.max(0, zero - secondaryTop),
+                  roundTop: secondary >= point.positive,
+                  roundBottom: true,
+                })}
+                fill={hatchFill}
+              />
+            )}
+            <path
+              d={barPath({
+                x,
+                y: zero,
+                width: barWidth,
+                height: Math.max(0, yScale(-point.negative) - zero),
+                roundTop: true,
+                roundBottom: true,
+              })}
+              fill="var(--diverge-neg)"
+            />
+          </g>
+        );
+      })}
+      {/* Drawn over the bars like the other charts' x axis, in the same
+          recessive stroke. */}
+      <line
+        x1={0}
+        x2={innerWidth}
+        y1={zero}
+        y2={zero}
+        stroke="var(--grid-line)"
+        strokeWidth={1}
+      />
+    </>
+  );
+}
+
+/**
+ * The value card beside the crosshair, laid out like the stacked charts' card:
+ * one swatch row per series. Its own component so the `xScale` call that
+ * positions it runs on frozen props (see {@link CrosshairLine}).
+ */
+function HoverCard({
+  point,
+  dateMs,
+  xScale,
+  width,
+  rows,
+}: {
+  point: DivergingPoint;
+  dateMs: number;
+  xScale: TimeScale;
+  width: number;
+  rows: Array<{ label: string; color: string; hatch?: string; value: string }>;
+}) {
+  // Left of the dashed line so it never covers the hovered bar; only when the
+  // line is too close to the chart's start to fit the card's estimated width
+  // does it flip to the right side. The estimate only picks the side — the
+  // left placement anchors the card's right edge (via `right`), so the gap to
+  // the line stays 10px whatever the card's true width.
+  const cardWidth = 180;
+  const crosshairX = margin.left + xScale(dateMs);
+  const fitsLeftOfLine = crosshairX >= 10 + cardWidth;
+  return (
+    <div
+      className="pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm will-change-transform"
+      style={
+        fitsLeftOfLine
+          ? { right: width - crosshairX + 10 }
+          : { left: Math.min(crosshairX + 10, Math.max(0, width - cardWidth)) }
+      }
+    >
+      <div className="mb-1 font-medium tabular-nums text-(--text-secondary)">
+        {formatMonth(point.month)}
+      </div>
+      {rows.map((row) => (
+        <div key={row.label} className="flex items-center gap-1.5">
+          <Swatch
+            color={row.color}
+            hatch={row.hatch}
+            className="inline-block size-2 rounded-xs"
+          />
+          <span className="text-(--text-secondary)">{row.label}</span>
+          <span className="ml-auto pl-3 font-medium tabular-nums">
+            {row.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A card value with its direction sign; a zero stays unsigned. */
+function signedCount(sign: "+" | "−", value: number): string {
+  return value === 0 ? "0" : `${sign}${formatCount(value)}`;
+}
 
 /** Monthly added lines above the baseline, deleted lines below it. */
 export function DivergingBars({
@@ -20,13 +186,7 @@ export function DivergingBars({
   positiveSecondaryLabel,
   positiveSecondaryHatch,
 }: {
-  points: Array<{
-    month: string;
-    positive: number;
-    negative: number;
-    /** A sub-part of `positive`, drawn as a hatched band from the baseline up. */
-    positiveSecondary?: number;
-  }>;
+  points: DivergingPoint[];
   positiveLabel: string;
   negativeLabel: string;
   /** Legend/tooltip label for the hatched `positiveSecondary` band. */
@@ -75,6 +235,9 @@ export function DivergingBars({
     pointUnit: "month",
     widthPx: innerWidth,
   });
+  // Mapped here, not inline in the JSX, to keep it out of the hover scope (see
+  // the same line in TimeSeriesChart).
+  const xTickValues = xTicks.map((tick) => tick.valueMs);
 
   const maxPositive = Math.max(1, ...points.map((point) => point.positive));
   const maxNegative = Math.max(1, ...points.map((point) => point.negative));
@@ -88,18 +251,51 @@ export function DivergingBars({
     1,
     Math.min(18, (innerWidth / Math.max(1, points.length)) * 0.7),
   );
+
+  const legendItems = [
+    { label: positiveLabel, color: "var(--diverge-pos)" },
+    ...(showSecondary
+      ? [
+          {
+            label: positiveSecondaryLabel,
+            color: "var(--diverge-pos)",
+            hatch: positiveSecondaryHatch,
+          },
+        ]
+      : []),
+    { label: negativeLabel, color: "var(--diverge-neg)" },
+  ];
+
   const hovered = hoverIndex === undefined ? undefined : points[hoverIndex];
-  // Hover card position: left of the hovered bar so it never covers it; only
-  // when the bar is too close to the chart's start to fit the card's estimated
-  // width does it flip to the right side. The estimate only picks the side —
-  // the left placement anchors the card's right edge (via `right`), so the gap
-  // to the bar stays 10px whatever the card's true width.
-  const hoverBarX =
-    hoverIndex === undefined ? 0 : margin.left + xScale(dates[hoverIndex] ?? 0);
-  const cardPosition =
-    hoverBarX >= 10 + 170
-      ? { right: width - hoverBarX + 10 }
-      : { left: Math.min(hoverBarX + 10, Math.max(0, width - 170)) };
+  const hoveredMs = hoverIndex === undefined ? undefined : dates[hoverIndex];
+  // The card lists every legend row in legend order, zeros included — like the
+  // stacked cards with up to three series — so it keeps its shape while the
+  // cursor scrubs across months with and without an assisted share.
+  const hoverRows =
+    hovered === undefined
+      ? []
+      : [
+          {
+            label: positiveLabel,
+            color: "var(--diverge-pos)",
+            value: signedCount("+", hovered.positive),
+          },
+          ...(showSecondary
+            ? [
+                {
+                  label: positiveSecondaryLabel,
+                  color: "var(--diverge-pos)",
+                  hatch: positiveSecondaryHatch,
+                  value: signedCount("+", hovered.positiveSecondary ?? 0),
+                },
+              ]
+            : []),
+          {
+            label: negativeLabel,
+            color: "var(--diverge-neg)",
+            value: signedCount("−", hovered.negative),
+          },
+        ];
 
   return (
     <div>
@@ -120,64 +316,14 @@ export function DivergingBars({
             </defs>
           )}
           <Group left={margin.left} top={margin.top}>
-            <GridRows
-              scale={yScale}
-              width={innerWidth}
-              numTicks={4}
-              stroke="var(--grid-line)"
-            />
-            {points.map((point, index) => {
-              const x = xScale(dates[index] ?? 0) - barWidth / 2;
-              const zero = yScale(0);
-              return (
-                <g
-                  key={point.month}
-                  opacity={
-                    hoverIndex === undefined || hoverIndex === index ? 1 : 0.45
-                  }
-                >
-                  <rect
-                    x={x}
-                    y={yScale(point.positive)}
-                    width={barWidth}
-                    height={Math.max(0, zero - yScale(point.positive))}
-                    fill="var(--diverge-pos)"
-                    rx={1}
-                  />
-                  {showSecondary && (point.positiveSecondary ?? 0) > 0 && (
-                    // The assisted share of "added", anchored to the baseline.
-                    <rect
-                      x={x}
-                      y={yScale(point.positiveSecondary ?? 0)}
-                      width={barWidth}
-                      height={Math.max(
-                        0,
-                        zero - yScale(point.positiveSecondary ?? 0),
-                      )}
-                      fill={`url(#${hatchId})`}
-                      rx={1}
-                    />
-                  )}
-                  <rect
-                    x={x}
-                    y={zero}
-                    width={barWidth}
-                    height={Math.max(0, yScale(-point.negative) - zero)}
-                    fill="var(--diverge-neg)"
-                    rx={1}
-                  />
-                </g>
-              );
-            })}
-            {/* Drawn over the bars like the other charts' x axis, in the same
-                recessive stroke. */}
-            <line
-              x1={0}
-              x2={innerWidth}
-              y1={yScale(0)}
-              y2={yScale(0)}
-              stroke="var(--grid-line)"
-              strokeWidth={1}
+            <DivergingMarks
+              points={points}
+              dates={dates}
+              xScale={xScale}
+              yScale={yScale}
+              innerWidth={innerWidth}
+              barWidth={barWidth}
+              hatchFill={showSecondary ? `url(#${hatchId})` : undefined}
             />
             <AxisLeft
               scale={yScale}
@@ -200,7 +346,7 @@ export function DivergingBars({
               // The axis line spans the scale's range, which `xInset` shrinks;
               // pad it back out so the line runs the full plot width.
               rangePadding={xInset}
-              tickValues={xTicks.map((tick) => tick.valueMs)}
+              tickValues={xTickValues}
               tickFormat={(_, index) => xTicks[index]?.label}
               hideTicks
               stroke="var(--grid-line)"
@@ -235,52 +381,27 @@ export function DivergingBars({
             />
           </Group>
         </svg>
-        {hovered !== undefined && hoverIndex !== undefined && (
-          <div
-            className="pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm"
-            style={cardPosition}
-          >
-            <div className="mb-1 font-medium tabular-nums text-(--text-secondary)">
-              {formatMonth(hovered.month)}
-            </div>
-            <div>
-              {positiveLabel}:{" "}
-              <span className="font-medium tabular-nums">
-                +{formatCount(hovered.positive)}
-              </span>
-            </div>
-            {showSecondary && (hovered.positiveSecondary ?? 0) > 0 && (
-              <div>
-                {positiveSecondaryLabel}:{" "}
-                <span className="font-medium tabular-nums">
-                  +{formatCount(hovered.positiveSecondary ?? 0)}
-                </span>
-              </div>
-            )}
-            <div>
-              {negativeLabel}:{" "}
-              <span className="font-medium tabular-nums">
-                −{formatCount(hovered.negative)}
-              </span>
-            </div>
-          </div>
+        {/* Over the chart, under the card — both outside the <svg>, see CrosshairLine. */}
+        {hoveredMs !== undefined && (
+          <CrosshairLine
+            xScale={xScale}
+            valueMs={hoveredMs}
+            left={margin.left}
+            top={margin.top}
+            height={innerHeight}
+          />
+        )}
+        {hovered !== undefined && hoveredMs !== undefined && (
+          <HoverCard
+            point={hovered}
+            dateMs={hoveredMs}
+            xScale={xScale}
+            width={width}
+            rows={hoverRows}
+          />
         )}
       </div>
-      <Legend
-        items={[
-          { label: positiveLabel, color: "var(--diverge-pos)" },
-          ...(showSecondary
-            ? [
-                {
-                  label: positiveSecondaryLabel,
-                  color: "var(--diverge-pos)",
-                  hatch: positiveSecondaryHatch,
-                },
-              ]
-            : []),
-          { label: negativeLabel, color: "var(--diverge-neg)" },
-        ]}
-      />
+      <Legend items={legendItems} />
     </div>
   );
 }
