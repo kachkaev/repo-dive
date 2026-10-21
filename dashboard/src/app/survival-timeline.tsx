@@ -23,7 +23,7 @@ import {
  */
 const maxYearShades = 10;
 
-/** How far the oldest band fades toward the surface; newest stays full color. */
+/** How far the oldest band fades toward the surface at most; newest stays full color. */
 const maxYearFade = 70;
 
 /**
