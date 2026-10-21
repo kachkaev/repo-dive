@@ -173,6 +173,11 @@ function HoverCard({
   );
 }
 
+/** A card value with its direction sign; a zero stays unsigned. */
+function signedCount(sign: "+" | "−", value: number): string {
+  return value === 0 ? "0" : `${sign}${formatCount(value)}`;
+}
+
 /** Monthly added lines above the baseline, deleted lines below it. */
 export function DivergingBars({
   points,
@@ -263,8 +268,9 @@ export function DivergingBars({
 
   const hovered = hoverIndex === undefined ? undefined : points[hoverIndex];
   const hoveredMs = hoverIndex === undefined ? undefined : dates[hoverIndex];
-  // The card lists every legend row in legend order; the assisted share is
-  // left out for a month that had none, like a zero row in the stacked cards.
+  // The card lists every legend row in legend order, zeros included — like the
+  // stacked cards with up to three series — so it keeps its shape while the
+  // cursor scrubs across months with and without an assisted share.
   const hoverRows =
     hovered === undefined
       ? []
@@ -272,22 +278,22 @@ export function DivergingBars({
           {
             label: positiveLabel,
             color: "var(--diverge-pos)",
-            value: `+${formatCount(hovered.positive)}`,
+            value: signedCount("+", hovered.positive),
           },
-          ...(showSecondary && (hovered.positiveSecondary ?? 0) > 0
+          ...(showSecondary
             ? [
                 {
                   label: positiveSecondaryLabel,
                   color: "var(--diverge-pos)",
                   hatch: positiveSecondaryHatch,
-                  value: `+${formatCount(hovered.positiveSecondary ?? 0)}`,
+                  value: signedCount("+", hovered.positiveSecondary ?? 0),
                 },
               ]
             : []),
           {
             label: negativeLabel,
             color: "var(--diverge-neg)",
-            value: `−${formatCount(hovered.negative)}`,
+            value: signedCount("−", hovered.negative),
           },
         ];
 
