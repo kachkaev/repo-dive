@@ -6,6 +6,8 @@ import { scaleLinear, scaleTime } from "@visx/scale";
 import { AreaStack, BarStack, LinePath } from "@visx/shape";
 import { useDeferredValue, useId, useState } from "react";
 
+import { barPath } from "./shared/bar-path.ts";
+import { CrosshairLine } from "./shared/crosshair-line.tsx";
 import { formatCount, formatMonth, formatPercent } from "./shared/format.ts";
 import { DateStamp, Legend, Swatch } from "./shared/primitives.tsx";
 import { StaleOverlay } from "./shared/stale-overlay.tsx";
@@ -139,35 +141,49 @@ function ChartMarks({
           yScale={yScale}
           color={(key) => colors[seriesKeys.indexOf(key)] ?? ""}
         >
-          {(barStacks) =>
-            barStacks.map((barStack) =>
-              barStack.bars.map((bar) => (
-                <g key={`${barStack.index}-${bar.index}`}>
-                  {/* No stroke: segment boundaries come from hue/hatch changes,
-                      so stacked heights read as exact totals (and match the
-                      gapless churn bars). */}
-                  <rect
-                    x={bar.x + bar.width / 2 - barWidth / 2}
-                    y={bar.y}
-                    width={barWidth}
-                    height={Math.max(0, bar.height)}
-                    fill={bar.color}
-                    rx={1}
-                  />
-                  {hatchUrlOf(bar.key) && (
-                    <rect
-                      x={bar.x + bar.width / 2 - barWidth / 2}
-                      y={bar.y}
-                      width={barWidth}
-                      height={Math.max(0, bar.height)}
-                      fill={hatchUrlOf(bar.key)}
-                      rx={1}
-                    />
-                  )}
-                </g>
-              )),
-            )
-          }
+          {(barStacks) => {
+            // Per data point, the stack index of its lowest and highest
+            // non-empty segment — the only two whose outer end is rounded, so
+            // the seams inside a stack stay square and it reads as one bar.
+            const lowestStack = new Map<number, number>();
+            const highestStack = new Map<number, number>();
+            for (const barStack of barStacks) {
+              for (const bar of barStack.bars) {
+                if (bar.height <= 0) {
+                  continue;
+                }
+                if (!lowestStack.has(bar.index)) {
+                  lowestStack.set(bar.index, barStack.index);
+                }
+                highestStack.set(bar.index, barStack.index);
+              }
+            }
+            return barStacks.map((barStack) =>
+              barStack.bars
+                .filter((bar) => bar.height > 0)
+                .map((bar) => {
+                  const path = barPath({
+                    x: bar.x + bar.width / 2 - barWidth / 2,
+                    y: bar.y,
+                    width: barWidth,
+                    height: bar.height,
+                    roundTop: highestStack.get(bar.index) === barStack.index,
+                    roundBottom: lowestStack.get(bar.index) === barStack.index,
+                  });
+                  return (
+                    <g key={`${barStack.index}-${bar.index}`}>
+                      {/* No stroke: segment boundaries come from hue/hatch
+                          changes, so stacked heights read as exact totals
+                          (and match the gapless churn bars). */}
+                      <path d={path} fill={bar.color} />
+                      {hatchUrlOf(bar.key) && (
+                        <path d={path} fill={hatchUrlOf(bar.key)} />
+                      )}
+                    </g>
+                  );
+                }),
+            );
+          }}
         </BarStack>
       )}
       {mode === "line" &&
@@ -206,56 +222,6 @@ function ChartMarks({
           );
         })}
     </>
-  );
-}
-
-/**
- * The dashed cursor line. Drawn as its own 1px-wide overlay next to the main
- * `<svg>` rather than as a `<line>` inside it, and moved with a transform on
- * its own compositor layer (`will-change-transform`): a line inside the chart
- * would invalidate the layer holding the stacked paths, and the browser then
- * re-rasterizes every path under the damaged tiles on each mouse move — with a
- * dense per-commit series that is megabytes of path data, and the card lags
- * behind the cursor although React itself re-renders almost nothing. On a
- * separate layer the move is compositor-only and the marks stay cached.
- *
- * Also split out (like {@link HoverTooltip}) so the parent body never calls
- * `xScale(crosshairMs)`: React Compiler cannot know a d3 scale function is
- * pure, so a call with a hover-reactive argument would extend the scale's
- * mutable range into the hover scope, fusing every derived value — including
- * ChartMarks' props — into one memo block that recomputes on each mouse move.
- * Inside a child, the call runs on a frozen prop instead.
- */
-function CrosshairLine({
-  xScale,
-  crosshairMs,
-  innerHeight,
-}: {
-  xScale: TimeScale;
-  crosshairMs: number;
-  innerHeight: number;
-}) {
-  // Snapped to whole pixels: a fractional translate would smear the 1px dashes
-  // across two columns, and half a pixel is well below what a cursor resolves.
-  const x = margin.left + Math.round(xScale(crosshairMs));
-  return (
-    <svg
-      aria-hidden="true"
-      className="pointer-events-none absolute will-change-transform"
-      style={{ left: 0, top: margin.top, transform: `translateX(${x}px)` }}
-      width={1}
-      height={innerHeight}
-    >
-      <line
-        x1={0.5}
-        x2={0.5}
-        y1={0}
-        y2={innerHeight}
-        stroke="var(--text-muted)"
-        strokeWidth={1}
-        strokeDasharray="3,3"
-      />
-    </svg>
   );
 }
 
@@ -904,8 +870,10 @@ export function TimeSeriesChart(props: {
         {crosshairMs !== undefined && (
           <CrosshairLine
             xScale={xScale}
-            crosshairMs={crosshairMs}
-            innerHeight={innerHeight}
+            valueMs={crosshairMs}
+            left={margin.left}
+            top={margin.top}
+            height={innerHeight}
           />
         )}
         {crosshairMs !== undefined && (
