@@ -23,8 +23,17 @@ import {
  */
 const maxYearShades = 10;
 
-/** How far the oldest band fades toward the surface; newest stays full color. */
+/** How far the oldest band fades toward the surface at most; newest stays full color. */
 const maxYearFade = 70;
+
+/**
+ * The most one year of age may fade a band. With only a few years the full
+ * {@link maxYearFade} range would put adjacent years far apart (two years
+ * would jump straight from full color to 70% faded), so short histories use a
+ * narrower range; from four years on the steps fall below this cap and the
+ * oldest band reaches the full fade.
+ */
+const maxYearFadeStep = 25;
 
 /**
  * A per-year lightness band of a category's base color: the newest year keeps
@@ -39,7 +48,8 @@ function yearBandColor(
   if (shadeCount <= 1 || ageFromNewest <= 0) {
     return baseColor;
   }
-  const fade = Math.round((ageFromNewest / (shadeCount - 1)) * maxYearFade);
+  const fadeStep = Math.min(maxYearFade / (shadeCount - 1), maxYearFadeStep);
+  const fade = Math.round(ageFromNewest * fadeStep);
   return `color-mix(in oklab, ${baseColor} ${100 - fade}%, var(--surface-1))`;
 }
 
