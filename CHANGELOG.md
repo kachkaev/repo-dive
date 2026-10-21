@@ -1,5 +1,13 @@
 # repo-dive
 
+## 0.18.2
+
+### Patch Changes
+
+- [#323](https://github.com/kachkaev/repo-dive/pull/323) [`c9eec71`](https://github.com/kachkaev/repo-dive/commit/c9eec710ecba3ae2f6bacbaeddd14f3dee1f5a9e) - Align the churn chart's hover with the other time charts and square off the seams inside stacked bars.
+  Hovering a month in "Churn per month" now draws the dashed crosshair and a swatch-style card instead of dimming every other bar.
+  Stacked bars round only their top and bottom ends, so segments no longer look notched where they meet.
+
 ## 0.18.1
 
 ### Patch Changes
