@@ -1,5 +1,13 @@
 # repo-dive
 
+## 0.18.3
+
+### Patch Changes
+
+- [#325](https://github.com/kachkaev/repo-dive/pull/325) [`50a956a`](https://github.com/kachkaev/repo-dive/commit/50a956af546fc39551e567b885cae6cf4f812856) - Soften year shading for short histories.
+  Each year of age now fades a shade by at most 25%, so in a two-year repository the older year reads as a softer shade of the same color instead of nearly blending into the background.
+  Histories of four years or more look the same as before.
+
 ## 0.18.2
 
 ### Patch Changes
