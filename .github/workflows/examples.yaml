@@ -33,7 +33,7 @@ jobs:
     name: Build CLI and list examples
     # Forks would fail at the deploy step and burn minutes before that
     if: github.repository == 'kachkaev/repo-dive'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       examples: ${{ steps.list.outputs.examples }}
     steps:
@@ -70,7 +70,7 @@ jobs:
   analyze:
     name: Analyze ${{ matrix.example.name }}
     needs: prepare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # A hosted runner scans the heaviest histories at ~1 commit/s, so a fresh
     # catalog can take longer than the 6-hour job ceiling (react: ~14 h).
     # Scans are resumable: the catalog is cached across runs, every run banks
@@ -183,7 +183,7 @@ jobs:
     # Deploy whatever examples are ready: while heavy catalogs are still
     # catching up across runs, the finished ones should not be held back
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       pages: write
       id-token: write

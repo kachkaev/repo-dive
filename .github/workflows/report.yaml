@@ -19,7 +19,7 @@ permissions: {}
 jobs:
   report:
     name: Report on ${{ inputs.repo }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # Heavy histories scan at ~1 commit/s here; the catalog cache below is
     # shared with the examples workflow and makes re-runs resume where the
     # previous one stopped
