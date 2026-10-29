@@ -411,8 +411,8 @@ function HoverTooltip({
               </div>
             ))}
           {showSummary && (
-            // The same 4px the date line keeps above the rows, so the list
-            // sits evenly between the two; swatchless rows need no divider.
+            // The same 4px the date line keeps above the rows, so the list sits
+            // evenly between the two; rows without a swatch need no divider.
             <div className="mt-1">
               {summaryRows.map((row) => (
                 <div key={row.label} className="flex items-center gap-1.5">
