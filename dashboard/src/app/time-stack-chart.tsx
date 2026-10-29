@@ -302,8 +302,8 @@ function HoverTooltip({
             .toSorted(
               (left, right) => legendRank(left.key) - legendRank(right.key),
             );
-  // Summed over every entry, before the card drops zero rows and caps the
-  // list, so the summary never depends on how many rows fit.
+  // Summed over every entry, before the card drops zero rows, so the summary
+  // never depends on which rows are listed.
   const hasHiddenEntries = entries.some((entry) => hiddenLabels.has(entry.key));
   const shownTotal = entries
     .filter((entry) => !hiddenLabels.has(entry.key))
@@ -365,7 +365,11 @@ function HoverTooltip({
         <>
           {entries
             .filter((entry) => entry.value !== 0 || seriesKeys.length <= 3)
-            .slice(0, 10)
+            // A card that sums its rows lists all of them, or the rows would
+            // fall short of the total with nothing to say why — e.g. the
+            // default 10 contributors plus "Other". Those stacks are bounded
+            // by config; only the others need a cap.
+            .slice(0, showSummary ? entries.length : 10)
             .map((entry) => (
               <div key={entry.key} className="flex items-center gap-1.5">
                 <Swatch
