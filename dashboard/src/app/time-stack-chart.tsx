@@ -250,6 +250,7 @@ function HoverTooltip({
   legendRank,
   formatValue,
   zeroLabel,
+  showSummary,
 }: {
   crosshairMs: number;
   pointUnit: PointUnit;
@@ -272,7 +273,58 @@ function HoverTooltip({
   legendRank: (label: string) => number;
   formatValue: (value: number) => string;
   zeroLabel: string | undefined;
+  /**
+   * Closes the rows with a total under a divider, preceded by the drawn sum
+   * and its share while the legend hides any of them.
+   */
+  showSummary: boolean;
 }) {
+  const entries =
+    hovered === undefined
+      ? []
+      : tooltipGroups
+        ? tooltipGroups.map((group) => ({
+            key: group.label,
+            color: group.color,
+            hatch: undefined,
+            value: group.keys.reduce(
+              (sum, key) => sum + (hovered[key] ?? 0),
+              0,
+            ),
+          }))
+        : seriesKeys
+            .map((key, index) => ({
+              key,
+              color: colors[index] ?? "var(--series-1)",
+              hatch: seriesHatch?.[key],
+              value: hovered[key] ?? 0,
+            }))
+            .toSorted(
+              (left, right) => legendRank(left.key) - legendRank(right.key),
+            );
+  // Summed over every entry, before the card drops zero rows and caps the
+  // list, so the summary never depends on how many rows fit.
+  const hasHiddenEntries = entries.some((entry) => hiddenLabels.has(entry.key));
+  const shownTotal = entries
+    .filter((entry) => !hiddenLabels.has(entry.key))
+    .reduce((sum, entry) => sum + entry.value, 0);
+  const summaryRows = [
+    ...(hasHiddenEntries
+      ? [
+          {
+            label: "Shown",
+            value: shownTotal,
+            share:
+              hoveredTotal === 0
+                ? "—"
+                : formatPercent(shownTotal / hoveredTotal),
+          },
+        ]
+      : []),
+    // A total is always 100%, so its share cell stays empty.
+    { label: "Total", value: hoveredTotal, share: "" },
+  ];
+
   // The card sits left of the dashed line so it never covers the hovered
   // point; only when the line is too close to the chart's start to fit the
   // card's estimated width does it flip to the right side. The estimate only
@@ -310,69 +362,76 @@ function HoverTooltip({
         // A collected point that came back empty; say so concretely.
         <div className="text-(--text-muted)">{zeroLabel}</div>
       ) : (
-        (tooltipGroups
-          ? tooltipGroups.map((group) => ({
-              key: group.label,
-              color: group.color,
-              hatch: undefined,
-              value: group.keys.reduce(
-                (sum, key) => sum + (hovered[key] ?? 0),
-                0,
-              ),
-            }))
-          : seriesKeys
-              .map((key, index) => ({
-                key,
-                color: colors[index] ?? "var(--series-1)",
-                hatch: seriesHatch?.[key],
-                value: hovered[key] ?? 0,
-              }))
-              .toSorted(
-                (left, right) => legendRank(left.key) - legendRank(right.key),
-              )
-        )
-          .filter((entry) => entry.value !== 0 || seriesKeys.length <= 3)
-          .slice(0, 10)
-          .map((entry) => (
-            <div key={entry.key} className="flex items-center gap-1.5">
-              <Swatch
-                color={entry.color}
-                hatch={entry.hatch}
-                className={
-                  hiddenLabels.has(entry.key)
-                    ? "inline-block size-2 rounded-xs opacity-35"
-                    : "inline-block size-2 rounded-xs"
-                }
-              />
-              <span
-                className={
-                  hiddenLabels.has(entry.key)
-                    ? "text-(--text-secondary) line-through opacity-60"
-                    : "text-(--text-secondary)"
-                }
-              >
-                {entry.key}
-              </span>
-              <span
-                className={`ml-auto pl-3 tabular-nums ${
-                  showPercent ? "text-(--text-muted)" : "font-medium"
-                }`}
-              >
-                {formatValue(entry.value)}
-              </span>
-              {supportsPercent && (
+        <>
+          {entries
+            .filter((entry) => entry.value !== 0 || seriesKeys.length <= 3)
+            .slice(0, 10)
+            .map((entry) => (
+              <div key={entry.key} className="flex items-center gap-1.5">
+                <Swatch
+                  color={entry.color}
+                  hatch={entry.hatch}
+                  className={
+                    hiddenLabels.has(entry.key)
+                      ? "inline-block size-2 rounded-xs opacity-35"
+                      : "inline-block size-2 rounded-xs"
+                  }
+                />
                 <span
-                  className={`min-w-9 pl-2 text-right tabular-nums ${
-                    showPercent ? "font-medium" : "text-(--text-muted)"
+                  className={
+                    hiddenLabels.has(entry.key)
+                      ? "text-(--text-secondary) line-through opacity-60"
+                      : "text-(--text-secondary)"
+                  }
+                >
+                  {entry.key}
+                </span>
+                <span
+                  className={`ml-auto pl-3 tabular-nums ${
+                    showPercent ? "text-(--text-muted)" : "font-medium"
                   }`}
                 >
-                  {hoveredTotal === 0
-                    ? "—"
-                    : formatPercent(entry.value / hoveredTotal)}
+                  {formatValue(entry.value)}
                 </span>
-              )}
+                {supportsPercent && (
+                  <span
+                    className={`min-w-9 pl-2 text-right tabular-nums ${
+                      showPercent ? "font-medium" : "text-(--text-muted)"
+                    }`}
+                  >
+                    {hoveredTotal === 0
+                      ? "—"
+                      : formatPercent(entry.value / hoveredTotal)}
+                  </span>
+                )}
+              </div>
+            ))}
+          {showSummary && (
+            <div className="mt-1 border-t border-(--grid-line) pt-1">
+              {summaryRows.map((row) => (
+                <div key={row.label} className="flex items-center gap-1.5">
+                  {/* Stands in for a swatch so the labels line up with the rows above. */}
+                  <span className="inline-block size-2" />
+                  <span className="text-(--text-secondary)">{row.label}</span>
+                  <span
+                    className={`ml-auto pl-3 tabular-nums ${
+                      showPercent ? "text-(--text-muted)" : "font-medium"
+                    }`}
+                  >
+                    {formatValue(row.value)}
+                  </span>
+                  <span
+                    className={`min-w-9 pl-2 text-right tabular-nums ${
+                      showPercent ? "font-medium" : "text-(--text-muted)"
+                    }`}
+                  >
+                    {row.share}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))
+          )}
+        </>
       )}
     </div>
   );
@@ -535,6 +594,10 @@ export function TimeSeriesChart(props: {
   // Lines aren't parts of a whole, and a single series is always 100%.
   const supportsPercent = mode !== "line" && seriesKeys.length > 1;
   const showPercent = supportsPercent && (percentMode ?? false);
+  // The hover card sums its rows only where the stack is one quantity split
+  // into parts — area charts for now. A lone row is its own total already.
+  const tooltipRowCount = tooltipGroups?.length ?? seriesKeys.length;
+  const showSummary = mode === "area" && tooltipRowCount > 1;
 
   // An empty `legendItems` hides the legend — a one-entry legend for a chart
   // like the all-lines total explains nothing.
@@ -894,6 +957,7 @@ export function TimeSeriesChart(props: {
             legendRank={legendRank}
             formatValue={formatValue}
             zeroLabel={zeroLabel}
+            showSummary={showSummary}
           />
         )}
       </div>
