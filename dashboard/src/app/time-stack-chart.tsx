@@ -274,8 +274,8 @@ function HoverTooltip({
   formatValue: (value: number) => string;
   zeroLabel: string | undefined;
   /**
-   * Closes the rows with a total under a divider, preceded by the drawn sum
-   * and its share while the legend hides any of them.
+   * Closes the rows with a total, preceded by the drawn sum and its share
+   * while the legend hides any of them.
    */
   showSummary: boolean;
 }) {
