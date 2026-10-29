@@ -320,8 +320,11 @@ export function SurvivalTimeline({
     ),
   );
 
-  /** Series label of the single-stack "all units" variant: "Lines" / "Files". */
-  const allSeriesLabel = unit === "lines" ? "Lines" : "Files";
+  /**
+   * Series label of the single-stack "all units" variant — "All lines" / "All
+   * files", so the hover card names the stack the way the split control does.
+   */
+  const allSeriesLabel = unit === "lines" ? "All lines" : "All files";
 
   let chart: StackedChart;
   if (deferredDimension === "all") {
