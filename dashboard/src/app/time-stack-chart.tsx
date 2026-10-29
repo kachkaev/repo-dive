@@ -407,7 +407,9 @@ function HoverTooltip({
               </div>
             ))}
           {showSummary && (
-            <div className="mt-1 border-t border-(--grid-line) pt-1">
+            // The same 4px the date line keeps above the rows, so the list
+            // sits evenly between the two; swatchless rows need no divider.
+            <div className="mt-1">
               {summaryRows.map((row) => (
                 <div key={row.label} className="flex items-center gap-1.5">
                   {/* Stands in for a swatch so the labels line up with the rows above. */}
