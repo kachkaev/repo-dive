@@ -1,5 +1,13 @@
 # repo-dive
 
+## 0.18.4
+
+### Patch Changes
+
+- [#341](https://github.com/kachkaev/repo-dive/pull/341) [`a3c82c3`](https://github.com/kachkaev/repo-dive/commit/a3c82c3da06db80a8d74ad72fc5c530464ea557c) - Add Shown and Total rows to the chart hover card.
+  Split area charts such as lines and files now close their hover card with a Total row, plus a Shown row with its share while the legend hides some categories, e.g. `Shown 488k 81%` above `Total 599k`.
+  The single-stack variant's row now reads "All lines" / "All files", matching the split control.
+
 ## 0.18.3
 
 ### Patch Changes
