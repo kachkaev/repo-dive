@@ -805,76 +805,82 @@ export const runScan = Effect.fn("runScan")(function* ({
       Effect.gen(function* () {
         for (const plan of plans) {
           const { collector } = plan;
-          if (!collector.collectBatch) {
+          const { collectBatch } = collector;
+          if (!collectBatch) {
             continue;
           }
-          const pending = new Set<string>();
-          for (const sha of plan.shas) {
-            if (
-              force ||
-              !(yield* isCollected(
-                catalog,
-                sha,
-                collector,
-                cacheKeyOf(collector),
-                config.filePurposes.rulesKey,
-              ))
-            ) {
-              pending.add(sha);
-            }
-          }
-          totalSkipped += plan.shas.size - pending.size;
-          if (pending.size === 0) {
-            batchDone.set(collector.name, plan.shas);
-            continue;
-          }
+          yield* progress.track(
+            `${collector.name} on ${plan.shas.size} commits`,
+            Effect.gen(function* () {
+              const pending = new Set<string>();
+              for (const sha of plan.shas) {
+                if (
+                  force ||
+                  !(yield* isCollected(
+                    catalog,
+                    sha,
+                    collector,
+                    cacheKeyOf(collector),
+                    config.filePurposes.rulesKey,
+                  ))
+                ) {
+                  pending.add(sha);
+                }
+              }
+              totalSkipped += plan.shas.size - pending.size;
+              if (pending.size === 0) {
+                batchDone.set(collector.name, plan.shas);
+                return;
+              }
 
-          const [batchDuration, outputs] = yield* progress.track(
-            `${collector.name} on ${pending.size} commits`,
-            collector.collectBatch({ repoRoot, shas: pending }).pipe(
-              Effect.catch((error) => {
-                failures.push(`Batch ${collector.name}: ${error.message}`);
-                return Effect.succeed(new Map<string, unknown>());
-              }),
-              Effect.timed,
-            ),
-          );
-          const durationMs = Math.max(
-            1,
-            Math.round(
-              Duration.toMillis(batchDuration) / Math.max(1, outputs.size),
-            ),
-          );
+              const [batchDuration, outputs] = yield* collectBatch({
+                repoRoot,
+                shas: pending,
+              }).pipe(
+                Effect.catch((error) => {
+                  failures.push(`Batch ${collector.name}: ${error.message}`);
+                  return Effect.succeed(new Map<string, unknown>());
+                }),
+                Effect.timed,
+              );
+              const durationMs = Math.max(
+                1,
+                Math.round(
+                  Duration.toMillis(batchDuration) / Math.max(1, outputs.size),
+                ),
+              );
 
-          const written = new Set(
-            yield* Effect.forEach(
-              outputs.entries().toArray(),
-              ([sha, output]) =>
-                writeCollectorOutput({
-                  catalog,
-                  sha,
-                  collector,
-                  cacheKey: cacheKeyOf(collector),
-                  output,
-                  durationMs,
-                }).pipe(Effect.as(sha)),
-              { concurrency: 16 },
-            ),
-          );
-          totalRun += written.size;
+              const written = new Set(
+                yield* Effect.forEach(
+                  outputs.entries().toArray(),
+                  ([sha, output]) =>
+                    writeCollectorOutput({
+                      catalog,
+                      sha,
+                      collector,
+                      cacheKey: cacheKeyOf(collector),
+                      output,
+                      durationMs,
+                    }).pipe(Effect.as(sha)),
+                  { concurrency: 16 },
+                ),
+              );
+              totalRun += written.size;
 
-          const done = new Set(plan.shas);
-          for (const sha of pending) {
-            if (!written.has(sha)) {
-              done.delete(sha); // fall back to per-commit collect()
-            }
-          }
-          batchDone.set(collector.name, done);
-          if (written.size > 0) {
-            yield* progress.log(
-              `Batched ${collector.name}: ${written.size} commits in one pass.`,
-            );
-          }
+              const done = new Set(plan.shas);
+              for (const sha of pending) {
+                if (!written.has(sha)) {
+                  done.delete(sha); // fall back to per-commit collect()
+                }
+              }
+              batchDone.set(collector.name, done);
+              if (written.size > 0) {
+                yield* progress.log(
+                  `Batched ${collector.name}: ${written.size} commits in one pass.`,
+                );
+              }
+            }),
+          );
         }
 
         const startedAt = yield* Clock.currentTimeMillis;
