@@ -53,7 +53,8 @@ jobs:
         with:
           name: cli
           path: dist/
-          retention-days: 1
+          # Same retention as the reports below, for re-runs to find it
+          retention-days: 7
 
       - name: List examples
         id: list
@@ -114,7 +115,7 @@ jobs:
       - name: Load the catalog cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          key: ${{ steps.cache-key.outputs.prefix }}-${{ github.run_id }}
+          key: ${{ steps.cache-key.outputs.prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: analyzed/.repo-dive
           restore-keys: |
             ${{ steps.cache-key.outputs.prefix }}-
@@ -141,7 +142,9 @@ jobs:
         if: ${{ always() }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          key: ${{ steps.cache-key.outputs.prefix }}-${{ github.run_id }}
+          # Keyed per attempt because cache keys are immutable: a re-run saving
+          # under the key of an earlier attempt would lose its scan progress
+          key: ${{ steps.cache-key.outputs.prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: analyzed/.repo-dive
 
       - name: Run repo-dive index
@@ -175,7 +178,10 @@ jobs:
         with:
           path: report/
           archive: false
-          retention-days: 1
+          # Longer than a day, as reports expire one by one: a re-run would
+          # otherwise deploy only the survivors and take the others offline.
+          # A week covers the gap until the next scheduled run
+          retention-days: 7
 
   deploy:
     name: Deploy to GitHub Pages
@@ -245,8 +251,14 @@ jobs:
       - name: Upload the site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
+          # Named per attempt: deploy-pages looks the artifact up across all
+          # attempts of a run and refuses to deploy when the name is ambiguous,
+          # so with a fixed name, re-running this job would fail
+          name: github-pages-${{ github.run_attempt }}
           path: _site/
 
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
