@@ -117,10 +117,14 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v5
         with:
+          # Named per attempt: deploy-pages fails on a re-run otherwise
+          name: github-pages-${{ github.run_attempt }}
           path: _site/
 
       - id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
 ```
 
 Mind that GitHub Pages sites are public even for private repositories on the Free plan — the default artifact upload keeps the report as private as the repository itself.

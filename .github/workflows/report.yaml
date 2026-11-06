@@ -52,7 +52,7 @@ jobs:
       - name: Load the catalog cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          key: ${{ steps.name.outputs.cache-prefix }}-${{ github.run_id }}
+          key: ${{ steps.name.outputs.cache-prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: analyzed/.repo-dive
           restore-keys: |
             ${{ steps.name.outputs.cache-prefix }}-
@@ -72,7 +72,9 @@ jobs:
         if: ${{ always() }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          key: ${{ steps.name.outputs.cache-prefix }}-${{ github.run_id }}
+          # Keyed per attempt because cache keys are immutable: a re-run saving
+          # under the key of an earlier attempt would lose its scan progress
+          key: ${{ steps.name.outputs.cache-prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: analyzed/.repo-dive
 
       - name: Run repo-dive index
