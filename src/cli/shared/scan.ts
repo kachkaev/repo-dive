@@ -885,11 +885,9 @@ export const runScan = Effect.fn("runScan")(function* ({
 
         const startedAt = yield* Clock.currentTimeMillis;
 
-        const rateAt = (processed: number, now: number): number =>
-          processed / Math.max(1, (now - startedAt) / 1000);
-
         const formatEta = (processed: number, now: number): string => {
-          const rate = rateAt(processed, now);
+          const elapsedSeconds = (now - startedAt) / 1000;
+          const rate = processed / Math.max(1, elapsedSeconds);
           const remainingSeconds = Math.round(
             (selected.length - processed) / Math.max(0.01, rate),
           );
@@ -921,9 +919,8 @@ export const runScan = Effect.fn("runScan")(function* ({
                     (count) => count + 1,
                   );
                   if (processed === selected.length) {
-                    const now = yield* Clock.currentTimeMillis;
                     yield* progress.log(
-                      `Scanned ${processed}/${selected.length} commits (${Math.round(rateAt(processed, now))}/s).`,
+                      `Scanned ${processed}/${selected.length} commits.`,
                     );
                   } else if (processed % 250 === 0) {
                     const now = yield* Clock.currentTimeMillis;
