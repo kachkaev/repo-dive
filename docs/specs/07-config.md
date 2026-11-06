@@ -159,18 +159,18 @@ Like the rest of `charts`, annotations flow into `dashboard.json` (`config.chart
 Every file git tracks has one **purpose**, told from its path: what the file is for.
 "Lines of code" and "Number of files" split by it, the way they split by language and by contributor.
 
-| Purpose (`purpose` value)                         | Source? | Holds                                                                                  |
-| ------------------------------------------------- | ------- | -------------------------------------------------------------------------------------- |
-| Production (`"production"`)                       | yes     | Code no other rule claims                                                              |
-| Tests (`"tests"`)                                 | yes     | Test code, wherever a project keeps it                                                 |
-| Docs (`"docs"`)                                   | yes     | Documentation folders, websites, changelogs and any other Markdown                     |
-| Examples (`"examples"`)                           | yes     | Examples, demos, playgrounds and stories                                               |
-| Tooling (`"tooling"`)                             | yes     | CI, scripts, build setup and tool config                                               |
-| AI instructions (`"ai-instructions"`)             | yes     | Skills, rules and agent guides: `.claude/`, `.agents/`, `AGENTS.md`, `SKILL.md`, …     |
-| Test data (`"test-data"`)                         | no      | What test folders hold besides code: snapshots, fixtures, test cases                   |
-| Assets (`"assets"`)                               | no      | Images, fonts, media and archives                                                      |
-| Generated & vendored (`"generated-and-vendored"`) | no      | Lockfiles, `vendor/`, `node_modules/`, `dist/`, `build/`, `*.min.*`, `Generated.ts`, … |
-| Other (`"other"`)                                 | no      | Everything else: `package.json`, `LICENSE`, stray YAML, logs                           |
+| Purpose (`purpose` value)                         | Source? | Holds                                                                                                                                                    |
+| ------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production (`"production"`)                       | yes     | Code no other rule claims                                                                                                                                |
+| Tests (`"tests"`)                                 | yes     | Test code, by the folder or file naming conventions projects keep it under                                                                               |
+| Docs (`"docs"`)                                   | yes     | Documentation folders, a `website/` at the root, changelogs and any other Markdown, reStructuredText or AsciiDoc                                         |
+| Examples (`"examples"`)                           | yes     | Examples, demos, playgrounds and stories                                                                                                                 |
+| Tooling (`"tooling"`)                             | yes     | CI, scripts, build setup and tool config                                                                                                                 |
+| AI instructions (`"ai-instructions"`)             | yes     | Skills, rules and agent guides: `.claude/`, `.agents/`, `AGENTS.md`, `SKILL.md`, …                                                                       |
+| Test data (`"test-data"`)                         | no      | What test folders hold besides code: snapshots, fixtures, test cases                                                                                     |
+| Assets (`"assets"`)                               | no      | Images, fonts, media and archives                                                                                                                        |
+| Generated & vendored (`"generated-and-vendored"`) | no      | Lockfiles, `vendor/`, `node_modules/`, `dist/`, `build/`, `*.min.*`, `Generated.ts`, … (`build/` and `dist/` only outside source folders such as `src/`) |
+| Other (`"other"`)                                 | no      | Everything else: `package.json`, `LICENSE`, stray YAML, logs                                                                                             |
 
 ### Which files are source
 
@@ -184,7 +184,7 @@ A source file over 2 MiB, or a binary one, counts as a file on "Number of files"
 
 Three steps, in this order:
 
-1.  What nobody wrote by hand goes to Generated & vendored, whatever the path says.
+1.  What nobody wrote by hand goes to Generated & vendored, even in a test folder (a file merely named after generated code, like `tests/test_generated_code.py`, does not count).
 1.  A file without a source extension (see [`languages.ts`](../../src/cli/shared/languages.ts)) goes to Test data if its path says tests, to Assets if it is media, and otherwise to Other.
 1.  A source file goes by the first of these its path matches: AI instructions, CI (`.github/`, `.circleci/`, …), Tests, Examples, Docs, other Tooling.
     What is left is Production, except for YAML, which goes to Other.

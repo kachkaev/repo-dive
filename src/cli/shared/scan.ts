@@ -720,27 +720,46 @@ export const runScan = Effect.fn("runScan")(function* ({
       const planned = describesTreeState(collector)
         ? sampleTreeCommits(lineages, selected, policy)
         : new Set(sampleCommits(selected, policy).map((commit) => commit.hash));
-      if (policy === "all" || !collector.scansSourceFiles) {
-        return { collector, policy, shas: planned };
+      if (
+        force ||
+        sampleOverride !== undefined ||
+        policy === "all" ||
+        !collector.scansSourceFiles
+      ) {
+        return { collector, policy, planned, shas: planned };
       }
       // Sampling moves on as the history grows, yet `index` reads every output
-      // there is: the mid-month HEAD of an earlier scan, say. Those would keep
-      // answering for the rules they were collected under, so they stay in the
-      // plan for as long as they exist.
+      // there is: the mid-month HEAD of an earlier scan, say. Once the file
+      // purpose rules change, those would keep answering for the old rules, so
+      // they get checked as well. A scan asked to do something narrower leaves
+      // them for the next plain one.
       const cacheKey = cacheKeyOf(collector);
-      const everyTreeCommit = sampleTreeCommits(lineages, selected, "all");
-      const earlier = yield* Effect.forEach(
-        [...everyTreeCommit].filter((sha) => !planned.has(sha)),
+      const rulesKey = config.filePurposes.rulesKey;
+      const outdated = yield* Effect.forEach(
+        [...sampleTreeCommits(lineages, selected, "all")].filter(
+          (sha) => !planned.has(sha),
+        ),
         (sha) =>
-          readSourceFilesPathsKey(catalog, sha, collector, cacheKey).pipe(
-            Effect.map((pathsKey) => (pathsKey === undefined ? [] : [sha])),
+          Effect.all({
+            current: isCollected(catalog, sha, collector, cacheKey, rulesKey),
+            pathsKey: readSourceFilesPathsKey(
+              catalog,
+              sha,
+              collector,
+              cacheKey,
+            ),
+          }).pipe(
+            Effect.map(({ current, pathsKey }) =>
+              !current && pathsKey !== undefined ? [sha] : [],
+            ),
           ),
         { concurrency: 16 },
       );
       return {
         collector,
         policy,
-        shas: new Set([...planned, ...earlier.flat()]),
+        planned,
+        shas: new Set([...planned, ...outdated.flat()]),
       };
     }),
   );
@@ -749,7 +768,10 @@ export const runScan = Effect.fn("runScan")(function* ({
     `Plan: ${plans
       .map(
         (plan) =>
-          `${plan.collector.name} → ${plan.shas.size} commits (${samplingLabel(plan.policy)})`,
+          `${plan.collector.name} → ${plan.planned.size} commits (${samplingLabel(plan.policy)})` +
+          (plan.shas.size > plan.planned.size
+            ? ` + ${plan.shas.size - plan.planned.size} earlier samples to check against edited file purpose rules`
+            : ""),
       )
       .join(", ")}`,
   );

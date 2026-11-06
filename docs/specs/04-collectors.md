@@ -185,7 +185,7 @@ Implemented, in `src/cli/shared/collectors/` (strategy, then default sampling wh
 1.  **todo-comments** (`tree`) — TODO/FIXME/HACK/XXX counts in source files. Blob-cached.
 1.  **languages** (`tree`) — lines and readable source file count per language (a file over 2 MiB is not read), counted in-process over the source files of the commit's tree and labelled from the shared extension → language map.
     Blob-cached.
-    It scans exactly the file set `survival` blames, so the dashboard's "Lines by language" chart shows the same totals with age shading on and off; an earlier version shelled out to `tokei`, which counted lockfiles and generated data the blame view could never account for.
+    It scans the file set `survival` blames (blame only skips a path that is not valid UTF-8, which it cannot name), so the dashboard's "Lines by language" chart shows the same totals with age shading on and off; an earlier version shelled out to `tokei`, which counted lockfiles and generated data the blame view could never account for.
 1.  **survival** (`tree`, `monthly`) — living lines by file, author and authoring-month cohort, via `git blame --line-porcelain` per source file. The expensive one.
     Its raw rows keep the file's path, in lookup tables that hold them to about the size per-extension rows took, so that `index` can tell [file purposes](07-config.md#filepurposes) without blaming anything again.
 1.  **file-survival** (`tree`, `monthly`) — living files by path, creator and creation-month cohort, from one rename-following `git log --name-status` walk per sample, for every file git tracks.

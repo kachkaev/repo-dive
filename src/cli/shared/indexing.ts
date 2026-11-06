@@ -185,17 +185,22 @@ const spanOf = (
 };
 
 /**
- * Older outputs say nothing of purposes and count a different set of files, so
- * a catalog `scan` is part-way through renewing would draw a cliff between the
- * two: they go from the first new output on. That covers any left outside the
- * current sampling plan as well, which `scan` never gets round to.
+ * Older outputs that fall inside the range `scan` has renewed. It walks newest
+ * first, so what is older than the first renewed sample is simply still to come,
+ * and keeps the chart drawn until then, if with a step where it meets the renewed
+ * part of "Number of files". Any older output still among the renewed ones was
+ * left out of the current sampling plan, and nothing would ever replace it.
  */
 const withoutOutdatedSamples = <Row extends { byPurpose?: unknown }>(
-  rows: Row[],
-): Row[] =>
-  rows.some((row) => row.byPurpose !== undefined)
-    ? rows.filter((row) => row.byPurpose !== undefined)
-    : rows;
+  rows: readonly Row[],
+): Row[] => {
+  const firstRenewed = rows.findIndex((row) => row.byPurpose !== undefined);
+  return firstRenewed === -1
+    ? [...rows]
+    : rows.filter(
+        (row, index) => index < firstRenewed || row.byPurpose !== undefined,
+      );
+};
 const buildDashboardData = (
   repoRoot: string,
   commits: readonly CommitFacts[], // oldest first

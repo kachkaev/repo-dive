@@ -82,6 +82,7 @@ multiset
 noxfile
 npmjs
 numstat
+okhttp
 ollama
 onefetch
 opencode
@@ -115,6 +116,7 @@ smol
 Sourcegraph
 tanuki
 testdata
+testfixtures
 testutil
 testutils
 tgz

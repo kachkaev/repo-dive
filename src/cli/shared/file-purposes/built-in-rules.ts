@@ -5,7 +5,7 @@ import { extensionOf, sourceExtensions } from "../languages.ts";
  * Bump whenever {@link builtInPurposeOf} changes which files are source: it is
  * part of what tells `scan` to look at every commit's source files again.
  */
-export const builtInRulesVersion = "1";
+export const builtInRulesVersion = "2";
 
 const lockfileNames = new Set([
   "bun.lockb",
@@ -23,18 +23,42 @@ const vendoredFolders = new Set([
 ]);
 
 /**
- * Names that mean build output or vendored code at the top of a project, and
- * nothing of the sort among its sources: `dist/index.js` against
- * `packages/next/src/build/webpack-config.ts`, or `src/go/build/build.go`.
+ * Build output at the top of a project, and nothing of the sort among its
+ * sources: `dist/index.js` against `packages/next/src/build/webpack-config.ts`,
+ * or `src/go/build/build.go`.
  */
-const outputFolders = new Set(["build", "dist", "vendor", "vendors"]);
+const outputFolders = new Set(["build", "dist"]);
+
+const vendorFolders = new Set(["vendor", "vendors"]);
+
+/**
+ * What vendored code means wherever it sits, `src/lib/vendor/` included, unless
+ * it is a part of the product about vendors: `src/features/vendor/`.
+ */
+const domainFolders = new Set([
+  "admin",
+  "api",
+  "app",
+  "components",
+  "controllers",
+  "domains",
+  "features",
+  "models",
+  "modules",
+  "pages",
+  "routes",
+  "services",
+  "views",
+]);
 
 /** Folders whose contents are named for what the code does rather than what it is. */
 const sourceRootFolders = new Set([
+  "app",
   "cmd",
   "internal",
   "lib",
   "libs",
+  "pages",
   "pkg",
   "scripts",
   "source",
@@ -46,12 +70,18 @@ const sourceRootFolders = new Set([
 /** Below these, folders are package names: `com/example/demo`, `devtools/build`. */
 const packageRootFolders = new Set(["java", "kotlin", "scala"]);
 
-/** Whether a folder of one of these names sits outside any source root. */
+/**
+ * Whether a folder of one of these names sits outside any source root, and is
+ * not the name of a package: `packages/docker/`, `packages/playwright/`.
+ */
 const inProjectLayout = (
   folders: readonly string[],
   names: ReadonlySet<string>,
 ): boolean => {
-  for (const folder of folders) {
+  for (const [index, folder] of folders.entries()) {
+    if (folders[index - 1] === "packages") {
+      continue;
+    }
     if (names.has(folder)) {
       return true;
     }
@@ -61,6 +91,14 @@ const inProjectLayout = (
   }
   return false;
 };
+
+const isVendored = (folders: readonly string[]): boolean =>
+  folders.some(
+    (folder, index) =>
+      vendorFolders.has(folder) &&
+      !domainFolders.has(folders[index - 1] ?? "") &&
+      folders[index - 1] !== "packages",
+  );
 
 /** A whole word of a file or folder name: `generated.c`, `__Generated.yaml`, `generated-client/`. */
 const generatedWord = /(?:^|[._-])generated(?:[._-]|$)/i;
@@ -135,10 +173,8 @@ const testFolders = new Set([
   "typetests",
 ]);
 
-/** Mean tests at the top of a project, and may well be the project lower down. */
-const rootTestFolders = new Set(["cypress", "playwright", "t"]);
-
-const specFolders = new Set(["spec"]);
+/** Mean tests where a project lays out its parts, and may well be a part itself. */
+const layoutTestFolders = new Set(["cypress", "playwright", "spec"]);
 
 /**
  * `test`, `__tests__`, `tests_integration`, `unit-tests`, `MyApp.Tests`,
@@ -146,24 +182,37 @@ const specFolders = new Set(["spec"]);
  * `react-test-renderer`, `test_runner`, `test-result` or `ab-test`.
  */
 const testFolderName =
-  /^_*tests?_*$|^_*tests[-_]|^test[-_](?:cases?|data|fixtures?|helpers?|resources|support|suite|utils?)$|[-_.]tests_*$|\.test$|(?:acceptance|api|e2e|functional|integration|regression|smoke|system|unit)[-_]?tests?_*$|(?:android|common|ios|js|jvm|native)test$/;
+  /^_*tests?_*$|^_*tests[-_]|^test[-_](?:apps?|cases?|data|fixtures?|helpers?|modules?|projects?|resources|support|suite|utils?)$|[-_.]tests_*$|\.test$|(?:acceptance|api|e2e|functional|integration|regression|smoke|system|unit)[-_]?tests?_*$|(?:android|common|instrumented|ios|js|jvm|native)test$|^testfixtures$/;
 
 const dottedTestFileName =
   /\.(?:bench|benchmark|cy|e2e|spec|test|tests)(?:\.[^.]+)?\.[^.]+$|\.(?:test-d|tst)\.[^.]+$/i;
 
-/** `routes_test.go`, `test_bert.py`, `test.c`, `FooTests.cs`: in code files only. */
+/** `routes_test.go`, `user_spec.rb`, `test_bert.py`: only ever tests, in code. */
 const wordyTestFileName =
-  /[_-](?:bench|benchmark|e2e|spec|test|tests)\.[^.]+$|^(?:bench|benchmark|test|tests)_.+|^tests?\.[^.]+$/i;
+  /_(?:bench|benchmark|e2e|spec|test|tests)\.[^.]+$|^(?:bench|benchmark|test|tests)_.+/i;
 
-const camelCaseTestFileName = /[0-9a-z](?:Spec|Tests?)\.[^.]+$/;
+/**
+ * `a-test.js`, `tests.py`, `FooTests.cs`: tests beside the sources, but what
+ * `commands/test.rs`, `speed-test.ts` or `HttpApiTest.ts` among them are about.
+ */
+const looseTestFileName =
+  /-(?:bench|benchmark|e2e|test|tests)\.[^.]+$|^tests?\.[^.]+$/i;
+
+const camelCaseTestFileName = /[0-9a-z]Tests?\.[^.]+$/;
 
 const proseOrDataFileName = /\.(?:adoc|json|md|mdx|rst|toml|txt|ya?ml)$/i;
 
-const isTestFileName = (fileName: string): boolean =>
+const isTestFileName = (
+  fileName: string,
+  folders: readonly string[],
+): boolean =>
   fileName === "conftest.py" ||
   dottedTestFileName.test(fileName) ||
   (!proseOrDataFileName.test(fileName) &&
-    (wordyTestFileName.test(fileName) || camelCaseTestFileName.test(fileName)));
+    (wordyTestFileName.test(fileName) ||
+      (folders.every((folder) => !sourceRootFolders.has(folder)) &&
+        (looseTestFileName.test(fileName) ||
+          camelCaseTestFileName.test(fileName)))));
 
 const exampleFolders = new Set([
   ".storybook",
@@ -240,10 +289,10 @@ const purposeByPath = (
   }
   if (
     inAny(testFolders) ||
-    rootTestFolders.has(folders[0] ?? "") ||
-    inProjectLayout(folders, specFolders) ||
+    folders[0] === "t" ||
+    inProjectLayout(folders, layoutTestFolders) ||
     folders.some((folder) => testFolderName.test(folder)) ||
-    isTestFileName(fileName)
+    isTestFileName(fileName, folders)
   ) {
     return "tests";
   }
@@ -276,7 +325,8 @@ export const builtInPurposeOf = (filePath: string): BuiltInFilePurpose => {
   const segments = filePath.split("/");
   const fileName = segments.at(-1) ?? "";
   const allFolders = segments.slice(0, -1).map((name) => name.toLowerCase());
-  const packageRootIndex = allFolders.findIndex((folder) =>
+  // The last one: `java/core/src/test/java/` still says what it holds.
+  const packageRootIndex = allFolders.findLastIndex((folder) =>
     packageRootFolders.has(folder),
   );
   const folders =
@@ -287,12 +337,13 @@ export const builtInPurposeOf = (filePath: string): BuiltInFilePurpose => {
   if (
     lockfileNames.has(fileName) ||
     machineMadeFileName.test(fileName) ||
-    folders.some((folder) => generatedWord.test(folder)) ||
+    allFolders.some((folder) => generatedWord.test(folder)) ||
     // A test of generated code, or a document about it, is not generated itself.
     (generatedWord.test(fileName) &&
-      !isTestFileName(fileName) &&
+      !isTestFileName(fileName, folders) &&
       !documentFileName.test(fileName)) ||
-    folders.some((folder) => vendoredFolders.has(folder)) ||
+    allFolders.some((folder) => vendoredFolders.has(folder)) ||
+    isVendored(folders) ||
     inProjectLayout(folders, outputFolders)
   ) {
     return "generated-and-vendored";
