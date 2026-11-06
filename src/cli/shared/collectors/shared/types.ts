@@ -3,7 +3,6 @@ import type { ChildProcessSpawner } from "effect/process";
 
 import type { ResolvedConfig } from "../../config.ts";
 import type { ResolvedFilePurpose } from "../../file-purposes.ts";
-import { noExtension } from "../../languages.ts";
 import type { SamplingPolicy } from "../../sampling.ts";
 
 type CollectContext = {
@@ -126,11 +125,4 @@ export const describesTreeState = (collector: Collector): boolean =>
 export const cohortMonthOf = (unixSeconds: number): string => {
   const date = new Date(unixSeconds * 1000);
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-};
-
-/** File extension used as a category key, e.g. ".ts"; files without one map to "(none)". */
-export const extensionOf = (filePath: string): string => {
-  const basename = filePath.split("/").at(-1) ?? "";
-  const dotIndex = basename.lastIndexOf(".");
-  return dotIndex > 0 ? basename.slice(dotIndex).toLowerCase() : noExtension;
 };

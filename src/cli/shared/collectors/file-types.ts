@@ -2,7 +2,8 @@ import { Effect } from "effect";
 
 import { numberAt, recordAt } from "../../../shared/json.ts";
 import { runGit } from "../git.ts";
-import { type Collector, extensionOf, type Fact } from "./shared/types.ts";
+import { extensionOf } from "../languages.ts";
+import type { Collector, Fact } from "./shared/types.ts";
 
 type FileTypeStats = {
   files: number;

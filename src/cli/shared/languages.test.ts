@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { extensionOf } from "./types.ts";
+import { extensionOf } from "./languages.ts";
 
 test("extensionOf maps paths to extension categories", () => {
   expect(extensionOf("src/cli/shared/scan.ts")).toBe(".ts");

@@ -583,6 +583,14 @@ test.each([
     "non-empty array of globs",
   ],
   [
+    {
+      filePurposes: {
+        rules: [{ paths: ["src/**", "!src/gen/**"], purpose: "tests" }],
+      },
+    },
+    "cannot negate a glob",
+  ],
+  [
     { filePurposes: { rules: [{ paths: ["a"], purpose: "test" }] } },
     '"production"',
   ],
@@ -592,7 +600,7 @@ test.each([
         rules: [{ paths: ["a"], purpose: { type: "custom", source: true } }],
       },
     },
-    "`.name` must be a non-empty string",
+    ".name` must be a non-empty string",
   ],
   [
     {
@@ -600,7 +608,7 @@ test.each([
         rules: [{ paths: ["a"], purpose: { type: "custom", name: "X" } }],
       },
     },
-    "`.source` must be a boolean",
+    ".source` must be a boolean",
   ],
   [
     {

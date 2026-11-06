@@ -1,8 +1,10 @@
+adoc
 Aimard
 amazonq
 ASF
 browsable
 burndown
+caf
 CHAOSS
 Charta
 chatmodes
@@ -26,10 +28,13 @@ EAV
 Effectful
 ENOENT
 env
+erl
 esac
 esbuild
 explorable
+exs
 fabfile
+FFFD
 gapless
 gilot
 gitext
@@ -80,11 +85,13 @@ numstat
 ollama
 onefetch
 opencode
+openrouter
 otf
 oxc
 Picci
 Pijul
 pnp
+pyi
 pyproject
 rasterizes
 Rebuildability
@@ -94,6 +101,7 @@ repodive
 repodiving
 repoinsights
 rollups
+rst
 scc
 scp
 scriptable
@@ -121,6 +129,7 @@ typetest
 typetests
 uncazzy
 undashed
+unittests
 unparseable
 unscanned
 utf

@@ -47,7 +47,7 @@ const fetchBlobContents = (
             if (!Number.isSafeInteger(size)) {
               continue;
             }
-            if (type === "blob" && size <= maxBlobBytes) {
+            if (type === "blob") {
               contents.set(
                 sha,
                 decoder.decode(bytes.subarray(offset, offset + size)),
@@ -94,8 +94,10 @@ export const scanTreeWithBlobCache = Effect.fnUntraced(function* ({
   Error,
   ChildProcessSpawner.ChildProcessSpawner
 > {
-  const blobs = (yield* listTreeBlobs(repoRoot, sha)).filter((blob) =>
-    isSourceFile(blob.filePath),
+  // Sizes are known up front, so a blob too large to scan is never even read: a
+  // rule can make anything source, a 400 MB model file included.
+  const blobs = (yield* listTreeBlobs(repoRoot, sha)).filter(
+    (blob) => isSourceFile(blob.filePath) && blob.sizeBytes <= maxBlobBytes,
   );
   const cache = getBlobCache(catalogPath);
 

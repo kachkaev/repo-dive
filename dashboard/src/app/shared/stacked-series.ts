@@ -40,9 +40,12 @@ export function shapeStacked(
   }
   const ranked =
     typeof rankBy === "string"
-      ? Object.keys(weights).toSorted(
-          (left, right) => (weights[right] ?? 0) - (weights[left] ?? 0),
-        )
+      ? Object.keys(weights)
+          // Data can arrive with its own tail folded: that is never a named series.
+          .filter((key) => key !== "Other")
+          .toSorted(
+            (left, right) => (weights[right] ?? 0) - (weights[left] ?? 0),
+          )
       : rankBy.filter((key) => (weights[key] ?? 0) > 0);
   const kept = ranked.slice(0, maxSeries);
   const hasOther =

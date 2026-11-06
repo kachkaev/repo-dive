@@ -1,5 +1,6 @@
 import { arrayAt, numberAt, stringAt } from "../../../../shared/json.ts";
-import { extensionOf, type Fact, type NormalizeContext } from "./types.ts";
+import { extensionOf } from "../../languages.ts";
+import type { Fact, NormalizeContext } from "./types.ts";
 
 /**
  * Survival units attributed to one file: path, author and cohort, plus how many

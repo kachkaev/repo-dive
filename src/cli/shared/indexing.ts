@@ -45,6 +45,9 @@ class NoCollectedCommitsError extends Data.TaggedError(
  */
 const kindGroupLabels = { bot: "Bots", ai: "AI agents" } as const;
 
+/** Comfortably more languages than the file-count chart names before "Other". */
+const maxFileLanguagesInData = 15;
+
 /**
  * Which of a commit's two dates a series uses comes down to the series' shape,
  * not its subject matter — see docs/specs/04-collectors.md.
@@ -181,6 +184,18 @@ const spanOf = (
   return { first, last };
 };
 
+/**
+ * Older outputs say nothing of purposes and count a different set of files, so
+ * a catalog `scan` is part-way through renewing would draw a cliff between the
+ * two: they go from the first new output on. That covers any left outside the
+ * current sampling plan as well, which `scan` never gets round to.
+ */
+const withoutOutdatedSamples = <Row extends { byPurpose?: unknown }>(
+  rows: Row[],
+): Row[] =>
+  rows.some((row) => row.byPurpose !== undefined)
+    ? rows.filter((row) => row.byPurpose !== undefined)
+    : rows;
 const buildDashboardData = (
   repoRoot: string,
   commits: readonly CommitFacts[], // oldest first
@@ -264,7 +279,7 @@ const buildDashboardData = (
     }),
   );
 
-  const fileTypes = composeSeries(
+  const allFileTypes = composeSeries(
     (commit) => hasMetric(commit, "files.count"),
     (commit) => ({
       sha: commit.sha.slice(0, 10),
@@ -279,6 +294,20 @@ const buildDashboardData = (
       ),
     }),
   );
+  // A tree can hold dozens of extensions, at every commit, while the chart names
+  // a handful: folding the long tail keeps the report from paying for all of them.
+  const namedFileLanguages = new Set(
+    Object.entries(allFileTypes.at(-1)?.byLanguage ?? {})
+      .toSorted(([, left], [, right]) => right - left)
+      .slice(0, maxFileLanguagesInData)
+      .map(([language]) => language),
+  );
+  const fileTypes = allFileTypes.map((row) => ({
+    ...row,
+    byLanguage: sumByKey(row.byLanguage, (language) =>
+      namedFileLanguages.has(language) ? language : "Other",
+    ),
+  }));
 
   const directives = composeSeries(
     (commit) => hasMetric(commit, "directives.ts"),
@@ -480,16 +509,10 @@ const buildDashboardData = (
       },
     );
 
-  const survival = survivalSeriesOf("survival.lines");
-  const allFileSurvival = survivalSeriesOf("survival.files");
-  // Older outputs only ever counted source files, so a catalog that `scan` is
-  // part-way through renewing would draw a cliff between the two: leave them
-  // out from the first new output on.
-  const fileSurvival = allFileSurvival.some(
-    (row) => row.byPurpose !== undefined,
-  )
-    ? allFileSurvival.filter((row) => row.byPurpose !== undefined)
-    : allFileSurvival;
+  const survival = withoutOutdatedSamples(survivalSeriesOf("survival.lines"));
+  const fileSurvival = withoutOutdatedSamples(
+    survivalSeriesOf("survival.files"),
+  );
 
   // One entry per person, whether they authored commits, only ever helped
   // with someone else's, or both — humans, bots and AI agents alike. The list

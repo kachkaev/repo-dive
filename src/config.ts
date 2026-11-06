@@ -26,7 +26,7 @@
  *     weekStartsOn: "monday",
  *   },
  *   filePurposes: {
- *     rules: [{ paths: ["playground/**"], purpose: "tests" }],
+ *     rules: [{ paths: ["utils/**"], purpose: "tooling" }],
  *   },
  *   catalog: {
  *     dir: ".repo-dive",
@@ -167,7 +167,8 @@ export type FilePurpose = BuiltInFilePurpose | CustomFilePurpose;
 /**
  * Sends every file matching any of `paths` to `purpose`, whatever its extension.
  * Globs match the whole path from the repository root, dotfiles included, so
- * `*.md` covers the root only and `**\/*.md` every folder.
+ * `*.md` covers the root only and `**\/*.md` every folder. A glob cannot be
+ * negated: put a rule for the exception ahead of this one.
  */
 export type FilePurposeRule = {
   readonly paths: readonly string[];

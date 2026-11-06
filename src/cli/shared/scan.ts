@@ -557,16 +557,11 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
   let skipped = 0;
   const rulesKey = filePurposes.rulesKey;
 
+  const failures: string[] = [];
+
   // Listed at most once per commit, and only when something is left to do: an
   // up-to-date catalog stays a matter of reading sidecars.
   let sourceFiles: SourceFilesStamp | undefined;
-  const sourceFilesOfCommit = Effect.gen(function* () {
-    sourceFiles ??= {
-      rulesKey,
-      pathsKey: yield* sourceFilesPathsKey(catalog.repoRoot, sha, filePurposes),
-    };
-    return sourceFiles;
-  });
 
   for (const collector of collectors) {
     const cacheKey = cacheKeyOf(collector);
@@ -578,14 +573,29 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
       continue;
     }
     if (collector.scansSourceFiles) {
-      const current = yield* sourceFilesOfCommit;
+      if (sourceFiles === undefined) {
+        const pathsKey = yield* sourceFilesPathsKey(
+          catalog.repoRoot,
+          sha,
+          filePurposes,
+        ).pipe(
+          Effect.catch((error) => {
+            failures.push(`Tree of ${sha.slice(0, 10)}: ${error.message}`);
+            return Effect.succeed(undefined);
+          }),
+        );
+        if (pathsKey === undefined) {
+          continue;
+        }
+        sourceFiles = { rulesKey, pathsKey };
+      }
       // New rules that pick the very same source files leave the output valid.
       if (
         !force &&
         (yield* readSourceFilesPathsKey(catalog, sha, collector, cacheKey)) ===
-          current.pathsKey
+          sourceFiles.pathsKey
       ) {
-        yield* confirmSourceRules(catalog, sha, collector, current);
+        yield* confirmSourceRules(catalog, sha, collector, sourceFiles);
         skipped += 1;
         continue;
       }
@@ -601,7 +611,6 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
   );
 
   let run = 0;
-  const failures: string[] = [];
   for (const collector of direct) {
     const failure = yield* runCollector({
       catalog,
@@ -705,16 +714,36 @@ export const runScan = Effect.fn("runScan")(function* ({
 
   const lineages = yield* listLineages(repoRoot);
 
-  const plans = collectors.map((collector) => {
-    const policy = sampleOverride ?? collector.defaultSampling;
-    return {
-      collector,
-      policy,
-      shas: describesTreeState(collector)
+  const plans = yield* Effect.forEach(collectors, (collector) =>
+    Effect.gen(function* () {
+      const policy = sampleOverride ?? collector.defaultSampling;
+      const planned = describesTreeState(collector)
         ? sampleTreeCommits(lineages, selected, policy)
-        : new Set(sampleCommits(selected, policy).map((commit) => commit.hash)),
-    };
-  });
+        : new Set(sampleCommits(selected, policy).map((commit) => commit.hash));
+      if (policy === "all" || !collector.scansSourceFiles) {
+        return { collector, policy, shas: planned };
+      }
+      // Sampling moves on as the history grows, yet `index` reads every output
+      // there is: the mid-month HEAD of an earlier scan, say. Those would keep
+      // answering for the rules they were collected under, so they stay in the
+      // plan for as long as they exist.
+      const cacheKey = cacheKeyOf(collector);
+      const everyTreeCommit = sampleTreeCommits(lineages, selected, "all");
+      const earlier = yield* Effect.forEach(
+        [...everyTreeCommit].filter((sha) => !planned.has(sha)),
+        (sha) =>
+          readSourceFilesPathsKey(catalog, sha, collector, cacheKey).pipe(
+            Effect.map((pathsKey) => (pathsKey === undefined ? [] : [sha])),
+          ),
+        { concurrency: 16 },
+      );
+      return {
+        collector,
+        policy,
+        shas: new Set([...planned, ...earlier.flat()]),
+      };
+    }),
+  );
 
   yield* Console.log(
     `Plan: ${plans

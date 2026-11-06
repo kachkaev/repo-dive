@@ -372,6 +372,56 @@ test.concurrent(
   },
 );
 
+test.concurrent(
+  "a rule crossing the source line renews samples outside the current plan",
+  async () => {
+    const repoPath = createFixtureRepo();
+    function scan() {
+      return runCli("scan", "--repo", repoPath, "--collectors", "survival");
+    }
+
+    try {
+      // One sample a month: the HEAD of this scan drops out of the plan as soon
+      // as a newer commit lands in the same month.
+      const first = await scan();
+      expect(first.status, first.stderr).toBe(0);
+      writeFileSync(path.join(repoPath, "more.ts"), "export {};\n");
+      runGit(repoPath, "add", ".");
+      runGit(repoPath, "commit", "-m", "Add more");
+      const second = await scan();
+      expect(second.stdout).toMatch(/Collector runs: 1 new/);
+
+      // `hello.txt` is in the trees of both samples and starts to count.
+      writeFileSync(
+        path.join(repoPath, "repo-dive.config.mjs"),
+        'export default { filePurposes: { rules: [{ paths: ["**/*.txt"], purpose: "docs" }] } };\n',
+      );
+      // The samples the first two scans took are renewed alongside the new HEAD.
+      const crossing = await scan();
+      expect(crossing.stdout).toMatch(/Collector runs: 3 new, 0 already/);
+
+      const status = await runCli("status", "--repo", repoPath);
+      expect(status.stdout).not.toMatch(/to re-check/);
+
+      // Rules spelled differently may pick other files, which takes a scan to
+      // tell, so `status` says that rather than reporting nothing collected.
+      writeFileSync(
+        path.join(repoPath, "repo-dive.config.mjs"),
+        'export default { filePurposes: { rules: [{ paths: ["hello.txt"], purpose: "docs" }] } };\n',
+      );
+      const edited = await runCli("status", "--repo", repoPath);
+      expect(edited.stdout).toMatch(
+        /survival: (\d+)\/\1 commits collected.* to re-check/,
+      );
+      // They do pick the same files, so nothing needs collecting again.
+      const confirmed = await scan();
+      expect(confirmed.stdout).toMatch(/Collector runs: 0 new/);
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  },
+);
+
 test.concurrent("status reports catalog coverage", async () => {
   const repoPath = createFixtureRepo();
 

@@ -392,16 +392,16 @@ const parseFilePurpose = (value: unknown, at: string): FilePurpose => {
   }
   if (!Predicate.isObject(value) || prop(value, "type") !== "custom") {
     throw configError(
-      `${at} must be one of ${builtInFilePurposes.map((purpose) => JSON.stringify(purpose)).join(", ")}, or an object \`{ type: "custom", name, source }\`.`,
+      `\`${at}\` must be one of ${builtInFilePurposes.map((purpose) => JSON.stringify(purpose)).join(", ")}, or an object \`{ type: "custom", name, source }\`.`,
     );
   }
-  const name = parseOptionalString(prop(value, "name"), `${at}\`.name\``);
+  const name = parseOptionalString(prop(value, "name"), `\`${at}.name\``);
   if (name === undefined) {
-    throw configError(`${at}\`.name\` must be a non-empty string.`);
+    throw configError(`\`${at}.name\` must be a non-empty string.`);
   }
   const source = prop(value, "source");
   if (typeof source !== "boolean") {
-    throw configError(`${at}\`.source\` must be a boolean.`);
+    throw configError(`\`${at}.source\` must be a boolean.`);
   }
   return { type: "custom", name, source };
 };
@@ -421,9 +421,9 @@ const parseFilePurposeRules = (value: unknown): FilePurposeRule[] => {
   /** Custom purpose name → the `source` the rules so far gave it. */
   const customSources = new Map<string, boolean>();
   return value.map((rule, index): FilePurposeRule => {
-    const at = `\`filePurposes.rules[${index}]\``;
+    const at = `filePurposes.rules[${index}]`;
     if (!Predicate.isObject(rule)) {
-      throw configError(`${at} must be an object.`);
+      throw configError(`\`${at}\` must be an object.`);
     }
     const paths = prop(rule, "paths");
     if (
@@ -431,16 +431,20 @@ const parseFilePurposeRules = (value: unknown): FilePurposeRule[] => {
       paths.length === 0 ||
       paths.some((glob) => typeof glob !== "string" || glob.trim() === "")
     ) {
-      throw configError(`${at}\`.paths\` must be a non-empty array of globs.`);
+      throw configError(`\`${at}.paths\` must be a non-empty array of globs.`);
     }
-    const purpose = parseFilePurpose(
-      prop(rule, "purpose"),
-      `${at}\`.purpose\``,
-    );
+    // An array of globs means any of them, so a negated one would match all the
+    // rest of the repository rather than carve anything out.
+    if (paths.some((glob: string) => glob.startsWith("!"))) {
+      throw configError(
+        `\`${at}.paths\` cannot negate a glob; put a rule for the exception ahead of this one.`,
+      );
+    }
+    const purpose = parseFilePurpose(prop(rule, "purpose"), `${at}.purpose`);
     if (typeof purpose !== "string") {
       if (builtInLabels.has(purpose.name.toLowerCase())) {
         throw configError(
-          `${at}\`.purpose.name\` ${JSON.stringify(purpose.name)} is taken by a built-in purpose.`,
+          `\`${at}.purpose.name\` ${JSON.stringify(purpose.name)} is taken by a built-in purpose.`,
         );
       }
       const earlierSource = customSources.get(purpose.name);

@@ -240,22 +240,22 @@ const sourceFilesStampOf = (sidecar: unknown): unknown =>
  * fingerprint exists. `cacheKey` folds in the collector version and any config
  * it depends on, so a version bump or a relevant config change re-collects it.
  * A collector that scans source files must also have been run, or confirmed, for
- * the current file purpose rules; `scan` can confirm one with
- * {@link readSourceFilesPathsKey}, while a read-only caller takes it as pending.
+ * the file purpose rules given, if any; `scan` can confirm one with
+ * {@link readSourceFilesPathsKey}.
  */
 export const isCollected = (
   catalog: Catalog,
   sha: string,
   collector: Collector,
   cacheKey: string,
-  sourceRulesKey: string,
+  sourceRulesKey: string | undefined,
 ): Effect.Effect<boolean, Error> =>
   readJsonIfIntact(sidecarPath(catalog, sha, collector.name)).pipe(
     Effect.map((sidecar) => {
       if (cacheKeyOf(sidecar) !== cacheKey) {
         return false;
       }
-      if (!collector.scansSourceFiles) {
+      if (sourceRulesKey === undefined || !collector.scansSourceFiles) {
         return true;
       }
       const stamp = sourceFilesStampOf(sidecar);

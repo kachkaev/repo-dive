@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 
 import { numberAt, recordAt } from "../../../shared/json.ts";
-import { languageOfExtension } from "../languages.ts";
+import { extensionOf, languageOfExtension } from "../languages.ts";
 import { scanTreeWithBlobCache } from "./shared/tree-scan.ts";
-import { type Collector, extensionOf, type Fact } from "./shared/types.ts";
+import type { Collector, Fact } from "./shared/types.ts";
 
 type ExtensionStats = {
   files: number;

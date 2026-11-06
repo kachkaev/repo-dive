@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 
-import { listTreeBlobs, runGit } from "../git.ts";
+import { listTreeBlobs, runGit, type TreeBlob } from "../git.ts";
 import { encodePathRows, normalizePathRows } from "./shared/path-rows.ts";
 import { maxBlobBytes } from "./shared/tree-scan.ts";
 import { cohortMonthOf, type Collector } from "./shared/types.ts";
@@ -39,43 +39,62 @@ export const parseBlamePorcelain = (stdout: string): LineAttribution[] => {
 const fieldSeparator = "\u{1F}";
 
 /**
- * Tallies one commit's blame results per file, author and cohort. A binary file
- * has no lines to attribute, wherever a config rule sends it.
+ * Lines per author and cohort in one file's blame. Tallied per file because a
+ * whole tree's raw blame output outgrows the heap on a large repository once a
+ * few samples run concurrently. A binary file has no lines to attribute,
+ * wherever a config rule sends it.
  */
-export const summarizeBlames = (
-  blames: ReadonlyArray<{ filePath: string; stdout: string }>,
-) => {
-  const counts = new Map<string, number>();
-  let totalLines = 0;
-  for (const { filePath, stdout } of blames) {
-    if (stdout.includes("\0")) {
-      continue;
-    }
-    for (const attribution of parseBlamePorcelain(stdout)) {
-      const key = [
-        filePath,
-        attribution.authorEmail,
-        attribution.cohortMonth,
-      ].join(fieldSeparator);
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-      totalLines += 1;
+export const tallyBlame = (stdout: string): ReadonlyMap<string, number> => {
+  const tally = new Map<string, number>();
+  if (!stdout.includes("\0")) {
+    for (const { authorEmail, cohortMonth } of parseBlamePorcelain(stdout)) {
+      const key = `${authorEmail}${fieldSeparator}${cohortMonth}`;
+      tally.set(key, (tally.get(key) ?? 0) + 1);
     }
   }
+  return tally;
+};
+
+export const summarizeBlames = (
+  files: ReadonlyArray<{
+    filePath: string;
+    tally: ReadonlyMap<string, number>;
+  }>,
+) => {
+  const rows = files.flatMap(({ filePath, tally }) =>
+    tally
+      .entries()
+      .map(([key, count]) => {
+        const [authorEmail = "", cohortMonth = ""] = key.split(fieldSeparator);
+        return { filePath, authorEmail, cohortMonth, count };
+      })
+      .toArray(),
+  );
   return {
-    ...encodePathRows(
-      counts
-        .entries()
-        .map(([key, count]) => {
-          const [filePath = "", authorEmail = "", cohortMonth = ""] =
-            key.split(fieldSeparator);
-          return { filePath, authorEmail, cohortMonth, count };
-        })
-        .toArray(),
-    ),
-    totalLines,
-    fileCount: blames.length,
+    ...encodePathRows(rows),
+    totalLines: rows.reduce((total, row) => total + row.count, 0),
+    fileCount: files.length,
   };
 };
+
+/**
+ * What can be blamed of a commit's tree. A path that is not valid UTF-8 reaches
+ * us with a replacement character in it, naming no file `git blame` could find,
+ * and one such failure would lose the commit's whole sample; the file still
+ * counts as a file, through `file-survival`.
+ */
+export const selectBlameableFiles = (
+  blobs: readonly TreeBlob[],
+  isSourceFile: (filePath: string) => boolean,
+): string[] =>
+  blobs
+    .filter(
+      (blob) =>
+        isSourceFile(blob.filePath) &&
+        blob.sizeBytes <= maxBlobBytes &&
+        !blob.filePath.includes("\u{FFFD}"),
+    )
+    .map((blob) => blob.filePath);
 
 export const survivalCollector: Collector = {
   name: "survival",
@@ -88,14 +107,12 @@ export const survivalCollector: Collector = {
   scansSourceFiles: true,
   defaultSampling: "monthly",
   collect: Effect.fnUntraced(function* ({ repoRoot, sha, isSourceFile }) {
-    const blobs = yield* listTreeBlobs(repoRoot, sha);
-    const files = blobs
-      .filter(
-        (blob) => isSourceFile(blob.filePath) && blob.sizeBytes <= maxBlobBytes,
-      )
-      .map((blob) => blob.filePath);
+    const files = selectBlameableFiles(
+      yield* listTreeBlobs(repoRoot, sha),
+      isSourceFile,
+    );
 
-    const blames = yield* Effect.forEach(
+    const tallies = yield* Effect.forEach(
       files,
       (filePath) =>
         runGit([
@@ -107,11 +124,13 @@ export const survivalCollector: Collector = {
           sha,
           "--",
           filePath,
-        ]).pipe(Effect.map((stdout) => ({ filePath, stdout }))),
+        ]).pipe(
+          Effect.map((stdout) => ({ filePath, tally: tallyBlame(stdout) })),
+        ),
       { concurrency: 8 },
     );
 
-    return summarizeBlames(blames);
+    return summarizeBlames(tallies);
   }),
   normalize: (raw, context) =>
     normalizePathRows({

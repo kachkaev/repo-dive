@@ -178,7 +178,7 @@ A purpose is wholly source or wholly not, never a mix, and that is the whole def
 "Number of files" counts every file git tracks, so hiding the non-source purposes in its legend leaves the very files whose lines are counted.
 The language split, the contributor split and the content-level collectors (`directives`, `todo-comments`) cover the same source files.
 
-A source file over 2 MiB, or a binary one, counts as a file but holds no lines.
+A source file over 2 MiB, or a binary one, counts as a file on "Number of files" but holds no lines.
 
 ### Built-in rules
 
@@ -212,6 +212,7 @@ filePurposes: {
 ```
 
 `paths` are [picomatch](https://github.com/micromatch/picomatch) globs against the whole path from the repository root, dotfiles included: `*.md` covers the root only, `**/*.md` every folder.
+A glob cannot be negated, since the list means any of them; put a rule for the exception ahead of this one.
 
 A rule sends **every** file it matches to its purpose, whatever the extension.
 That is how a file type repo-dive does not know becomes source, and it is also why `playground/**` alone would count the lines of every JSON file in there; the example above takes two rules for that reason.
@@ -234,8 +235,8 @@ What a rule edit takes depends on whether it changes which files are source:
   Raw survival outputs hold file paths, so `index` applies the rules afresh.
   `scan` confirms each commit by listing its tree once, then remembers.
 - Moving files across it takes `repo-dive scan` as well, because lines that were never counted or blamed have to be.
-  `scan` re-collects only the commits whose source files actually changed, for `languages`, `directives`, `todo-comments` and `survival`.
-  Until it has, `index` leaves lines of files that are no longer source out of the charts, and files that have become source hold no lines yet.
+  `scan` re-collects only the commits whose source files actually changed, for `languages`, `directives`, `todo-comments` and `survival`, including `survival` samples an earlier scan took that sampling has since moved past.
+  Until it has, totals are out of step: the blame-based variants leave out lines of files that are no longer source and hold none yet for files that have become source, while the per-commit language counts and the Lines tile still say what the old rules picked.
 
 ## `catalog`
 

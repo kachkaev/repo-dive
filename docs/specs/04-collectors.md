@@ -183,7 +183,7 @@ Implemented, in `src/cli/shared/collectors/` (strategy, then default sampling wh
     Blob-cached.
     Emits `dependencies.resolved`, `dependencies.direct` and `dependencies.manifest`.
 1.  **todo-comments** (`tree`) — TODO/FIXME/HACK/XXX counts in source files. Blob-cached.
-1.  **languages** (`tree`) — lines and source file count per language, counted in-process over the source files of the commit's tree and labelled from the shared extension → language map.
+1.  **languages** (`tree`) — lines and readable source file count per language (a file over 2 MiB is not read), counted in-process over the source files of the commit's tree and labelled from the shared extension → language map.
     Blob-cached.
     It scans exactly the file set `survival` blames, so the dashboard's "Lines by language" chart shows the same totals with age shading on and off; an earlier version shelled out to `tokei`, which counted lockfiles and generated data the blame view could never account for.
 1.  **survival** (`tree`, `monthly`) — living lines by file, author and authoring-month cohort, via `git blame --line-porcelain` per source file. The expensive one.

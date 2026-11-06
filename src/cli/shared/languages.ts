@@ -1,5 +1,11 @@
-/** What `extensionOf` calls the extension of a file that has none. */
-export const noExtension = "(none)";
+const noExtension = "(none)";
+
+/** File extension used as a category key, e.g. ".ts"; files without one map to "(none)". */
+export const extensionOf = (filePath: string): string => {
+  const basename = filePath.split("/").at(-1) ?? "";
+  const dotIndex = basename.lastIndexOf(".");
+  return dotIndex > 0 ? basename.slice(dotIndex).toLowerCase() : noExtension;
+};
 
 /**
  * The language repo-dive attributes each source extension to. One map serves
@@ -13,23 +19,32 @@ export const noExtension = "(none)";
  * describes one file universe rather than each picking its own.
  */
 const languageByExtension: Record<string, string> = {
+  ".adoc": "AsciiDoc",
   ".astro": "Astro",
   ".c": "C",
   ".cc": "C++",
   ".cjs": "JavaScript",
+  ".clj": "Clojure",
   ".cmake": "CMake",
   ".cpp": "C++",
   ".cs": "C#",
   ".css": "CSS",
   ".cts": "TypeScript",
   ".cxx": "C++",
+  ".dart": "Dart",
+  ".erl": "Erlang",
+  ".ex": "Elixir",
+  ".exs": "Elixir",
   ".go": "Go",
   ".graphql": "GraphQL",
+  ".groovy": "Groovy",
   ".h": "C Header",
   ".hh": "C++ Header",
   ".hpp": "C++ Header",
+  ".hs": "Haskell",
   ".html": "HTML",
   ".java": "Java",
+  ".jl": "Julia",
   ".js": "JavaScript",
   ".jsx": "JSX",
   ".kt": "Kotlin",
@@ -40,6 +55,7 @@ const languageByExtension: Record<string, string> = {
   ".mdc": "Markdown",
   ".mdx": "Markdown",
   ".mjs": "JavaScript",
+  ".ml": "OCaml",
   ".mm": "Objective-C",
   ".mts": "TypeScript",
   ".php": "PHP",
@@ -49,9 +65,13 @@ const languageByExtension: Record<string, string> = {
   ".proto": "Protocol Buffers",
   ".ps1": "PowerShell",
   ".py": "Python",
+  ".pyi": "Python",
+  ".r": "R",
   ".rb": "Ruby",
   ".rs": "Rust",
+  ".rst": "reStructuredText",
   ".sass": "Sass",
+  ".scala": "Scala",
   ".scss": "Sass",
   ".sh": "Shell",
   ".sql": "SQL",
@@ -62,6 +82,7 @@ const languageByExtension: Record<string, string> = {
   ".vue": "Vue",
   ".yaml": "YAML",
   ".yml": "YAML",
+  ".zig": "Zig",
 };
 
 /**
