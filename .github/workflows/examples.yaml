@@ -53,7 +53,8 @@ jobs:
         with:
           name: cli
           path: dist/
-          retention-days: 1
+          # Same retention as the reports below, for re-runs to find it
+          retention-days: 7
 
       - name: List examples
         id: list
@@ -177,7 +178,10 @@ jobs:
         with:
           path: report/
           archive: false
-          retention-days: 1
+          # Longer than a day, as reports expire one by one: a re-run would
+          # otherwise deploy only the survivors and take the others offline.
+          # A week covers the gap until the next scheduled run
+          retention-days: 7
 
   deploy:
     name: Deploy to GitHub Pages
@@ -249,7 +253,7 @@ jobs:
         with:
           # Named per attempt: deploy-pages looks the artifact up across all
           # attempts of a run and refuses to deploy when the name is ambiguous,
-          # so with a fixed name, re-running this job could never succeed
+          # so with a fixed name, re-running this job would fail
           name: github-pages-${{ github.run_attempt }}
           path: _site/
 
