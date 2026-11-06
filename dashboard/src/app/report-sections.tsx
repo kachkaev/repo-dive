@@ -653,7 +653,7 @@ export function ReportSections({
           sibling. Gated on data the file chart can actually draw: per-language
           file counts (absent in dashboard.json written before they landed) or
           file-survival samples. */}
-      {(data.languages.some((row) => row.byLanguageFiles !== undefined) ||
+      {(data.fileTypes.some((row) => row.byLanguage !== undefined) ||
         (data.fileSurvival ?? []).length > 0) && (
         <FilesTimeline
           data={data}

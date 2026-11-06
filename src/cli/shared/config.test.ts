@@ -484,3 +484,154 @@ test("prettifyAuthorEmail shortens GitHub noreply addresses", () => {
   expect(prettifyAuthorEmail("bob@users.noreply.github.com")).toBe("bob");
   expect(prettifyAuthorEmail("carol@example.com")).toBe("carol@example.com");
 });
+
+test("resolveConfig classifies files by built-in rules out of the box", () => {
+  const { classify } = resolveInRepo({}).filePurposes;
+  expect(classify("src/app.ts")).toStrictEqual({
+    label: "Production",
+    source: true,
+  });
+  expect(classify("yarn.lock").label).toBe("Generated & vendored");
+});
+
+test("filePurposes rules run before the built-in ones", () => {
+  const { classify } = resolveInRepo({
+    filePurposes: {
+      rules: [
+        { paths: ["utils/**"], purpose: "tooling" },
+        {
+          paths: ["**/*.proto"],
+          purpose: { type: "custom", name: "Schemas", source: true },
+        },
+        { paths: ["utils/late.ts"], purpose: "docs" },
+      ],
+    },
+  }).filePurposes;
+  expect(classify("utils/check.py").label).toBe("Tooling");
+  // First match wins, among rules too.
+  expect(classify("utils/late.ts").label).toBe("Tooling");
+  expect(classify("api/a.proto")).toStrictEqual({
+    label: "Schemas",
+    source: true,
+  });
+  expect(classify("src/app.ts").label).toBe("Production");
+});
+
+test("filePurposes.skipBuiltInRules leaves the rest in Other", () => {
+  const { classify } = resolveInRepo({
+    filePurposes: {
+      skipBuiltInRules: true,
+      rules: [{ paths: ["lib/**"], purpose: "production" }],
+    },
+  }).filePurposes;
+  expect(classify("lib/a.c").label).toBe("Production");
+  expect(classify("src/app.ts")).toStrictEqual({
+    label: "Other",
+    source: false,
+  });
+});
+
+test("filePurposes lists custom purposes among their own side", () => {
+  const labels = resolveInRepo({
+    filePurposes: {
+      rules: [
+        {
+          paths: ["raw/**"],
+          purpose: { type: "custom", name: "Raw data", source: false },
+        },
+        {
+          paths: ["api/**"],
+          purpose: { type: "custom", name: "Schemas", source: true },
+        },
+      ],
+    },
+  }).filePurposes.all.map((purpose) => purpose.label);
+  expect(labels).toStrictEqual([
+    "Production",
+    "Tests",
+    "Docs",
+    "Examples",
+    "Tooling",
+    "AI instructions",
+    "Schemas",
+    "Test data",
+    "Assets",
+    "Generated & vendored",
+    "Raw data",
+    "Other",
+  ]);
+});
+
+const rulesKeyOf = (filePurposes: unknown) =>
+  resolveInRepo({ filePurposes }).filePurposes.rulesKey;
+
+test("filePurposes rulesKey follows the rules, not their presence alone", () => {
+  expect(rulesKeyOf(undefined)).toBe(rulesKeyOf({ rules: [] }));
+  expect(rulesKeyOf({ skipBuiltInRules: true })).not.toBe(rulesKeyOf({}));
+  expect(
+    rulesKeyOf({ rules: [{ paths: ["a/**"], purpose: "tests" }] }),
+  ).not.toBe(rulesKeyOf({}));
+});
+
+test.each([
+  [{ filePurposes: [] }, "`filePurposes` must be an object"],
+  [{ filePurposes: { skipBuiltInRules: "yes" } }, "must be a boolean"],
+  [{ filePurposes: { rules: {} } }, "must be an array"],
+  [{ filePurposes: { rules: ["a"] } }, "must be an object"],
+  [
+    { filePurposes: { rules: [{ paths: [], purpose: "tests" }] } },
+    "non-empty array of globs",
+  ],
+  [
+    { filePurposes: { rules: [{ paths: ["a"], purpose: "test" }] } },
+    '"production"',
+  ],
+  [
+    {
+      filePurposes: {
+        rules: [{ paths: ["a"], purpose: { type: "custom", source: true } }],
+      },
+    },
+    "`.name` must be a non-empty string",
+  ],
+  [
+    {
+      filePurposes: {
+        rules: [{ paths: ["a"], purpose: { type: "custom", name: "X" } }],
+      },
+    },
+    "`.source` must be a boolean",
+  ],
+  [
+    {
+      filePurposes: {
+        rules: [
+          {
+            paths: ["a"],
+            purpose: { type: "custom", name: "other", source: false },
+          },
+        ],
+      },
+    },
+    "is taken by a built-in purpose",
+  ],
+  [
+    {
+      filePurposes: {
+        rules: [
+          {
+            paths: ["a"],
+            purpose: { type: "custom", name: "X", source: true },
+          },
+          {
+            paths: ["b"],
+            purpose: { type: "custom", name: "X", source: false },
+          },
+        ],
+      },
+    },
+    "one `source` value across all rules",
+  ],
+])("resolveConfig rejects malformed filePurposes: %j", (raw, message) => {
+  expect(() => resolveInRepo(raw)).toThrow(message);
+});

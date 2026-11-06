@@ -84,7 +84,14 @@ export const runStatus = Effect.fn("runStatus")(function* ({
     const cacheKey = collectorCacheKey(collector, config);
     const collectedFlags = yield* Effect.forEach(
       [...targetShas],
-      (sha) => isCollected(catalog, sha, collector, cacheKey),
+      (sha) =>
+        isCollected(
+          catalog,
+          sha,
+          collector,
+          cacheKey,
+          config.filePurposes.rulesKey,
+        ),
       { concurrency: 16 },
     );
     const collected = collectedFlags.filter(Boolean).length;

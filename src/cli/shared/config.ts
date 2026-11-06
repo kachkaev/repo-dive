@@ -6,11 +6,19 @@ import { pathToFileURL } from "node:url";
 import { Effect, Predicate } from "effect";
 
 import {
+  builtInFilePurposes,
   type ChartId,
   chartIds,
   type ContributorKind,
+  type FilePurpose,
+  type FilePurposeRule,
   type WeekStart,
 } from "../../config.ts";
+import {
+  builtInFilePurposeDetails,
+  createFilePurposes,
+  type FilePurposes,
+} from "./file-purposes.ts";
 
 /** "12345+alice@users.noreply.github.com" → "alice"; other emails unchanged. */
 export const prettifyAuthorEmail = (email: string): string => {
@@ -150,6 +158,8 @@ export type ResolvedConfig = {
   readonly weekStartsOn: WeekStart;
   /** Markdown notes rendered in a callout above the chart they are keyed by. */
   readonly chartAnnotations: Readonly<Partial<Record<ChartId, string>>>;
+  /** What each file in the repository is for, and whether it counts as source. */
+  readonly filePurposes: FilePurposes;
   /** Absolute path of the catalog folder for this repository. */
   readonly catalogPath: string;
   /**
@@ -375,6 +385,98 @@ const parseChartAnnotations = (
   return annotations;
 };
 
+const parseFilePurpose = (value: unknown, at: string): FilePurpose => {
+  const builtIn = builtInFilePurposes.find((purpose) => purpose === value);
+  if (builtIn !== undefined) {
+    return builtIn;
+  }
+  if (!Predicate.isObject(value) || prop(value, "type") !== "custom") {
+    throw configError(
+      `${at} must be one of ${builtInFilePurposes.map((purpose) => JSON.stringify(purpose)).join(", ")}, or an object \`{ type: "custom", name, source }\`.`,
+    );
+  }
+  const name = parseOptionalString(prop(value, "name"), `${at}\`.name\``);
+  if (name === undefined) {
+    throw configError(`${at}\`.name\` must be a non-empty string.`);
+  }
+  const source = prop(value, "source");
+  if (typeof source !== "boolean") {
+    throw configError(`${at}\`.source\` must be a boolean.`);
+  }
+  return { type: "custom", name, source };
+};
+
+const parseFilePurposeRules = (value: unknown): FilePurposeRule[] => {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw configError("`filePurposes.rules` must be an array.");
+  }
+  const builtInLabels = new Set(
+    Object.values(builtInFilePurposeDetails).map((purpose) =>
+      purpose.label.toLowerCase(),
+    ),
+  );
+  /** Custom purpose name → the `source` the rules so far gave it. */
+  const customSources = new Map<string, boolean>();
+  return value.map((rule, index): FilePurposeRule => {
+    const at = `\`filePurposes.rules[${index}]\``;
+    if (!Predicate.isObject(rule)) {
+      throw configError(`${at} must be an object.`);
+    }
+    const paths = prop(rule, "paths");
+    if (
+      !Array.isArray(paths) ||
+      paths.length === 0 ||
+      paths.some((glob) => typeof glob !== "string" || glob.trim() === "")
+    ) {
+      throw configError(`${at}\`.paths\` must be a non-empty array of globs.`);
+    }
+    const purpose = parseFilePurpose(
+      prop(rule, "purpose"),
+      `${at}\`.purpose\``,
+    );
+    if (typeof purpose !== "string") {
+      if (builtInLabels.has(purpose.name.toLowerCase())) {
+        throw configError(
+          `${at}\`.purpose.name\` ${JSON.stringify(purpose.name)} is taken by a built-in purpose.`,
+        );
+      }
+      const earlierSource = customSources.get(purpose.name);
+      if (earlierSource !== undefined && earlierSource !== purpose.source) {
+        throw configError(
+          `custom file purpose ${JSON.stringify(purpose.name)} must have one \`source\` value across all rules, or a band would mix source files with others.`,
+        );
+      }
+      customSources.set(purpose.name, purpose.source);
+    }
+    return {
+      paths: paths.flatMap((glob: unknown) =>
+        typeof glob === "string" ? [glob] : [],
+      ),
+      purpose,
+    };
+  });
+};
+
+const parseFilePurposes = (value: unknown): FilePurposes => {
+  if (value !== undefined && !Predicate.isObject(value)) {
+    throw configError("`filePurposes` must be an object.");
+  }
+  const skipBuiltInRules =
+    value === undefined ? undefined : prop(value, "skipBuiltInRules");
+  if (skipBuiltInRules !== undefined && typeof skipBuiltInRules !== "boolean") {
+    throw configError("`filePurposes.skipBuiltInRules` must be a boolean.");
+  }
+  return createFilePurposes({
+    skipBuiltInRules: skipBuiltInRules ?? false,
+    rules: parseFilePurposeRules(
+      value === undefined ? undefined : prop(value, "rules"),
+    ),
+  });
+};
+
 /**
  * Resolves `catalog.dir` against the repository root. `gc` deletes whole
  * subtrees under the result, so the two placements that would take the
@@ -477,6 +579,7 @@ export const resolveConfig = (
     maxInCharts,
     weekStartsOn,
     chartAnnotations,
+    filePurposes: parseFilePurposes(prop(raw, "filePurposes")),
     catalogPath,
     catalogRelativePath: relativeCatalogPath(repoRoot, catalogPath),
     checkIgnoreFiles: parseCheckIgnoreFiles(

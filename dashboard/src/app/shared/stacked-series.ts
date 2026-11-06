@@ -18,27 +18,32 @@ export const otherColor = "var(--text-muted)";
  * be absent now (e.g. a package manager used before a migration): ranking by
  * each key's peak keeps it a named series across the whole timeline instead of
  * dropping it into "Other" the moment it disappears from the latest snapshot.
+ * Pass a list instead when a chart's series are a fixed vocabulary: they stack
+ * in that order, those a chart never draws are left out and nothing is folded.
  */
 export function shapeStacked(
   rows: ReadonlyArray<{ date: string; values: Record<string, number> }>,
   maxSeries: number,
-  rankBy: "latest" | "peak" = "latest",
+  rankBy: "latest" | "peak" | readonly string[] = "latest",
 ): { points: TimePoint[]; seriesKeys: string[]; colors: string[] } {
   const weights: Record<string, number> = {};
-  if (rankBy === "peak") {
+  if (rankBy === "latest") {
+    for (const [key, value] of Object.entries(rows.at(-1)?.values ?? {})) {
+      weights[key] = value;
+    }
+  } else {
     for (const row of rows) {
       for (const [key, value] of Object.entries(row.values)) {
         weights[key] = Math.max(weights[key] ?? 0, value);
       }
     }
-  } else {
-    for (const [key, value] of Object.entries(rows.at(-1)?.values ?? {})) {
-      weights[key] = value;
-    }
   }
-  const ranked = Object.keys(weights).toSorted(
-    (left, right) => (weights[right] ?? 0) - (weights[left] ?? 0),
-  );
+  const ranked =
+    typeof rankBy === "string"
+      ? Object.keys(weights).toSorted(
+          (left, right) => (weights[right] ?? 0) - (weights[left] ?? 0),
+        )
+      : rankBy.filter((key) => (weights[key] ?? 0) > 0);
   const kept = ranked.slice(0, maxSeries);
   const hasOther =
     ranked.length > maxSeries ||

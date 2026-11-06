@@ -261,9 +261,6 @@ const buildDashboardData = (
       sha: commit.sha.slice(0, 10),
       date: commit.committedAt,
       byLanguage: groupMetric(commit, "languages.lines", "language"),
-      // The same scan also counts files, so the file-count timeline gets its
-      // dense flat-by-language variant from data every catalog already holds.
-      byLanguageFiles: groupMetric(commit, "languages.files", "language"),
     }),
   );
 
@@ -274,6 +271,12 @@ const buildDashboardData = (
       date: commit.committedAt,
       totalFiles: sumMetric(commit, "files.count"),
       totalBytes: sumMetric(commit, "files.bytes"),
+      // Every file in the tree, so the file-count timeline covers what git
+      // tracks where the line-count one covers source files.
+      byLanguage: sumByKey(
+        groupMetric(commit, "files.count", "extension"),
+        languageOfExtension,
+      ),
     }),
   );
 
@@ -419,9 +422,10 @@ const buildDashboardData = (
 
   /**
    * One survival series — living lines or living files, the same shape at two
-   * grains: the units cross-tabulated by contributor (and by extension) and
-   * the year each was authored, so the dashboard can split a contributor's or
-   * language's area into year bands.
+   * grains: the units cross-tabulated by contributor, by extension and by
+   * purpose, and the year each was authored, so the dashboard can split any of
+   * those areas into year bands. Outputs collected before paths were kept say
+   * nothing of purposes, and their rows carry no purpose fields.
    */
   const survivalSeriesOf = (metric: "survival.lines" | "survival.files") =>
     composeSeries(
@@ -429,6 +433,7 @@ const buildDashboardData = (
       (commit) => {
         const byContributorYear: Record<string, Record<string, number>> = {};
         const byLanguageYear: Record<string, Record<string, number>> = {};
+        const byPurposeYear: Record<string, Record<string, number>> = {};
         for (const facts of commit.factsByCollector.values()) {
           for (const fact of facts) {
             if (fact.metric !== metric) {
@@ -446,6 +451,11 @@ const buildDashboardData = (
             );
             const languageYears = (byLanguageYear[language] ??= {});
             languageYears[year] = (languageYears[year] ?? 0) + fact.value;
+            const purpose = fact.categories?.["purpose"];
+            if (purpose !== undefined) {
+              const purposeYears = (byPurposeYear[purpose] ??= {});
+              purposeYears[year] = (purposeYears[year] ?? 0) + fact.value;
+            }
           }
         }
         return {
@@ -462,12 +472,24 @@ const buildDashboardData = (
             languageOfExtension,
           ),
           byLanguageYear,
+          ...(Object.keys(byPurposeYear).length > 0 && {
+            byPurpose: groupMetric(commit, metric, "purpose"),
+            byPurposeYear,
+          }),
         };
       },
     );
 
   const survival = survivalSeriesOf("survival.lines");
-  const fileSurvival = survivalSeriesOf("survival.files");
+  const allFileSurvival = survivalSeriesOf("survival.files");
+  // Older outputs only ever counted source files, so a catalog that `scan` is
+  // part-way through renewing would draw a cliff between the two: leave them
+  // out from the first new output on.
+  const fileSurvival = allFileSurvival.some(
+    (row) => row.byPurpose !== undefined,
+  )
+    ? allFileSurvival.filter((row) => row.byPurpose !== undefined)
+    : allFileSurvival;
 
   // One entry per person, whether they authored commits, only ever helped
   // with someone else's, or both — humans, bots and AI agents alike. The list
@@ -582,6 +604,7 @@ const buildDashboardData = (
           annotations: config.chartAnnotations,
         }),
       },
+      filePurposes: config.filePurposes.all,
     },
     repo: {
       // The remote is the name people know the repo by; the checkout directory
@@ -771,7 +794,12 @@ export const runIndex = Effect.fn("runIndex")(function* ({
             }
             throw error;
           }
-          factsByCollector.set(collectorName, collector.normalize(raw));
+          factsByCollector.set(
+            collectorName,
+            collector.normalize(raw, {
+              classifyFile: config.filePurposes.classify,
+            }),
+          );
         }
         const facts: CommitFacts = {
           sha: commit.hash,

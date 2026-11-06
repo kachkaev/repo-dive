@@ -1,9 +1,12 @@
+/** What `extensionOf` calls the extension of a file that has none. */
+export const noExtension = "(none)";
+
 /**
  * The language repo-dive attributes each source extension to. One map serves
  * every language-shaped view: the `languages` collector labels its per-file
- * line counts with it, `indexing` relabels the blame-based survival breakdown
- * with it, and its key set is what content-level collectors treat as source
- * (see `isScannableSourceFile`).
+ * line counts with it, `indexing` relabels the survival and file-count
+ * breakdowns with it, and its key set is what the built-in file purpose rules
+ * treat as source (see `file-purposes.ts`).
  *
  * Classifying by extension is an approximation — a real classifier reads the
  * file — but it is the same approximation everywhere, so every view of a repo
@@ -12,13 +15,18 @@
 const languageByExtension: Record<string, string> = {
   ".astro": "Astro",
   ".c": "C",
+  ".cc": "C++",
   ".cjs": "JavaScript",
+  ".cmake": "CMake",
   ".cpp": "C++",
   ".cs": "C#",
   ".css": "CSS",
   ".cts": "TypeScript",
+  ".cxx": "C++",
   ".go": "Go",
+  ".graphql": "GraphQL",
   ".h": "C Header",
+  ".hh": "C++ Header",
   ".hpp": "C++ Header",
   ".html": "HTML",
   ".java": "Java",
@@ -26,12 +34,20 @@ const languageByExtension: Record<string, string> = {
   ".jsx": "JSX",
   ".kt": "Kotlin",
   ".less": "LESS",
+  ".lua": "Lua",
+  ".m": "Objective-C",
   ".md": "Markdown",
+  ".mdc": "Markdown",
   ".mdx": "Markdown",
   ".mjs": "JavaScript",
+  ".mm": "Objective-C",
   ".mts": "TypeScript",
   ".php": "PHP",
+  ".pl": "Perl",
+  ".pm": "Perl",
   ".prisma": "Prisma",
+  ".proto": "Protocol Buffers",
+  ".ps1": "PowerShell",
   ".py": "Python",
   ".rb": "Ruby",
   ".rs": "Rust",
@@ -59,4 +75,6 @@ export const sourceExtensions: ReadonlySet<string> = new Set(
 
 /** Unknown extensions show up as themselves rather than disappearing. */
 export const languageOfExtension = (extension: string): string =>
-  languageByExtension[extension] ?? extension;
+  extension === noExtension
+    ? "No extension"
+    : (languageByExtension[extension] ?? extension);

@@ -165,20 +165,20 @@ test.concurrent(
         path.join(commitDir, "commit-meta", "output.json"),
         "utf8",
       );
-      expect(commitMeta).toMatch(/"subject": "Update hello, add readme"/);
-      expect(commitMeta).toMatch(/"authorEmail": "author@example\.com"/);
+      expect(commitMeta).toMatch(/"subject":"Update hello, add readme"/);
+      expect(commitMeta).toMatch(/"authorEmail":"author@example\.com"/);
 
       const churn = readFileSync(
         path.join(commitDir, "churn", "output.json"),
         "utf8",
       );
-      expect(churn).toMatch(/"filesChanged": 2/);
+      expect(churn).toMatch(/"filesChanged":2/);
 
       const fileTypes = readFileSync(
         path.join(commitDir, "file-types", "output.json"),
         "utf8",
       );
-      expect(fileTypes).toMatch(/"totalFiles": 2/);
+      expect(fileTypes).toMatch(/"totalFiles":2/);
 
       const secondRun = await runCli(
         "scan",
@@ -227,7 +227,7 @@ test.concurrent(
       );
       expect(
         readFileSync(path.join(headDir, "file-types", "output.json"), "utf8"),
-      ).toMatch(/"totalFiles": 2/);
+      ).toMatch(/"totalFiles":2/);
       // Writes go through a temporary file renamed into place
       expect(
         readdirSync(catalogPath, { encoding: "utf8", recursive: true }).filter(
@@ -244,6 +244,128 @@ test.concurrent(
       expect(indexRun.stdout).toMatch(
         /Skipped 1 incomplete outputs left by an interrupted scan\./,
       );
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  },
+);
+
+const purposeCollectors = "languages,file-types,survival,file-survival";
+
+test.concurrent(
+  "file purposes split the files chart and bound what counts as lines",
+  async () => {
+    const repoPath = mkdtempSync(path.join(os.tmpdir(), "repo-dive-test-"));
+    function write(relativePath: string, content: string) {
+      const filePath = path.join(repoPath, relativePath);
+      mkdirSync(path.dirname(filePath), { recursive: true });
+      writeFileSync(filePath, content);
+    }
+    /** Scans and indexes, returning the scan's summary and the newest samples. */
+    async function scanAndIndex() {
+      const scan = await runCli(
+        "scan",
+        "--repo",
+        repoPath,
+        "--collectors",
+        purposeCollectors,
+      );
+      expect(scan.status, scan.stderr).toBe(0);
+      const index = await runCli("index", "--repo", repoPath);
+      expect(index.status, index.stderr).toBe(0);
+      const dashboard: unknown = JSON.parse(
+        readFileSync(
+          path.join(repoPath, ".repo-dive", "index", "dashboard.json"),
+          "utf8",
+        ),
+      );
+      return {
+        scanOutput: scan.stdout,
+        lines: recordAt(arrayAt(dashboard, "survival").at(-1), "byPurpose"),
+        files: recordAt(arrayAt(dashboard, "fileSurvival").at(-1), "byPurpose"),
+        totalFiles: numberAt(
+          arrayAt(dashboard, "fileTypes").at(-1),
+          "totalFiles",
+        ),
+        byLanguage: recordAt(
+          arrayAt(dashboard, "languages").at(-1),
+          "byLanguage",
+        ),
+      };
+    }
+
+    try {
+      runGit(repoPath, "init", "-b", "main");
+      write("src/app.ts", "export const app = 1;\n");
+      write("src/app.test.ts", "test();\ntest();\n");
+      write("src/__snapshots__/app.snap", "a\nb\nc\n");
+      write("docs/guide.md", "# Guide\n");
+      write("docs/logo.png", "not really\n");
+      write(".claude/skills/a/SKILL.md", "# Skill\n");
+      write("yarn.lock", "x\ny\n");
+      write("package.json", "{}\n");
+      runGit(repoPath, "add", ".");
+      runGit(repoPath, "commit", "-m", "Add files");
+
+      const first = await scanAndIndex();
+      expect(first.files).toStrictEqual({
+        Production: 1,
+        Tests: 1,
+        "Test data": 1,
+        Docs: 1,
+        Assets: 1,
+        "AI instructions": 1,
+        "Generated & vendored": 1,
+        Other: 1,
+      });
+      expect(first.totalFiles).toBe(8);
+      // Every line belongs to a source purpose, and only those count.
+      expect(first.lines).toStrictEqual({
+        Production: 1,
+        Tests: 2,
+        Docs: 1,
+        "AI instructions": 1,
+      });
+      expect(first.byLanguage).toStrictEqual({
+        TypeScript: 3,
+        Markdown: 2,
+      });
+
+      // A rule within the source side needs nothing collected again.
+      write(
+        "repo-dive.config.mjs",
+        'export default { filePurposes: { rules: [{ paths: ["src/app.ts"], purpose: "tooling" }] } };\n',
+      );
+      const sameSide = await scanAndIndex();
+      expect(sameSide.scanOutput).toMatch(/Collector runs: 0 new/);
+      expect(sameSide.lines).toStrictEqual({
+        Tooling: 1,
+        Tests: 2,
+        Docs: 1,
+        "AI instructions": 1,
+      });
+
+      // A custom source purpose pulls a file across the boundary: its lines
+      // start to count, which takes collecting them.
+      write(
+        "repo-dive.config.mjs",
+        'export default { filePurposes: { rules: [{ paths: ["**/*.snap"], purpose: { type: "custom", name: "Snapshots", source: true } }] } };\n',
+      );
+      const crossing = await scanAndIndex();
+      expect(crossing.scanOutput).toMatch(/Collector runs: 2 new/);
+      expect(crossing.lines["Snapshots"]).toBe(3);
+      expect(crossing.files["Snapshots"]).toBe(1);
+      expect(crossing.files["Test data"]).toBeUndefined();
+
+      // Starting from scratch leaves anything unmatched in Other, and so
+      // uncounted — lines included.
+      write(
+        "repo-dive.config.mjs",
+        'export default { filePurposes: { skipBuiltInRules: true, rules: [{ paths: ["src/**"], purpose: "production" }] } };\n',
+      );
+      const scratch = await scanAndIndex();
+      expect(scratch.lines).toStrictEqual({ Production: 6 });
+      expect(scratch.files["Other"]).toBe(5);
     } finally {
       rmSync(repoPath, { force: true, recursive: true });
     }

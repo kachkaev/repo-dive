@@ -24,8 +24,32 @@ const humanCategoricalColors = categoricalColors.filter(
 );
 
 /**
- * One base color per language and per contributor, shared by every survival
- * timeline on the page. Both charts pass these to {@link SurvivalTimeline},
+ * Built-in file purposes keep one color in every repository, so that charts read
+ * alike from one report to the next. Test data sits in the green family of
+ * tests, AI instructions in the color AI agents have among contributors. Must
+ * match the labels in src/cli/shared/file-purposes.ts.
+ */
+const builtInPurposeColors: Record<string, string> = {
+  Production: "var(--series-1)",
+  Tests: "var(--series-2)",
+  Docs: "var(--series-3)",
+  Examples: "var(--series-5)",
+  Tooling: "var(--series-8)",
+  "AI instructions": kindColors.ai,
+  "Test data": "var(--series-14)",
+  Assets: "var(--series-13)",
+  "Generated & vendored": "var(--series-12)",
+  Other: otherColor,
+};
+
+/** What custom file purposes draw from: whatever no built-in one has reserved. */
+const customPurposeColors = categoricalColors.filter(
+  (color) => !Object.values(builtInPurposeColors).includes(color),
+);
+
+/**
+ * One base color per language, contributor and file purpose, shared by every
+ * survival timeline on the page. Both charts pass these to {@link SurvivalTimeline},
  * so a series keeps its color across "Lines of code" and "Number of files"
  * (and across each chart's flat and year-shaded variants). The `rank` is the
  * calling chart's own ranking, used only as a fallback for a label the scale
@@ -34,7 +58,12 @@ const humanCategoricalColors = categoricalColors.filter(
 export type SurvivalColorScales = {
   languageColorOf: (label: string, rank: number) => string;
   contributorColorOf: (label: string, rank: number) => string;
+  purposeColorOf: (label: string, rank: number) => string;
 };
+
+/** File purposes in stack order, as the data's config lists them. */
+export const filePurposeLabelsOf = (data: DashboardData): string[] =>
+  (data.config?.filePurposes ?? []).map((purpose) => purpose.label);
 
 /** Keys of a value record, largest value first — the order charts rank by. */
 const rankedKeys = (values: Record<string, number> | undefined): string[] =>
@@ -70,7 +99,7 @@ export function survivalColorScalesOf(
   // matching the page order of the charts the slots are anchored to.
   append(languageOrder, rankedKeys(data.languages.at(-1)?.byLanguage));
   append(languageOrder, rankedKeys(data.survival.at(-1)?.byLanguage));
-  append(languageOrder, rankedKeys(data.languages.at(-1)?.byLanguageFiles));
+  append(languageOrder, rankedKeys(data.fileTypes.at(-1)?.byLanguage));
   append(languageOrder, rankedKeys(data.fileSurvival?.at(-1)?.byLanguage));
 
   append(contributorOrder, rankedKeys(data.survival.at(-1)?.byContributor));
@@ -90,6 +119,9 @@ export function survivalColorScalesOf(
       .filter((label) => !Object.hasOwn(kindGroupSeriesColors, label))
       .map((label, slot) => [label, slot]),
   );
+  const customPurposes = (data.config?.filePurposes ?? [])
+    .map((purpose) => purpose.label)
+    .filter((label) => !Object.hasOwn(builtInPurposeColors, label));
 
   return {
     languageColorOf: (label, rank) => {
@@ -104,6 +136,17 @@ export function survivalColorScalesOf(
       const slot = humanSlots.get(label) ?? humanSlots.size + rank;
       return (
         humanCategoricalColors[slot % humanCategoricalColors.length] ??
+        otherColor
+      );
+    },
+    purposeColorOf: (label, rank) => {
+      const slot = customPurposes.indexOf(label);
+      return (
+        builtInPurposeColors[label] ??
+        customPurposeColors[
+          (slot === -1 ? customPurposes.length + rank : slot) %
+            customPurposeColors.length
+        ] ??
         otherColor
       );
     },

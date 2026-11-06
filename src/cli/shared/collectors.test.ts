@@ -3,12 +3,14 @@ import { expect, test } from "vitest";
 
 import { type Collector, collectorCacheKey } from "./collectors.ts";
 import type { ResolvedConfig } from "./config.ts";
+import { createFilePurposes } from "./file-purposes.ts";
 
 function config(maxInCharts: number): ResolvedConfig {
   return {
     maxInCharts,
     weekStartsOn: "monday",
     chartAnnotations: {},
+    filePurposes: createFilePurposes({ skipBuiltInRules: false, rules: [] }),
     catalogPath: "/repo/.repo-dive",
     catalogRelativePath: ".repo-dive",
     checkIgnoreFiles: true,

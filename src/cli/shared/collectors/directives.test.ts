@@ -6,6 +6,11 @@ import {
   scanFileForDirectives,
 } from "./directives.ts";
 
+/** None of these outputs depend on file purposes. */
+const context = {
+  classifyFile: () => ({ label: "Production", source: true }),
+};
+
 test("directives scanning classifies directives and pairs blocks", () => {
   const fileA = [
     "const a = 1;",
@@ -109,18 +114,21 @@ test("directives scanning counts oxlint comments apart from eslint ones", () => 
 });
 
 test("directives collector tags lint facts by linter, also for outputs collected before oxlint was counted", () => {
-  const facts = directivesCollector.normalize({
-    eslintNextLine: { count: 2, byRule: { "no-console": 2 } },
-    eslintLine: { count: 0, byRule: {} },
-    eslintBlocks: {
-      count: 1,
-      closedCount: 1,
-      unboundedCount: 0,
-      coveredLines: 4,
-      byRule: { "(all)": 1 },
+  const facts = directivesCollector.normalize(
+    {
+      eslintNextLine: { count: 2, byRule: { "no-console": 2 } },
+      eslintLine: { count: 0, byRule: {} },
+      eslintBlocks: {
+        count: 1,
+        closedCount: 1,
+        unboundedCount: 0,
+        coveredLines: 4,
+        byRule: { "(all)": 1 },
+      },
+      tsDirectives: { ignore: 1, expectError: 0, nocheck: 0 },
     },
-    tsDirectives: { ignore: 1, expectError: 0, nocheck: 0 },
-  });
+    context,
+  );
 
   expect(facts).toStrictEqual([
     {
@@ -150,7 +158,10 @@ test("directives collector tags lint facts by linter, also for outputs collected
 
   expect(
     directivesCollector
-      .normalize(scanFileForDirectives("// oxlint-disable-next-line no-var"))
+      .normalize(
+        scanFileForDirectives("// oxlint-disable-next-line no-var"),
+        context,
+      )
       .filter((fact) => fact.metric === "directives.lint"),
   ).toStrictEqual([
     {

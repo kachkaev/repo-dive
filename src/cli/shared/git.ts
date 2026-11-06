@@ -127,3 +127,50 @@ export const runCommandBytes = Effect.fn("runCommandBytes")(function* (
   }
   return result;
 }, Effect.scoped);
+
+/** One file in a commit's tree. */
+export type TreeBlob = {
+  readonly blobSha: string;
+  readonly filePath: string;
+  readonly sizeBytes: number;
+};
+
+/**
+ * Splits `git ls-tree -r -l -z` output into its files. Paths come out as they
+ * are, however unusual: without `-z`, git quotes any path holding a non-ASCII
+ * character. Gitlinks are skipped: a submodule's path can end in a source
+ * extension (ollama's `llm/llama.cpp`), yet it is not a file.
+ */
+export const parseTreeBlobs = (stdout: string): TreeBlob[] => {
+  const blobs: TreeBlob[] = [];
+  for (const entry of stdout.split("\0")) {
+    const tabIndex = entry.indexOf("\t");
+    if (tabIndex === -1) {
+      continue;
+    }
+    const [, type, blobSha = "", size = ""] = entry
+      .slice(0, tabIndex)
+      .split(/\s+/, 4);
+    if (type === "blob") {
+      blobs.push({
+        blobSha,
+        filePath: entry.slice(tabIndex + 1),
+        sizeBytes: Number(size) || 0,
+      });
+    }
+  }
+  return blobs;
+};
+
+/** Every file in a commit's tree. */
+export const listTreeBlobs = (
+  repoRoot: string,
+  sha: string,
+): Effect.Effect<
+  TreeBlob[],
+  CommandError,
+  ChildProcessSpawner.ChildProcessSpawner
+> =>
+  runGit(["-C", repoRoot, "ls-tree", "-r", "-l", "-z", sha]).pipe(
+    Effect.map(parseTreeBlobs),
+  );

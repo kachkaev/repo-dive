@@ -163,7 +163,7 @@ Collectors whose per-file result depends on **content alone** therefore compute 
 
 A collector opts in by calling one of the shared helpers instead of walking the tree itself, passing the `cacheKey` from its collect context so cached results share the collector's invalidation:
 
-- `scanTreeWithBlobCache` — every source-like file in the tree (extension allowlist, `node_modules`/`dist`/lockfiles excluded), for a `(content) => result` scan. Used by `directives` and `todo-comments`.
+- `scanTreeWithBlobCache` — every [source file](07-config.md#which-files-are-source) in the tree, for a `(content) => result` scan. Used by `directives` and `todo-comments`.
 - `scanTreeFilesWithBlobCache` — files selected by path predicate, for a `(content, filePath) => result` scan. Used by `dependencies` to parse lockfiles and `package.json` manifests.
 
 Both return one result per file path in the tree; merging those into the commit's raw output stays the collector's job.
@@ -183,11 +183,12 @@ Implemented, in `src/cli/shared/collectors/` (strategy, then default sampling wh
     Blob-cached.
     Emits `dependencies.resolved`, `dependencies.direct` and `dependencies.manifest`.
 1.  **todo-comments** (`tree`) — TODO/FIXME/HACK/XXX counts in source files. Blob-cached.
-1.  **languages** (`tree`) — lines and file count per language, counted in-process over the source files of the commit's tree and labelled from the shared extension → language map.
+1.  **languages** (`tree`) — lines and source file count per language, counted in-process over the source files of the commit's tree and labelled from the shared extension → language map.
     Blob-cached.
     It scans exactly the file set `survival` blames, so the dashboard's "Lines by language" chart shows the same totals with age shading on and off; an earlier version shelled out to `tokei`, which counted lockfiles and generated data the blame view could never account for.
-1.  **survival** (`tree`, `monthly`) — living lines by extension, author and authoring-month cohort, via `git blame --line-porcelain` per file. The expensive one.
-1.  **file-survival** (`tree`, `monthly`) — living files by extension, creator and creation-month cohort, from one rename-following `git log --name-status` walk per sample.
+1.  **survival** (`tree`, `monthly`) — living lines by file, author and authoring-month cohort, via `git blame --line-porcelain` per source file. The expensive one.
+    Its raw rows keep the file's path, in lookup tables that hold them to about the size per-extension rows took, so that `index` can tell [file purposes](07-config.md#filepurposes) without blaming anything again.
+1.  **file-survival** (`tree`, `monthly`) — living files by path, creator and creation-month cohort, from one rename-following `git log --name-status` walk per sample, for every file git tracks.
     A file belongs to the commit that created it until it is deleted: later edits never re-attribute it or move it to a newer cohort, and a rename keeps its origin.
     Emits `survival.files` into the same metric namespace as `survival` — the file grain of the same question, collected separately so either collector can bump its version without invalidating the other's outputs.
 

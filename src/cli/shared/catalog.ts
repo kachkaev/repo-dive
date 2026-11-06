@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { Data, DateTime, Effect } from "effect";
+import { Data, DateTime, Effect, Predicate } from "effect";
 
 import type { Collector } from "./collectors.ts";
 import { defaultCatalogDirName } from "./config.ts";
@@ -21,12 +21,23 @@ type CatalogManifest = {
   readonly createdAt: string;
 };
 
+/**
+ * Which source files an output covers: `pathsKey` hashes their paths, `rulesKey`
+ * names the file purpose rules that were last found to pick exactly those.
+ */
+export type SourceFilesStamp = {
+  readonly rulesKey: string;
+  readonly pathsKey: string;
+};
+
 type CollectorSidecar = {
   readonly collector: string;
   /** Human-readable version — kept for inspection; `cacheKey` is the real key. */
   readonly version: string;
   /** Cache fingerprint (version + relevant config) that decides re-collection. */
   readonly cacheKey: string;
+  /** Present for collectors that scan source files. */
+  readonly sourceFiles?: SourceFilesStamp;
   readonly completedAt: string;
   readonly durationMs: number;
 };
@@ -66,16 +77,15 @@ class CatalogFormatError extends Data.TaggedError("CatalogFormatError")<{
  * truncated one. A temporary file a cut-short write leaves behind is reused by
  * the next write of the same file.
  */
-const writeJson = (filePath: string, value: unknown) =>
+const writeText = (filePath: string, text: string) =>
   Effect.tryPromise(async () => {
     const temporaryPath = `${filePath}.tmp`;
-    await writeFile(
-      temporaryPath,
-      `${JSON.stringify(value, undefined, 2)}\n`,
-      "utf8",
-    );
+    await writeFile(temporaryPath, text, "utf8");
     await rename(temporaryPath, filePath);
   });
+
+const writeJson = (filePath: string, value: unknown) =>
+  writeText(filePath, `${JSON.stringify(value, undefined, 2)}\n`);
 
 const readTextIfExists = async (
   filePath: string,
@@ -219,20 +229,79 @@ export const readCollectorCacheKey = (
     path.join(collectorDir(catalog, sha, collectorName), "collector.json"),
   ).pipe(Effect.map(cacheKeyOf));
 
+const sidecarPath = (catalog: Catalog, sha: string, collectorName: string) =>
+  path.join(collectorDir(catalog, sha, collectorName), "collector.json");
+
+const sourceFilesStampOf = (sidecar: unknown): unknown =>
+  Predicate.isObject(sidecar) ? sidecar["sourceFiles"] : undefined;
+
 /**
  * A (commit, collector) pair is done when a sidecar recording the current cache
  * fingerprint exists. `cacheKey` folds in the collector version and any config
  * it depends on, so a version bump or a relevant config change re-collects it.
+ * A collector that scans source files must also have been run, or confirmed, for
+ * the current file purpose rules; `scan` can confirm one with
+ * {@link readSourceFilesPathsKey}, while a read-only caller takes it as pending.
  */
 export const isCollected = (
   catalog: Catalog,
   sha: string,
   collector: Collector,
   cacheKey: string,
+  sourceRulesKey: string,
 ): Effect.Effect<boolean, Error> =>
-  readCollectorCacheKey(catalog, sha, collector.name).pipe(
-    Effect.map((stored) => stored === cacheKey),
+  readJsonIfIntact(sidecarPath(catalog, sha, collector.name)).pipe(
+    Effect.map((sidecar) => {
+      if (cacheKeyOf(sidecar) !== cacheKey) {
+        return false;
+      }
+      if (!collector.scansSourceFiles) {
+        return true;
+      }
+      const stamp = sourceFilesStampOf(sidecar);
+      return Predicate.isObject(stamp) && stamp["rulesKey"] === sourceRulesKey;
+    }),
   );
+
+/**
+ * The hash of the source files an output of the current fingerprint covers, if
+ * there is such an output.
+ */
+export const readSourceFilesPathsKey = (
+  catalog: Catalog,
+  sha: string,
+  collector: Collector,
+  cacheKey: string,
+): Effect.Effect<unknown, Error> =>
+  readJsonIfIntact(sidecarPath(catalog, sha, collector.name)).pipe(
+    Effect.map((sidecar) => {
+      const stamp = sourceFilesStampOf(sidecar);
+      return cacheKeyOf(sidecar) === cacheKey && Predicate.isObject(stamp)
+        ? stamp["pathsKey"]
+        : undefined;
+    }),
+  );
+
+/**
+ * Records that new rules pick the very source files an output already covers, so
+ * the next scan need not list the commit's tree to find that out again.
+ */
+export const confirmSourceRules = (
+  catalog: Catalog,
+  sha: string,
+  collector: Collector,
+  sourceFiles: SourceFilesStamp,
+): Effect.Effect<void, Error> => {
+  const filePath = sidecarPath(catalog, sha, collector.name);
+  return readJsonIfIntact(filePath).pipe(
+    Effect.flatMap((sidecar) =>
+      writeJson(filePath, {
+        ...(Predicate.isObject(sidecar) && sidecar),
+        sourceFiles,
+      }),
+    ),
+  );
+};
 
 export const writeCollectorOutput = Effect.fn("writeCollectorOutput")(
   function* ({
@@ -240,6 +309,7 @@ export const writeCollectorOutput = Effect.fn("writeCollectorOutput")(
     sha,
     collector,
     cacheKey,
+    sourceFiles,
     output,
     durationMs,
   }: {
@@ -247,17 +317,20 @@ export const writeCollectorOutput = Effect.fn("writeCollectorOutput")(
     readonly sha: string;
     readonly collector: Collector;
     readonly cacheKey: string;
+    readonly sourceFiles?: SourceFilesStamp | undefined;
     readonly output: unknown;
     readonly durationMs: number;
   }): Effect.fn.Return<void, Error> {
     const dir = collectorDir(catalog, sha, collector.name);
     yield* Effect.tryPromise(() => mkdir(dir, { recursive: true }));
-    yield* writeJson(path.join(dir, "output.json"), output);
+    // Unindented: indenting would inflate path-keyed survival rows several times.
+    yield* writeText(path.join(dir, "output.json"), JSON.stringify(output));
     const now = yield* DateTime.now;
     yield* writeJson(path.join(dir, "collector.json"), {
       collector: collector.name,
       version: collector.version,
       cacheKey,
+      ...(sourceFiles !== undefined && { sourceFiles }),
       completedAt: DateTime.formatIso(now),
       durationMs,
     } satisfies CollectorSidecar);

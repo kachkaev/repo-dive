@@ -71,15 +71,15 @@ Collectors so far:
 - **directives** — `eslint-disable` and `oxlint-disable` comments by linter and rule (block disables tracked as gray areas) and `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck`
 - **dependencies** — resolved package totals from lockfiles, per package manager (pnpm, npm, yarn classic and yarn berry), plus direct/dev/optional dependencies and manifest counts read straight from `package.json` files; version-aware, monorepo-aware and extensible to more managers
 - **todo-comments** — TODO/FIXME/HACK/XXX counts
-- **languages** — lines and file count per language across a commit's source files (lockfiles, minified bundles and generated data excluded)
-- **survival** — `git blame` line survival by extension, author and age cohort (sampled monthly)
-- **file-survival** — file survival by extension, creator and creation cohort, renames followed (sampled monthly)
+- **languages** — lines and file count per language across a commit's source files (test data, assets, generated and vendored files excluded)
+- **survival** — `git blame` line survival by file, author and age cohort (sampled monthly)
+- **file-survival** — file survival by file, creator and creation cohort, for every tracked file, renames followed (sampled monthly)
 
 The catalog hides itself from git, but other tools that walk the repository (prettier, markdownlint, cspell, docker builds) each read one ignore file at its root.
 `scan` warns when the catalog is missing from those; `repo-dive ignore` adds it to every one that needs it, writing the entry in the shape the file is already written in and skipping the files whose tool learns about the catalog elsewhere.
 
 `index` normalizes raw snapshots into `.repo-dive/index/metrics.sqlite` — a facts-by-categories cube, rebuildable at any time — plus `dashboard.json`.
-`dashboard` then serves a local React app with interactive charts: languages over time, file counts over time, a GitHub-style commit calendar, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
+`dashboard` then serves a local React app with interactive charts: languages over time, file counts over time, a split of both by file purpose (production, tests, docs, …), a GitHub-style commit calendar, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
 
 ## Configuration
 
@@ -108,6 +108,16 @@ export default defineConfig({
     // First day of the week in calendar-shaped charts (default "monday").
     weekStartsOn: "monday",
   },
+  filePurposes: {
+    // What files are for, ahead of the built-in rules. A custom purpose says whether its lines count.
+    rules: [
+      { paths: ["utils/**"], purpose: "tooling" },
+      {
+        paths: ["**/*.proto"],
+        purpose: { type: "custom", name: "Schemas", source: true },
+      },
+    ],
+  },
   catalog: {
     // Where snapshots, caches and the cube live (default ".repo-dive").
     dir: ".repo-dive",
@@ -119,8 +129,9 @@ export default defineConfig({
 `contributors.aliases` merges the multiple identities one person commits under (work + personal email, GitHub noreply, name variants) so attribution, the contributors table and code-survival-by-contributor count them once.
 A group can also carry a `displayName`, a profile `url` and a `kind` (`human`/`bot`/`ai`, otherwise auto-derived).
 The dashboard badges bots and AI agents, listing them apart from humans.
+`filePurposes` refines how files sort into Production, Tests, Docs, Examples, Tooling, AI instructions, Test data, Assets, Generated & vendored and Other, and `skipBuiltInRules: true` starts that from scratch; "Lines of code" counts the first six and "Number of files" counts all of them.
 `catalog.dir` moves the catalog; point it outside the repository (e.g. `"../repo-dive-catalogs/my-repo"`) to leave the analyzed working tree untouched altogether, ignore files included.
-Apart from `catalog`, which every command needs, the config is read by `index`.
+Apart from `catalog`, which every command needs, and `filePurposes`, which `scan` needs too, the config is read by `index`.
 See [docs/specs/07-config.md](docs/specs/07-config.md) for details.
 
 ## GitHub Action

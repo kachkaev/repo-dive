@@ -73,7 +73,7 @@ const buildSchemaDescription = Effect.fn("buildSchemaDescription")(function* (
     hints: [
       "Join facts to commits via commit_sha to plot anything over time.",
       "Pick the date by the shape of the question. Measuring the tree at points in time (languages.*, files.*, dependencies.*, directives.*, survival.lines totals)? Order by committed_at — authored_at can run months behind and does not increase along the history, so a rebased repo plots as a zigzag. Counting commits or lines of work per day/month/author? Bucket by authored_at — that is when the work was done, and it is the clock survival's cohort category is already on.",
-      "categories is open-ended: keys differ per metric (language, extension, author, rule, cohort, …).",
+      "categories is open-ended: keys differ per metric (language, extension, author, rule, cohort, purpose, …).",
       "Sampled collectors (languages.*, survival.*) only have facts at sampled commits.",
     ],
   };
