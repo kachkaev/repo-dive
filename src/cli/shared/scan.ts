@@ -36,6 +36,7 @@ import {
   samplingLabel,
   type SamplingPolicy,
 } from "./sampling.ts";
+import { type ScanProgress, withScanProgress } from "./scan/scan-progress.ts";
 import { withTemporaryWorktree } from "./scan/with-temporary-worktree.ts";
 
 export type CommitMeta = {
@@ -541,6 +542,7 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
   cacheKeyOf,
   filePurposes,
   force,
+  track,
 }: {
   readonly catalog: Catalog;
   readonly sha: string;
@@ -548,6 +550,7 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
   readonly cacheKeyOf: (collector: Collector) => string;
   readonly filePurposes: FilePurposes;
   readonly force: boolean;
+  readonly track: ScanProgress["track"];
 }): Effect.fn.Return<
   CommitOutcome,
   Error,
@@ -609,17 +612,22 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
   const needingWorktree = pending.filter(
     (collector) => collector.strategy === "worktree",
   );
+  const labelOf = (collector: Collector): string =>
+    `${collector.name} on ${sha.slice(0, 10)}`;
 
   let run = 0;
   for (const collector of direct) {
-    const failure = yield* runCollector({
-      catalog,
-      sha,
-      collector,
-      cacheKey: cacheKeyOf(collector),
-      filePurposes,
-      sourceFiles,
-    }).pipe(
+    const failure = yield* track(
+      labelOf(collector),
+      runCollector({
+        catalog,
+        sha,
+        collector,
+        cacheKey: cacheKeyOf(collector),
+        filePurposes,
+        sourceFiles,
+      }),
+    ).pipe(
       Effect.as(undefined),
       Effect.catch((error) => Effect.succeed(error.message)),
     );
@@ -636,15 +644,18 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
       sha,
       (worktreePath) =>
         Effect.forEach(needingWorktree, (collector) =>
-          runCollector({
-            catalog,
-            sha,
-            collector,
-            cacheKey: cacheKeyOf(collector),
-            filePurposes,
-            sourceFiles,
-            worktreePath,
-          }).pipe(
+          track(
+            labelOf(collector),
+            runCollector({
+              catalog,
+              sha,
+              collector,
+              cacheKey: cacheKeyOf(collector),
+              filePurposes,
+              sourceFiles,
+              worktreePath,
+            }),
+          ).pipe(
             Effect.as(undefined),
             Effect.catch((error) => Effect.succeed(error.message)),
           ),
@@ -783,122 +794,143 @@ export const runScan = Effect.fn("runScan")(function* ({
   // Batch phase: collectors that can cover many commits per subprocess do so
   // up front; whatever they produced is excluded from the per-commit phase.
   const batchDone = new Map<string, ReadonlySet<string>>();
-  for (const plan of plans) {
-    const { collector } = plan;
-    if (!collector.collectBatch) {
-      continue;
-    }
-    const pending = new Set<string>();
-    for (const sha of plan.shas) {
-      if (
-        force ||
-        !(yield* isCollected(
-          catalog,
-          sha,
-          collector,
-          cacheKeyOf(collector),
-          config.filePurposes.rulesKey,
-        ))
-      ) {
-        pending.add(sha);
-      }
-    }
-    totalSkipped += plan.shas.size - pending.size;
-    if (pending.size === 0) {
-      batchDone.set(collector.name, plan.shas);
-      continue;
-    }
-
-    const [batchDuration, outputs] = yield* collector
-      .collectBatch({ repoRoot, shas: pending })
-      .pipe(
-        Effect.catch((error) => {
-          failures.push(`Batch ${collector.name}: ${error.message}`);
-          return Effect.succeed(new Map<string, unknown>());
-        }),
-        Effect.timed,
-      );
-    const durationMs = Math.max(
-      1,
-      Math.round(Duration.toMillis(batchDuration) / Math.max(1, outputs.size)),
-    );
-
-    const written = new Set(
-      yield* Effect.forEach(
-        outputs.entries().toArray(),
-        ([sha, output]) =>
-          writeCollectorOutput({
-            catalog,
-            sha,
-            collector,
-            cacheKey: cacheKeyOf(collector),
-            output,
-            durationMs,
-          }).pipe(Effect.as(sha)),
-        { concurrency: 16 },
-      ),
-    );
-    totalRun += written.size;
-
-    const done = new Set(plan.shas);
-    for (const sha of pending) {
-      if (!written.has(sha)) {
-        done.delete(sha); // fall back to per-commit collect()
-      }
-    }
-    batchDone.set(collector.name, done);
-    if (written.size > 0) {
-      yield* Console.log(
-        `Batched ${collector.name}: ${written.size} commits in one pass.`,
-      );
-    }
-  }
-
-  const startedAt = yield* Clock.currentTimeMillis;
-
-  const formatEta = (processed: number, now: number): string => {
-    const elapsedSeconds = (now - startedAt) / 1000;
-    const rate = processed / Math.max(1, elapsedSeconds);
-    const remainingSeconds = Math.round(
-      (selected.length - processed) / Math.max(0.01, rate),
-    );
-    return `${Math.round(rate)}/s, ~${formatTimeLeft(remainingSeconds)} left`;
-  };
-
   const processedRef = yield* Ref.make(0);
-  const outcomes = yield* Effect.forEach(
-    selected,
-    (commit) =>
-      collectCommit({
-        catalog,
-        sha: commit.hash,
-        collectors: plans
-          .filter(
-            (plan) =>
-              plan.shas.has(commit.hash) &&
-              !batchDone.get(plan.collector.name)?.has(commit.hash),
-          )
-          .map((plan) => plan.collector),
-        cacheKeyOf,
-        filePurposes: config.filePurposes,
-        force,
-      }).pipe(
-        Effect.tap(() =>
-          Effect.gen(function* () {
-            const processed = yield* Ref.updateAndGet(
-              processedRef,
-              (count) => count + 1,
-            );
-            if (processed % 250 === 0) {
-              const now = yield* Clock.currentTimeMillis;
-              yield* Console.log(
-                `Scanned ${processed}/${selected.length} commits (${formatEta(processed, now)})…`,
-              );
-            }
-          }),
-        ),
+  const outcomes = yield* withScanProgress(
+    Ref.get(processedRef).pipe(
+      Effect.map(
+        (processed) => `Scanned ${processed}/${selected.length} commits`,
       ),
-    { concurrency: 4 },
+    ),
+    (progress) =>
+      Effect.gen(function* () {
+        for (const plan of plans) {
+          const { collector } = plan;
+          if (!collector.collectBatch) {
+            continue;
+          }
+          const pending = new Set<string>();
+          for (const sha of plan.shas) {
+            if (
+              force ||
+              !(yield* isCollected(
+                catalog,
+                sha,
+                collector,
+                cacheKeyOf(collector),
+                config.filePurposes.rulesKey,
+              ))
+            ) {
+              pending.add(sha);
+            }
+          }
+          totalSkipped += plan.shas.size - pending.size;
+          if (pending.size === 0) {
+            batchDone.set(collector.name, plan.shas);
+            continue;
+          }
+
+          const [batchDuration, outputs] = yield* progress.track(
+            `${collector.name} on ${pending.size} commits`,
+            collector.collectBatch({ repoRoot, shas: pending }).pipe(
+              Effect.catch((error) => {
+                failures.push(`Batch ${collector.name}: ${error.message}`);
+                return Effect.succeed(new Map<string, unknown>());
+              }),
+              Effect.timed,
+            ),
+          );
+          const durationMs = Math.max(
+            1,
+            Math.round(
+              Duration.toMillis(batchDuration) / Math.max(1, outputs.size),
+            ),
+          );
+
+          const written = new Set(
+            yield* Effect.forEach(
+              outputs.entries().toArray(),
+              ([sha, output]) =>
+                writeCollectorOutput({
+                  catalog,
+                  sha,
+                  collector,
+                  cacheKey: cacheKeyOf(collector),
+                  output,
+                  durationMs,
+                }).pipe(Effect.as(sha)),
+              { concurrency: 16 },
+            ),
+          );
+          totalRun += written.size;
+
+          const done = new Set(plan.shas);
+          for (const sha of pending) {
+            if (!written.has(sha)) {
+              done.delete(sha); // fall back to per-commit collect()
+            }
+          }
+          batchDone.set(collector.name, done);
+          if (written.size > 0) {
+            yield* progress.log(
+              `Batched ${collector.name}: ${written.size} commits in one pass.`,
+            );
+          }
+        }
+
+        const startedAt = yield* Clock.currentTimeMillis;
+
+        const rateAt = (processed: number, now: number): number =>
+          processed / Math.max(1, (now - startedAt) / 1000);
+
+        const formatEta = (processed: number, now: number): string => {
+          const rate = rateAt(processed, now);
+          const remainingSeconds = Math.round(
+            (selected.length - processed) / Math.max(0.01, rate),
+          );
+          return `${Math.round(rate)}/s, ~${formatTimeLeft(remainingSeconds)} left`;
+        };
+
+        return yield* Effect.forEach(
+          selected,
+          (commit) =>
+            collectCommit({
+              catalog,
+              sha: commit.hash,
+              collectors: plans
+                .filter(
+                  (plan) =>
+                    plan.shas.has(commit.hash) &&
+                    !batchDone.get(plan.collector.name)?.has(commit.hash),
+                )
+                .map((plan) => plan.collector),
+              cacheKeyOf,
+              filePurposes: config.filePurposes,
+              force,
+              track: progress.track,
+            }).pipe(
+              Effect.tap(() =>
+                Effect.gen(function* () {
+                  const processed = yield* Ref.updateAndGet(
+                    processedRef,
+                    (count) => count + 1,
+                  );
+                  if (processed === selected.length) {
+                    const now = yield* Clock.currentTimeMillis;
+                    yield* progress.log(
+                      `Scanned ${processed}/${selected.length} commits (${Math.round(rateAt(processed, now))}/s).`,
+                    );
+                  } else if (processed % 250 === 0) {
+                    const now = yield* Clock.currentTimeMillis;
+                    yield* progress.log(
+                      `Scanned ${processed}/${selected.length} commits (${formatEta(processed, now)})…`,
+                    );
+                  }
+                }),
+              ),
+            ),
+          { concurrency: 4 },
+        );
+      }),
   );
 
   for (const outcome of outcomes) {
