@@ -1,5 +1,14 @@
 # repo-dive
 
+## 0.19.0
+
+### Minor Changes
+
+- [#349](https://github.com/kachkaev/repo-dive/pull/349) [`3629604`](https://github.com/kachkaev/repo-dive/commit/3629604592d7e04728c5128621ae3a4f83e6d538) - Add a by-purpose split to the lines and files charts.
+  Files now sort by path into Production, Tests, Docs, Examples, Tooling, AI instructions, Test data, Assets, Generated & vendored and Other, and the new `filePurposes` config adds rules, typed custom purposes or a clean slate with `skipBuiltInRules`.
+  "Number of files" now counts every file git tracks, while "Lines of code" counts the first six purposes, so effect's `Generated.ts` no longer counts while Perl, Scala, Dart and several other languages now do.
+  Existing catalogs need one `repo-dive scan`, which blames the sampled commits again.
+
 ## 0.18.4
 
 ### Patch Changes
