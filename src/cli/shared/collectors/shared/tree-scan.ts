@@ -2,40 +2,14 @@ import { Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/process";
 
 import { getBlobCache } from "../../blob-cache.ts";
-import { runCommandBytes, runGit } from "../../git.ts";
-import { isScannableSourceFile } from "./types.ts";
+import { listTreeBlobs, runCommandBytes } from "../../git.ts";
 
-const maxBlobBytes = 2 * 1024 * 1024;
-
-type TreeBlob = {
-  readonly blobSha: string;
-  readonly filePath: string;
-};
-
-/** Source files (per {@link isScannableSourceFile}) in a commit's tree with their blob ids. */
-const listSourceBlobs = (
-  repoRoot: string,
-  sha: string,
-): Effect.Effect<TreeBlob[], Error, ChildProcessSpawner.ChildProcessSpawner> =>
-  runGit(["-C", repoRoot, "ls-tree", "-r", sha]).pipe(
-    Effect.map((stdout) => {
-      const blobs: TreeBlob[] = [];
-      for (const line of stdout.split("\n")) {
-        const tabIndex = line.indexOf("\t");
-        if (tabIndex === -1) {
-          continue;
-        }
-        const filePath = line.slice(tabIndex + 1);
-        const [, type = "", blobSha = ""] = line
-          .slice(0, tabIndex)
-          .split(" ", 3);
-        if (type === "blob" && blobSha && isScannableSourceFile(filePath)) {
-          blobs.push({ blobSha, filePath });
-        }
-      }
-      return blobs;
-    }),
-  );
+/**
+ * Text this large is practically never written by hand, and every source file
+ * at or past it in the example repositories turned out to be bundled or
+ * vendored. Such a file still counts as a file, but none of its lines do.
+ */
+export const maxBlobBytes = 2 * 1024 * 1024;
 
 const decoder = new TextDecoder("utf-8", { fatal: false });
 const newline = 10;
@@ -73,7 +47,7 @@ const fetchBlobContents = (
             if (!Number.isSafeInteger(size)) {
               continue;
             }
-            if (type === "blob" && size <= maxBlobBytes) {
+            if (type === "blob") {
               contents.set(
                 sha,
                 decoder.decode(bytes.subarray(offset, offset + size)),
@@ -103,6 +77,7 @@ export const scanTreeWithBlobCache = Effect.fnUntraced(function* ({
   sha,
   collectorName,
   cacheKey,
+  isSourceFile,
   scanContent,
 }: {
   readonly repoRoot: string;
@@ -111,6 +86,7 @@ export const scanTreeWithBlobCache = Effect.fnUntraced(function* ({
   readonly collectorName: string;
   /** The collector's cache fingerprint (see {@link CollectContext.cacheKey}). */
   readonly cacheKey: string;
+  readonly isSourceFile: (filePath: string) => boolean;
   /** Pure per-file scan; its JSON-encoded result is what gets cached. */
   readonly scanContent: (content: string) => unknown;
 }): Effect.fn.Return<
@@ -118,7 +94,11 @@ export const scanTreeWithBlobCache = Effect.fnUntraced(function* ({
   Error,
   ChildProcessSpawner.ChildProcessSpawner
 > {
-  const blobs = yield* listSourceBlobs(repoRoot, sha);
+  // Sizes are known up front, so a blob too large to scan is never even read: a
+  // rule can make anything source, a 400 MB model file included.
+  const blobs = (yield* listTreeBlobs(repoRoot, sha)).filter(
+    (blob) => isSourceFile(blob.filePath) && blob.sizeBytes <= maxBlobBytes,
+  );
   const cache = getBlobCache(catalogPath);
 
   const memoKey = (blobSha: string) =>

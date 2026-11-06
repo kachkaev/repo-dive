@@ -1,28 +1,8 @@
 import { Effect } from "effect";
 
-import { arrayAt, numberAt, stringAt } from "../../../shared/json.ts";
-import { runGit } from "../git.ts";
-import {
-  cohortMonthOf,
-  type Collector,
-  extensionOf,
-  type Fact,
-  isScannableSourceFile,
-} from "./shared/types.ts";
-
-type FileSurvivalRow = {
-  readonly extension: string;
-  /** Author of the commit that created the file. */
-  readonly authorEmail: string;
-  /** YYYY-MM the creating commit was authored — the file's age cohort. */
-  readonly cohortMonth: string;
-  readonly files: number;
-};
-
-type FileSurvivalOutput = {
-  readonly rows: readonly FileSurvivalRow[];
-  readonly totalFiles: number;
-};
+import { listTreeBlobs, runGit } from "../git.ts";
+import { encodePathRows, normalizePathRows } from "./shared/path-rows.ts";
+import { cohortMonthOf, type Collector } from "./shared/types.ts";
 
 /** Between the fields of one commit header in the log stream. */
 const fieldSeparator = "";
@@ -121,8 +101,8 @@ export const resolveFileOrigins = (
 };
 
 /**
- * When a file was created and by whom, for every source file alive at a
- * commit. The granular sibling of `survival`: where that collector asks which
+ * When a file was created and by whom, for every file alive at a commit,
+ * whatever its purpose. The granular sibling of `survival`: where that collector asks which
  * *lines* still live, this one only asks whether the *file* still exists —
  * edits after creation neither re-attribute a file nor move it to a newer
  * cohort, and only a deletion ends it.
@@ -136,26 +116,16 @@ export const resolveFileOrigins = (
 export const fileSurvivalCollector: Collector = {
   name: "file-survival",
   description:
-    "File survival via git log: living files by extension, creator and creation cohort, renames followed (sampled monthly by default)",
-  version: "1",
+    "File survival via git log: living files by path, creator and creation cohort, renames followed (sampled monthly by default)",
+  // 1 → 2: every file rather than source files alone, each row holding its path
+  // so that `index` can tell the purposes of the files.
+  version: "2",
   strategy: "tree",
   defaultSampling: "monthly",
   collect: Effect.fnUntraced(function* ({ repoRoot, sha }) {
-    // Blobs only: a submodule is a gitlink entry whose path can end in a
-    // source extension (ollama's `llm/llama.cpp`), yet it is not a file.
-    const fileList = yield* runGit(["-C", repoRoot, "ls-tree", "-r", sha]);
-    const files: string[] = [];
-    for (const line of fileList.split("\n")) {
-      const tabIndex = line.indexOf("\t");
-      if (tabIndex === -1) {
-        continue;
-      }
-      const [, type] = line.slice(0, tabIndex).split(/\s+/, 2);
-      const filePath = line.slice(tabIndex + 1);
-      if (type === "blob" && isScannableSourceFile(filePath)) {
-        files.push(filePath);
-      }
-    }
+    const files = (yield* listTreeBlobs(repoRoot, sha)).map(
+      (blob) => blob.filePath,
+    );
 
     // One pass over the history reachable from the snapshot. `--topo-order`
     // keeps children ahead of parents, so of a delete-and-recreate pair the
@@ -166,6 +136,11 @@ export const fileSurvivalCollector: Collector = {
     const log = yield* runGit([
       "-C",
       repoRoot,
+      // Spells non-ASCII paths the way the tree listing does. A path git still
+      // has to quote (a tab or a quote in it) keeps its file counted, under
+      // the empty attribution below.
+      "-c",
+      "core.quotePath=false",
       "log",
       "--topo-order",
       "-M",
@@ -175,37 +150,29 @@ export const fileSurvivalCollector: Collector = {
     ]);
     const origins = resolveFileOrigins(log, files);
 
-    const counts = new Map<string, number>();
-    for (const filePath of files) {
-      // An unresolved origin (history boundary, undetected rename) keeps the
-      // file counted — it exists — under empty attribution.
-      const origin = origins.get(filePath);
-      const key = [
-        extensionOf(filePath),
-        origin?.authorEmail ?? "",
-        origin?.cohortMonth ?? "",
-      ].join(fieldSeparator);
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-
-    const rows: FileSurvivalRow[] = [...counts].map(([key, fileCount]) => {
-      const [extension = "", authorEmail = "", cohortMonth = ""] =
-        key.split(fieldSeparator);
-      return { extension, authorEmail, cohortMonth, files: fileCount };
-    });
-
-    return { rows, totalFiles: files.length } satisfies FileSurvivalOutput;
+    // An unresolved origin (history boundary, undetected rename) keeps the
+    // file counted — it exists — under empty attribution.
+    return {
+      ...encodePathRows(
+        files.map((filePath) => {
+          const origin = origins.get(filePath);
+          return {
+            filePath,
+            authorEmail: origin?.authorEmail ?? "",
+            cohortMonth: origin?.cohortMonth ?? "",
+            count: 1,
+          };
+        }),
+      ),
+      totalFiles: files.length,
+    };
   }),
-  normalize: (raw) => {
-    const facts: Fact[] = Array.from(arrayAt(raw, "rows"), (row) => ({
+  normalize: (raw, context) =>
+    normalizePathRows({
+      raw,
       metric: "survival.files",
-      value: numberAt(row, "files"),
-      categories: {
-        extension: stringAt(row, "extension"),
-        author: stringAt(row, "authorEmail"),
-        cohort: stringAt(row, "cohortMonth"),
-      },
-    }));
-    return facts;
-  },
+      legacyValueKey: "files",
+      context,
+      sourceFilesOnly: false,
+    }),
 };

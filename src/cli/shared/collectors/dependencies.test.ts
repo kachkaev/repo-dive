@@ -2,23 +2,31 @@ import { expect, test } from "vitest";
 
 import { dependenciesCollector } from "./dependencies.ts";
 
+/** None of these outputs depend on file purposes. */
+const context = {
+  classifyFile: () => ({ label: "Production", source: true }),
+};
+
 test("dependencies collector normalizes lockfiles and manifests into facts", () => {
-  const facts = dependenciesCollector.normalize({
-    lockfiles: [
-      {
-        path: "pnpm-lock.yaml",
-        packageManager: "pnpm",
-        lockfileVersion: "9.0",
-        resolvedCount: 741,
-      },
-    ],
-    manifests: [
-      {
-        path: "package.json",
-        direct: { prod: 4, dev: 36, optional: 0 },
-      },
-    ],
-  });
+  const facts = dependenciesCollector.normalize(
+    {
+      lockfiles: [
+        {
+          path: "pnpm-lock.yaml",
+          packageManager: "pnpm",
+          lockfileVersion: "9.0",
+          resolvedCount: 741,
+        },
+      ],
+      manifests: [
+        {
+          path: "package.json",
+          direct: { prod: 4, dev: 36, optional: 0 },
+        },
+      ],
+    },
+    context,
+  );
 
   expect(facts).toStrictEqual([
     {
@@ -50,10 +58,13 @@ test("dependencies collector normalizes lockfiles and manifests into facts", () 
 });
 
 test("dependencies collector marks a scanned tree with no lockfile or manifest", () => {
-  const facts = dependenciesCollector.normalize({
-    lockfiles: [],
-    manifests: [],
-  });
+  const facts = dependenciesCollector.normalize(
+    {
+      lockfiles: [],
+      manifests: [],
+    },
+    context,
+  );
 
   // A single presence marker (and no resolved/direct facts) so indexing can
   // distinguish "scanned, zero dependencies" from a commit that was never

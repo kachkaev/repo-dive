@@ -29,6 +29,10 @@ export default defineConfig({
     // First day of the week in calendar-shaped charts.
     weekStartsOn: "monday",
   },
+  filePurposes: {
+    // What files are for, ahead of the built-in rules.
+    rules: [{ paths: ["utils/**"], purpose: "tooling" }],
+  },
   catalog: {
     // Where snapshots, caches and the cube are kept.
     dir: ".repo-dive",
@@ -47,7 +51,8 @@ repo-dive attributes every metric to each commit's git **author** (not the commi
 ## Loading
 
 `catalog` is read by every command — it decides where the catalog is.
-The rest is read by the **`index`** step (the map phase stays raw — the catalog is never rewritten).
+`filePurposes` is read by `scan` as well as `index`, because it decides [which files are source](#which-files-are-source).
+The rest is read by the **`index`** step alone (the map phase stays raw — the catalog is never rewritten).
 `.ts` config relies on Node's built-in type stripping, unflagged since Node 22.18 / 23.6; on older runtimes use a `.mjs`/`.js` config.
 The config's `repo-dive/config` import resolves like any other from the analyzed repository, and falls back to the installation running the CLI when the repository cannot resolve it itself — so a bare clone without `node_modules` loads a `defineConfig` config just as well.
 Malformed config fails `index` with a friendly message rather than silently degrading.
@@ -148,6 +153,90 @@ Known ids, in page order: `lines-of-code`, `number-of-files`, `commit-calendar`,
 The dashboard renders each note in a callout between the chart's heading and the chart itself.
 Markdown is deliberately limited to what a note needs — paragraphs, `-` lists, `**bold**`, `_italic_`, `` `code` `` and `[links](https://…)` — and is rendered as React elements, never injected as HTML.
 Like the rest of `charts`, annotations flow into `dashboard.json` (`config.charts.annotations`, omitted when empty) at `index` time.
+
+## `filePurposes`
+
+Every file git tracks has one **purpose**, told from its path: what the file is for.
+"Lines of code" and "Number of files" split by it, the way they split by language and by contributor.
+
+| Purpose (`purpose` value)                         | Source? | Holds                                                                                                                                                    |
+| ------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production (`"production"`)                       | yes     | Code no other rule claims                                                                                                                                |
+| Tests (`"tests"`)                                 | yes     | Test code, by the folder or file naming conventions projects keep it under                                                                               |
+| Docs (`"docs"`)                                   | yes     | Documentation folders, a `website/` at the root, changelogs and any other Markdown, reStructuredText or AsciiDoc                                         |
+| Examples (`"examples"`)                           | yes     | Examples, demos, playgrounds and stories                                                                                                                 |
+| Tooling (`"tooling"`)                             | yes     | CI, scripts, build setup and tool config                                                                                                                 |
+| AI instructions (`"ai-instructions"`)             | yes     | Skills, rules and agent guides: `.claude/`, `.agents/`, `AGENTS.md`, `SKILL.md`, …                                                                       |
+| Test data (`"test-data"`)                         | no      | What test folders hold besides code: snapshots, fixtures, test cases                                                                                     |
+| Assets (`"assets"`)                               | no      | Images, fonts, media and archives                                                                                                                        |
+| Generated & vendored (`"generated-and-vendored"`) | no      | Lockfiles, `vendor/`, `node_modules/`, `dist/`, `build/`, `*.min.*`, `Generated.ts`, … (`build/` and `dist/` only outside source folders such as `src/`) |
+| Other (`"other"`)                                 | no      | Everything else: `package.json`, `LICENSE`, stray YAML, logs                                                                                             |
+
+### Which files are source
+
+A purpose is wholly source or wholly not, never a mix, and that is the whole definition of a source file: **"Lines of code" counts exactly the files of source purposes.**
+"Number of files" counts every file git tracks, so hiding the non-source purposes in its legend leaves the very files whose lines are counted.
+The language split, the contributor split and the content-level collectors (`directives`, `todo-comments`) cover the same source files.
+
+A source file over 2 MiB, or a binary one, counts as a file on "Number of files" but holds no lines.
+
+### Built-in rules
+
+Three steps, in this order:
+
+1.  What nobody wrote by hand goes to Generated & vendored, even in a test folder (a file merely named after generated code, like `tests/test_generated_code.py`, does not count).
+1.  A file without a source extension (see [`languages.ts`](../../src/cli/shared/languages.ts)) goes to Test data if its path says tests, to Assets if it is media, and otherwise to Other.
+1.  A source file goes by the first of these its path matches: AI instructions, CI (`.github/`, `.circleci/`, …), Tests, Examples, Docs, other Tooling.
+    What is left is Production, except for YAML, which goes to Other.
+
+So `.github/workflows/test.yml` is Tooling, `scripts/__tests__/a.js` is Tests, `docs/examples/a.c` is Examples and `tests/__snapshots__/a.snap` is Test data.
+
+### `filePurposes.rules`
+
+Rules run before the built-in ones, from the top, and the first match wins:
+
+```ts
+filePurposes: {
+  rules: [
+    { paths: ["utils/**"], purpose: "tooling" },
+    // Only the code of the playgrounds is test code.
+    { paths: ["playground/**/*.{js,ts,vue,css,html}"], purpose: "tests" },
+    { paths: ["playground/**"], purpose: "test-data" },
+    // A purpose of your own: `source` says whether its lines count.
+    {
+      paths: ["**/*.proto"],
+      purpose: { type: "custom", name: "Schemas", source: true },
+    },
+  ],
+},
+```
+
+`paths` are [picomatch](https://github.com/micromatch/picomatch) globs against the whole path from the repository root, dotfiles included: `*.md` covers the root only, `**/*.md` every folder.
+A glob cannot be negated, since the list means any of them; put a rule for the exception ahead of this one.
+
+A rule sends **every** file it matches to its purpose, whatever the extension.
+That is how a file type repo-dive does not know becomes source, and it is also why `playground/**` alone would count the lines of every JSON file in there; the example above takes two rules for that reason.
+
+Built-in purposes keep their source flag and their color in every repository, so charts compare across repositories.
+A custom purpose must name its `source` and cannot take a built-in purpose's name, and all rules using one `name` must agree on `source`, or a band could mix the two; anything else fails `index` and `scan` with a friendly message.
+Bands stack with source purposes first (Production at the bottom, custom ones after the built-in ones), then the others, with Other on top.
+
+### `filePurposes.skipBuiltInRules`
+
+`true` leaves classification to `rules` alone.
+Anything they do not match goes to Other and so counts no lines, code included; end the list with `{ paths: ["**"], purpose: "production" }` to change that.
+Defaults to `false`.
+
+### Editing the rules
+
+What a rule edit takes depends on whether it changes which files are source:
+
+- Moving files between purposes on the same side of that line — Production to Tooling, say — only takes `repo-dive index`.
+  Raw survival outputs hold file paths, so `index` applies the rules afresh.
+  `scan` confirms each commit by listing its tree once, then remembers.
+- Moving files across it takes `repo-dive scan` as well, because lines that were never counted or blamed have to be.
+  `scan` re-collects only the commits whose source files actually changed, for `languages`, `directives`, `todo-comments` and `survival`, including `survival` samples an earlier scan took that sampling has since moved past.
+  Until it has, totals are out of step: the blame-based variants leave out lines of files that are no longer source and hold none yet for files that have become source, while the per-commit language counts and the Lines tile still say what the old rules picked.
 
 ## `catalog`
 

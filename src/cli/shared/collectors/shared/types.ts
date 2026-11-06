@@ -2,7 +2,7 @@ import type { Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/process";
 
 import type { ResolvedConfig } from "../../config.ts";
-import { sourceExtensions } from "../../languages.ts";
+import type { ResolvedFilePurpose } from "../../file-purposes.ts";
 import type { SamplingPolicy } from "../../sampling.ts";
 
 type CollectContext = {
@@ -17,6 +17,11 @@ type CollectContext = {
    * invalidated whenever the version or the relevant config changes.
    */
   readonly cacheKey: string;
+  /**
+   * Whether a repo path is a source file under the current file purposes — what
+   * content-level collectors read and blame. See {@link Collector.scansSourceFiles}.
+   */
+  readonly isSourceFile: (filePath: string) => boolean;
   /** Present only for `worktree` collectors: a detached checkout of the commit. */
   readonly worktreePath?: string | undefined;
 };
@@ -30,6 +35,11 @@ export type Fact = {
   readonly metric: string;
   readonly value: number;
   readonly categories?: Readonly<Record<string, string>>;
+};
+
+/** What `index` hands {@link Collector.normalize} to read raw outputs with. */
+export type NormalizeContext = {
+  readonly classifyFile: (filePath: string) => ResolvedFilePurpose;
 };
 
 /**
@@ -52,6 +62,13 @@ export type Collector = {
    * `normalize` must NOT go here — `index` re-runs normalization every time.
    */
   readonly cacheConfig?: (config: ResolvedConfig) => unknown;
+  /**
+   * Whether the output covers exactly the commit's source files. Its fingerprint
+   * then stays free of the file purpose rules, so its blob cache survives them;
+   * `scan` instead re-collects a commit only once the rules change which of its
+   * files are source.
+   */
+  readonly scansSourceFiles?: boolean;
   /**
    * What the collector needs: `log` — commit metadata/diffs only; `tree` —
    * object-database reads; `worktree` — a real checkout.
@@ -83,7 +100,10 @@ export type Collector = {
    * facts for the cube. Pure and cheap: `index` re-runs it freely, so
    * normalization logic can improve without re-collecting.
    */
-  readonly normalize: (raw: unknown) => readonly Fact[];
+  readonly normalize: (
+    raw: unknown,
+    context: NormalizeContext,
+  ) => readonly Fact[];
 };
 
 /**
@@ -105,43 +125,4 @@ export const describesTreeState = (collector: Collector): boolean =>
 export const cohortMonthOf = (unixSeconds: number): string => {
   const date = new Date(unixSeconds * 1000);
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-};
-
-/** File extension used as a category key, e.g. ".ts"; files without one map to "(none)". */
-export const extensionOf = (filePath: string): string => {
-  const basename = filePath.split("/").at(-1) ?? "";
-  const dotIndex = basename.lastIndexOf(".");
-  return dotIndex > 0 ? basename.slice(dotIndex).toLowerCase() : "(none)";
-};
-
-const excludedPathSegments = [
-  "node_modules/",
-  "vendor/",
-  "dist/",
-  "build/",
-  ".min.",
-  "generated",
-];
-
-const excludedFileNames = new Set([
-  "pnpm-lock.yaml",
-  "yarn.lock",
-  "package-lock.json",
-  "composer.lock",
-  "Cargo.lock",
-  "Gemfile.lock",
-  "poetry.lock",
-  "uv.lock",
-]);
-
-/** Whether a repo path should be scanned by content-level collectors. */
-export const isScannableSourceFile = (filePath: string): boolean => {
-  const fileName = filePath.split("/").at(-1) ?? "";
-  if (excludedFileNames.has(fileName)) {
-    return false;
-  }
-  if (excludedPathSegments.some((segment) => filePath.includes(segment))) {
-    return false;
-  }
-  return sourceExtensions.has(extensionOf(filePath));
 };

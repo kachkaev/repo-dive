@@ -45,11 +45,6 @@ type LanguagesRow = {
   sha: string;
   date: SnapshotDate;
   byLanguage: Record<string, number>;
-  /**
-   * Source files per language at the same commit, from the same scan.
-   * Optional: absent in dashboard.json written before file counts landed.
-   */
-  byLanguageFiles?: Record<string, number>;
 };
 
 type FileTypesRow = {
@@ -57,6 +52,11 @@ type FileTypesRow = {
   date: SnapshotDate;
   totalFiles: number;
   totalBytes: number;
+  /**
+   * Every tracked file per language at the same commit. Optional: absent in
+   * dashboard.json written before the file chart covered every file.
+   */
+  byLanguage?: Record<string, number>;
 };
 
 type DirectivesRow = {
@@ -117,6 +117,12 @@ type SurvivalRow = {
    * language landed.
    */
   byLanguageYear?: Record<string, Record<string, number>>;
+  /**
+   * Living units per file purpose, and split by the year each was authored.
+   * Optional: absent on samples collected before survival outputs kept paths.
+   */
+  byPurpose?: Record<string, number>;
+  byPurposeYear?: Record<string, Record<string, number>>;
 };
 
 export type ContributorKind = "human" | "bot" | "ai";
@@ -201,6 +207,11 @@ export type DashboardData = {
        */
       annotations?: Partial<Record<ChartAnnotationId, string>>;
     };
+    /**
+     * Every file purpose in stack order. Optional: absent in dashboard.json
+     * written before purposes landed.
+     */
+    filePurposes?: Array<{ label: string; source: boolean }>;
   };
   repo: {
     /** The `origin` repo's own name, falling back to the checkout directory. */

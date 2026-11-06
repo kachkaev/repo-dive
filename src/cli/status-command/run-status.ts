@@ -82,17 +82,35 @@ export const runStatus = Effect.fn("runStatus")(function* ({
           ),
         );
     const cacheKey = collectorCacheKey(collector, config);
-    const collectedFlags = yield* Effect.forEach(
+    const flags = yield* Effect.forEach(
       [...targetShas],
-      (sha) => isCollected(catalog, sha, collector, cacheKey),
+      (sha) =>
+        Effect.all({
+          collected: isCollected(catalog, sha, collector, cacheKey, undefined),
+          confirmed: isCollected(
+            catalog,
+            sha,
+            collector,
+            cacheKey,
+            config.filePurposes.rulesKey,
+          ),
+        }),
       { concurrency: 16 },
     );
-    const collected = collectedFlags.filter(Boolean).length;
+    const collected = flags.filter((flag) => flag.collected).length;
+    // Their outputs stand unless the new rules changed which files are source,
+    // which takes `scan` listing the commit's tree to tell.
+    const unconfirmed = flags.filter(
+      (flag) => flag.collected && !flag.confirmed,
+    ).length;
     lines.push(
-      collector.defaultSampling === "all"
-        ? `  ${collector.name}: ${collected}/${targetShas.size} commits collected`
-        : `  ${collector.name}: ${collected}/${targetShas.size} commits collected` +
-            ` (${samplingLabel(collector.defaultSampling)} sample of ${commits.length})`,
+      `  ${collector.name}: ${collected}/${targetShas.size} commits collected` +
+        (collector.defaultSampling === "all"
+          ? ""
+          : ` (${samplingLabel(collector.defaultSampling)} sample of ${commits.length})`) +
+        (unconfirmed === 0
+          ? ""
+          : `, ${unconfirmed} to re-check against the edited file purpose rules on the next scan`),
     );
   }
 

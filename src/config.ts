@@ -25,6 +25,9 @@
  *   charts: {
  *     weekStartsOn: "monday",
  *   },
+ *   filePurposes: {
+ *     rules: [{ paths: ["utils/**"], purpose: "tooling" }],
+ *   },
  *   catalog: {
  *     dir: ".repo-dive",
  *   },
@@ -127,9 +130,65 @@ export type CatalogConfig = {
   readonly checkIgnoreFiles?: boolean;
 };
 
+/**
+ * What a file is for, in chart stack order. Each purpose is wholly source (its
+ * lines count towards "Lines of code") or wholly not: `production`, `tests`,
+ * `docs`, `examples`, `tooling` and `ai-instructions` are source, the rest are
+ * not.
+ */
+export const builtInFilePurposes = [
+  "production",
+  "tests",
+  "docs",
+  "examples",
+  "tooling",
+  "ai-instructions",
+  "test-data",
+  "assets",
+  "generated-and-vendored",
+  "other",
+] as const;
+
+export type BuiltInFilePurpose = (typeof builtInFilePurposes)[number];
+
+/**
+ * A purpose of your own, charted as a band called `name`. `source` says whether
+ * the lines of its files count towards "Lines of code"; every rule using one
+ * `name` must agree on it.
+ */
+export type CustomFilePurpose = {
+  readonly type: "custom";
+  readonly name: string;
+  readonly source: boolean;
+};
+
+export type FilePurpose = BuiltInFilePurpose | CustomFilePurpose;
+
+/**
+ * Sends every file matching any of `paths` to `purpose`, whatever its extension.
+ * Globs match the whole path from the repository root, dotfiles included, so
+ * `*.md` covers the root only and `**\/*.md` every folder. A glob cannot be
+ * negated: put a rule for the exception ahead of this one.
+ */
+export type FilePurposeRule = {
+  readonly paths: readonly string[];
+  readonly purpose: FilePurpose;
+};
+
+export type FilePurposesConfig = {
+  /**
+   * Leaves classification entirely to {@link rules}: anything they do not match
+   * goes to `other`, and so counts no lines. Defaults to `false`.
+   */
+  readonly skipBuiltInRules?: boolean;
+  /** Checked from the top, first match wins, before the built-in rules. */
+  readonly rules?: readonly FilePurposeRule[];
+};
+
 export type RepoDiveConfig = {
   readonly contributors?: ContributorsConfig;
   readonly charts?: ChartsConfig;
+  readonly filePurposes?: FilePurposesConfig;
   readonly catalog?: CatalogConfig;
 };
 

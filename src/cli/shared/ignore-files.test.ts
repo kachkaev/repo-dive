@@ -13,6 +13,7 @@ import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import type { ResolvedConfig } from "./config.ts";
+import { createFilePurposes } from "./file-purposes.ts";
 import {
   addIgnoreEntry,
   checkIgnoreFiles,
@@ -171,6 +172,10 @@ it.effect(
         maxInCharts: 10,
         weekStartsOn: "monday",
         chartAnnotations: {},
+        filePurposes: createFilePurposes({
+          skipBuiltInRules: false,
+          rules: [],
+        }),
         catalogPath: path.join(repoRoot, ".repo-dive"),
         catalogRelativePath: ".repo-dive",
         checkIgnoreFiles: true,

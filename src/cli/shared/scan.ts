@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   Clock,
   Console,
@@ -11,8 +13,11 @@ import type { ChildProcessSpawner } from "effect/process";
 
 import {
   type Catalog,
+  confirmSourceRules,
   isCollected,
   openCatalog,
+  readSourceFilesPathsKey,
+  type SourceFilesStamp,
   writeCollectorOutput,
 } from "./catalog.ts";
 import {
@@ -22,7 +27,8 @@ import {
   resolveCollectors,
 } from "./collectors.ts";
 import { loadConfig } from "./config.ts";
-import { type CommandError, runGit } from "./git.ts";
+import type { FilePurposes } from "./file-purposes.ts";
+import { type CommandError, listTreeBlobs, runGit } from "./git.ts";
 import { warnAboutIgnoreFiles } from "./ignore-files.ts";
 import {
   parseSamplingPolicy,
@@ -454,17 +460,39 @@ export const summarizeCommits = (
 export const formatTimeLeft = (seconds: number): string =>
   seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`;
 
+/** Hashes a commit's source files, in the order of its tree listing. */
+const sourceFilesPathsKey = (
+  repoRoot: string,
+  sha: string,
+  filePurposes: FilePurposes,
+): Effect.Effect<string, Error, ChildProcessSpawner.ChildProcessSpawner> =>
+  listTreeBlobs(repoRoot, sha).pipe(
+    Effect.map((blobs) => {
+      const hash = createHash("sha256");
+      for (const { filePath } of blobs) {
+        if (filePurposes.classify(filePath).source) {
+          hash.update(filePath).update("\0");
+        }
+      }
+      return hash.digest("hex").slice(0, 12);
+    }),
+  );
+
 const runCollector = ({
   catalog,
   sha,
   collector,
   cacheKey,
+  filePurposes,
+  sourceFiles,
   worktreePath,
 }: {
   readonly catalog: Catalog;
   readonly sha: string;
   readonly collector: Collector;
   readonly cacheKey: string;
+  readonly filePurposes: FilePurposes;
+  readonly sourceFiles: SourceFilesStamp | undefined;
   readonly worktreePath?: string | undefined;
 }): Effect.Effect<
   void,
@@ -477,6 +505,7 @@ const runCollector = ({
       catalogPath: catalog.rootPath,
       sha,
       cacheKey,
+      isSourceFile: (filePath) => filePurposes.classify(filePath).source,
       worktreePath,
     })
     .pipe(
@@ -491,6 +520,7 @@ const runCollector = ({
           sha,
           collector,
           cacheKey,
+          sourceFiles: collector.scansSourceFiles ? sourceFiles : undefined,
           output,
           durationMs: Math.round(Duration.toMillis(duration)),
         }),
@@ -509,12 +539,14 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
   sha,
   collectors,
   cacheKeyOf,
+  filePurposes,
   force,
 }: {
   readonly catalog: Catalog;
   readonly sha: string;
   readonly collectors: readonly Collector[];
   readonly cacheKeyOf: (collector: Collector) => string;
+  readonly filePurposes: FilePurposes;
   readonly force: boolean;
 }): Effect.fn.Return<
   CommitOutcome,
@@ -523,16 +555,52 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
 > {
   const pending: Collector[] = [];
   let skipped = 0;
+  const rulesKey = filePurposes.rulesKey;
+
+  const failures: string[] = [];
+
+  // Listed at most once per commit, and only when something is left to do: an
+  // up-to-date catalog stays a matter of reading sidecars.
+  let sourceFiles: SourceFilesStamp | undefined;
 
   for (const collector of collectors) {
+    const cacheKey = cacheKeyOf(collector);
     if (
       !force &&
-      (yield* isCollected(catalog, sha, collector, cacheKeyOf(collector)))
+      (yield* isCollected(catalog, sha, collector, cacheKey, rulesKey))
     ) {
       skipped += 1;
-    } else {
-      pending.push(collector);
+      continue;
     }
+    if (collector.scansSourceFiles) {
+      if (sourceFiles === undefined) {
+        const pathsKey = yield* sourceFilesPathsKey(
+          catalog.repoRoot,
+          sha,
+          filePurposes,
+        ).pipe(
+          Effect.catch((error) => {
+            failures.push(`Tree of ${sha.slice(0, 10)}: ${error.message}`);
+            return Effect.succeed(undefined);
+          }),
+        );
+        if (pathsKey === undefined) {
+          continue;
+        }
+        sourceFiles = { rulesKey, pathsKey };
+      }
+      // New rules that pick the very same source files leave the output valid.
+      if (
+        !force &&
+        (yield* readSourceFilesPathsKey(catalog, sha, collector, cacheKey)) ===
+          sourceFiles.pathsKey
+      ) {
+        yield* confirmSourceRules(catalog, sha, collector, sourceFiles);
+        skipped += 1;
+        continue;
+      }
+    }
+    pending.push(collector);
   }
 
   const direct = pending.filter(
@@ -543,13 +611,14 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
   );
 
   let run = 0;
-  const failures: string[] = [];
   for (const collector of direct) {
     const failure = yield* runCollector({
       catalog,
       sha,
       collector,
       cacheKey: cacheKeyOf(collector),
+      filePurposes,
+      sourceFiles,
     }).pipe(
       Effect.as(undefined),
       Effect.catch((error) => Effect.succeed(error.message)),
@@ -572,6 +641,8 @@ const collectCommit = Effect.fn("collectCommit")(function* ({
             sha,
             collector,
             cacheKey: cacheKeyOf(collector),
+            filePurposes,
+            sourceFiles,
             worktreePath,
           }).pipe(
             Effect.as(undefined),
@@ -643,22 +714,64 @@ export const runScan = Effect.fn("runScan")(function* ({
 
   const lineages = yield* listLineages(repoRoot);
 
-  const plans = collectors.map((collector) => {
-    const policy = sampleOverride ?? collector.defaultSampling;
-    return {
-      collector,
-      policy,
-      shas: describesTreeState(collector)
+  const plans = yield* Effect.forEach(collectors, (collector) =>
+    Effect.gen(function* () {
+      const policy = sampleOverride ?? collector.defaultSampling;
+      const planned = describesTreeState(collector)
         ? sampleTreeCommits(lineages, selected, policy)
-        : new Set(sampleCommits(selected, policy).map((commit) => commit.hash)),
-    };
-  });
+        : new Set(sampleCommits(selected, policy).map((commit) => commit.hash));
+      if (
+        force ||
+        sampleOverride !== undefined ||
+        policy === "all" ||
+        !collector.scansSourceFiles
+      ) {
+        return { collector, policy, planned, shas: planned };
+      }
+      // Sampling moves on as the history grows, yet `index` reads every output
+      // there is: the mid-month HEAD of an earlier scan, say. Once the file
+      // purpose rules change, those would keep answering for the old rules, so
+      // they get checked as well. A scan asked to do something narrower leaves
+      // them for the next plain one.
+      const cacheKey = cacheKeyOf(collector);
+      const rulesKey = config.filePurposes.rulesKey;
+      const outdated = yield* Effect.forEach(
+        [...sampleTreeCommits(lineages, selected, "all")].filter(
+          (sha) => !planned.has(sha),
+        ),
+        (sha) =>
+          Effect.all({
+            current: isCollected(catalog, sha, collector, cacheKey, rulesKey),
+            pathsKey: readSourceFilesPathsKey(
+              catalog,
+              sha,
+              collector,
+              cacheKey,
+            ),
+          }).pipe(
+            Effect.map(({ current, pathsKey }) =>
+              !current && pathsKey !== undefined ? [sha] : [],
+            ),
+          ),
+        { concurrency: 16 },
+      );
+      return {
+        collector,
+        policy,
+        planned,
+        shas: new Set([...planned, ...outdated.flat()]),
+      };
+    }),
+  );
 
   yield* Console.log(
     `Plan: ${plans
       .map(
         (plan) =>
-          `${plan.collector.name} → ${plan.shas.size} commits (${samplingLabel(plan.policy)})`,
+          `${plan.collector.name} → ${plan.planned.size} commits (${samplingLabel(plan.policy)})` +
+          (plan.shas.size > plan.planned.size
+            ? ` + ${plan.shas.size - plan.planned.size} earlier samples to check against edited file purpose rules`
+            : ""),
       )
       .join(", ")}`,
   );
@@ -679,7 +792,13 @@ export const runScan = Effect.fn("runScan")(function* ({
     for (const sha of plan.shas) {
       if (
         force ||
-        !(yield* isCollected(catalog, sha, collector, cacheKeyOf(collector)))
+        !(yield* isCollected(
+          catalog,
+          sha,
+          collector,
+          cacheKeyOf(collector),
+          config.filePurposes.rulesKey,
+        ))
       ) {
         pending.add(sha);
       }
@@ -761,6 +880,7 @@ export const runScan = Effect.fn("runScan")(function* ({
           )
           .map((plan) => plan.collector),
         cacheKeyOf,
+        filePurposes: config.filePurposes,
         force,
       }).pipe(
         Effect.tap(() =>

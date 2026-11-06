@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 
 import { numberAt, recordAt } from "../../../shared/json.ts";
-import { languageOfExtension } from "../languages.ts";
+import { extensionOf, languageOfExtension } from "../languages.ts";
 import { scanTreeWithBlobCache } from "./shared/tree-scan.ts";
-import { type Collector, extensionOf, type Fact } from "./shared/types.ts";
+import type { Collector, Fact } from "./shared/types.ts";
 
 type ExtensionStats = {
   files: number;
@@ -25,10 +25,11 @@ export type LanguagesOutput = {
  * Physical lines in one file, counted the way `git blame` attributes them: a
  * final line without a trailing newline still counts, an empty file has none.
  * Matching blame is what lets the dashboard's "Lines by language" chart show
- * the same totals with age shading on and off.
+ * the same totals with age shading on and off. A binary file has no lines to
+ * speak of, wherever a config rule sends it.
  */
 export const countLines = (content: string): number => {
-  if (content === "") {
+  if (content === "" || content.includes("\0")) {
     return 0;
   }
   const newlines = content.split("\n").length - 1;
@@ -64,17 +65,20 @@ export const languagesCollector: Collector = {
   // 1 → 2: the tokei shell-out gave way to an in-process count over the same
   // source files the blame-based survival collector scans. Outputs written by
   // version 1 counted lockfiles, minified bundles and data blobs, so they must
-  // not survive a re-scan.
-  version: "2",
+  // not survive a re-scan. 2 → 3: binary files stopped counting lines, which the
+  // blob cache would otherwise keep answering with what version 2 counted.
+  version: "3",
   strategy: "tree",
+  scansSourceFiles: true,
   defaultSampling: "all",
-  collect: ({ repoRoot, catalogPath, sha, cacheKey }) =>
+  collect: ({ repoRoot, catalogPath, sha, cacheKey, isSourceFile }) =>
     scanTreeWithBlobCache({
       repoRoot,
       catalogPath,
       sha,
       collectorName: "languages",
       cacheKey,
+      isSourceFile,
       scanContent: countLines,
     }).pipe(Effect.map(summarizeLineCounts)),
   normalize: (raw) => {

@@ -58,14 +58,16 @@ export const todoCommentsCollector: Collector = {
   // (and their poisoned cache entries) would survive every re-scan.
   version: "2",
   strategy: "tree",
+  scansSourceFiles: true,
   defaultSampling: "all",
-  collect: ({ repoRoot, catalogPath, sha, cacheKey }) =>
+  collect: ({ repoRoot, catalogPath, sha, cacheKey, isSourceFile }) =>
     scanTreeWithBlobCache({
       repoRoot,
       catalogPath,
       sha,
       collectorName: "todo-comments",
       cacheKey,
+      isSourceFile,
       scanContent: scanFileForTodos,
     }).pipe(
       Effect.map((files) => mergeTodos(files.map((file) => file.result))),

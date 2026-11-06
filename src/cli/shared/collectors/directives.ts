@@ -232,14 +232,16 @@ export const directivesCollector: Collector = {
     "ESLint and oxlint suppression comments (by linter and rule; block disables as gray areas) and @ts-ignore/@ts-expect-error/@ts-nocheck counts",
   version: "2",
   strategy: "tree",
+  scansSourceFiles: true,
   defaultSampling: "all",
-  collect: ({ repoRoot, catalogPath, sha, cacheKey }) =>
+  collect: ({ repoRoot, catalogPath, sha, cacheKey, isSourceFile }) =>
     scanTreeWithBlobCache({
       repoRoot,
       catalogPath,
       sha,
       collectorName: "directives",
       cacheKey,
+      isSourceFile,
       scanContent: scanFileForDirectives,
     }).pipe(
       Effect.map((files) => mergeDirectives(files.map((file) => file.result))),

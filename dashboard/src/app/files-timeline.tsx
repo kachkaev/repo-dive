@@ -1,14 +1,18 @@
 import type { DashboardData } from "../data.ts";
-import { survivalColorScalesOf } from "./shared/survival-colors.tsx";
+import {
+  filePurposeLabelsOf,
+  survivalColorScalesOf,
+} from "./shared/survival-colors.tsx";
 import { SurvivalTimeline } from "./survival-timeline.tsx";
 
 /**
  * The file-count timeline: the file grain of {@link SurvivalTimeline}, sitting
- * right under the lines-of-code chart it mirrors. The flat variants come from
- * the same per-commit scan that counts lines; the contributor split and age
- * shading come from the `file-survival` collector, which attributes each
- * living file to the commit that created it — so a file keeps its creator and
- * creation year through every later edit, until it is deleted.
+ * right under the lines-of-code chart it mirrors. It counts every file git
+ * tracks, where that chart only counts source files: the flat variants come from
+ * the per-commit tree listing, the contributor and purpose splits and age shading
+ * from the `file-survival` collector, which attributes each living file to the
+ * commit that created it — so a file keeps its creator and creation year through
+ * every later edit, until it is deleted.
  */
 export function FilesTimeline({
   data,
@@ -20,15 +24,14 @@ export function FilesTimeline({
   return (
     <SurvivalTimeline
       title="Number of files"
-      subtitle="source files in the tree over the whole history; contributor split and age shading come from each file's creating commit, sampled like survival — a file keeps its creator and creation year until deleted, later edits don't re-bin it; lockfiles, minified bundles and generated data are not counted"
+      subtitle="every file git tracks over the whole history; contributor split, purpose split and age shading come from each file's creating commit, sampled like survival — a file keeps its creator and creation year until deleted, later edits don't re-bin it"
       annotation={data.config?.charts?.annotations?.["number-of-files"]}
       unit="files"
-      flatRows={data.languages.flatMap((row) =>
-        row.byLanguageFiles
-          ? [{ date: row.date, values: row.byLanguageFiles }]
-          : [],
+      flatRows={data.fileTypes.flatMap((row) =>
+        row.byLanguage ? [{ date: row.date, values: row.byLanguage }] : [],
       )}
       survivalRows={data.fileSurvival ?? []}
+      purposeOrder={filePurposeLabelsOf(data)}
       maxContributorsInCharts={maxContributorsInCharts}
       colorScales={survivalColorScalesOf(data)}
     />

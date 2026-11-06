@@ -139,11 +139,20 @@ function shapeYearBands(
   yearScale: YearScale,
   /** Base color per kept group given its rank in this chart. */
   baseColorOf: (label: string, rank: number) => string,
+  /**
+   * A fixed vocabulary of groups: they stack in this order, those no row holds
+   * are left out, and nothing gets folded (`maxSeries` is then moot).
+   */
+  fixedOrder?: readonly string[],
 ): StackedChart {
   const latest = rows.at(-1)?.byGroupYear ?? {};
-  const ranked = Object.entries(latest)
-    .toSorted(([, left], [, right]) => sumValues(right) - sumValues(left))
-    .map(([name]) => name);
+  const ranked =
+    fixedOrder?.filter((name) =>
+      rows.some((row) => sumValues(row.byGroupYear[name] ?? {}) > 0),
+    ) ??
+    Object.entries(latest)
+      .toSorted(([, left], [, right]) => sumValues(right) - sumValues(left))
+      .map(([name]) => name);
   const kept = ranked.slice(0, maxSeries);
   const hasOther =
     ranked.length > maxSeries ||
@@ -202,12 +211,13 @@ const cohortBaseColor = "var(--series-1)";
  */
 const maxLanguagesInCharts = 7;
 
-type SplitDimension = "all" | "language" | "contributor";
+type SplitDimension = "all" | "language" | "contributor" | "purpose";
 
 /** Split options in display order, which is also the fallback order. */
 const splitDimensions: readonly SplitDimension[] = [
   "language",
   "contributor",
+  "purpose",
   "all",
 ];
 
@@ -223,6 +233,8 @@ export type SurvivalTimelineRow = {
   byContributorYear?: Record<string, Record<string, number>> | undefined;
   byLanguage: Record<string, number>;
   byLanguageYear?: Record<string, Record<string, number>> | undefined;
+  byPurpose?: Record<string, number> | undefined;
+  byPurposeYear?: Record<string, Record<string, number>> | undefined;
 };
 
 /**
@@ -245,6 +257,7 @@ export function SurvivalTimeline({
   unit,
   flatRows,
   survivalRows,
+  purposeOrder,
   maxContributorsInCharts,
   colorScales,
 }: {
@@ -256,6 +269,8 @@ export function SurvivalTimeline({
   /** Dense per-commit values by language, for the flat (unshaded) variants. */
   flatRows: ReadonlyArray<{ date: string; values: Record<string, number> }>;
   survivalRows: readonly SurvivalTimelineRow[];
+  /** File purposes in stack order: a fixed vocabulary, unlike the other splits. */
+  purposeOrder: readonly string[];
   maxContributorsInCharts: number;
   /**
    * The page-wide color scales (see {@link survivalColorScalesOf}), so a
@@ -279,10 +294,25 @@ export function SurvivalTimeline({
 
   const hasFlat = flatRows.length > 0;
   const hasSurvival = survivalRows.length > 0;
+  // Samples collected before survival outputs kept paths know no purposes; the
+  // split draws what the others can, rather than a cliff down to nothing.
+  const purposeRows = survivalRows.flatMap((row) =>
+    row.byPurpose === undefined
+      ? []
+      : [
+          {
+            date: row.date,
+            byPurpose: row.byPurpose,
+            byPurposeYear: row.byPurposeYear ?? {},
+          },
+        ],
+  );
+  const hasPurposes = purposeRows.length > 0;
   const flatAvailable: Record<SplitDimension, boolean> = {
     all: hasFlat,
     language: hasFlat,
     contributor: hasSurvival,
+    purpose: hasPurposes,
   };
   const shadedAvailable: Record<SplitDimension, boolean> = {
     all: hasSurvival,
@@ -290,6 +320,7 @@ export function SurvivalTimeline({
     contributor: survivalRows.some(
       (row) => row.byContributorYear !== undefined,
     ),
+    purpose: hasPurposes,
   };
   const canDraw = (candidate: SplitDimension) =>
     flatAvailable[candidate] || shadedAvailable[candidate];
@@ -327,87 +358,121 @@ export function SurvivalTimeline({
   const allSeriesLabel = unit === "lines" ? "All lines" : "All files";
 
   let chart: StackedChart;
-  if (deferredDimension === "all") {
-    chart = deferredShaded
-      ? {
-          points: survivalRows.map((row) => {
-            const values: Record<string, number> = {};
-            for (const [cohortMonth, value] of Object.entries(row.byCohort)) {
-              const bucket = survivalYearScale.bucketOf(
-                cohortMonth.slice(0, 4),
-              );
-              values[bucket] = (values[bucket] ?? 0) + value;
-            }
-            return { dateMs: new Date(row.date).getTime(), values };
-          }),
-          seriesKeys: survivalYearScale.buckets,
-          colors: survivalYearScale.buckets.map((bucket) =>
-            survivalYearScale.colorOf(cohortBaseColor, bucket),
-          ),
-        }
-      : {
-          points: flatRows.map((row) => ({
-            dateMs: new Date(row.date).getTime(),
-            values: { [allSeriesLabel]: sumValues(row.values) },
-          })),
-          seriesKeys: [allSeriesLabel],
-          colors: [cohortBaseColor],
-          // A one-entry legend explains nothing — hide it.
-          legendItems: [],
-        };
-  } else if (deferredDimension === "language") {
-    if (deferredShaded) {
-      // Blame-based counterpart to the per-commit stack: the same units over
-      // the same files, shaded by the year each was authored. The shared scale
-      // keeps a language's color identical to the flat variant's — and to the
-      // other chart's — even where the rankings disagree.
-      chart = shapeYearBands(
-        survivalRows.map((row) => ({
-          date: row.date,
-          byGroupYear: row.byLanguageYear ?? {},
-        })),
-        maxLanguagesInCharts,
-        survivalYearScale,
-        colorScales.languageColorOf,
-      );
-    } else {
-      const flat = shapeStacked([...flatRows], maxLanguagesInCharts);
-      chart = {
-        ...flat,
-        colors: flat.seriesKeys.map((key, index) =>
-          key === "Other"
-            ? otherColor
-            : colorScales.languageColorOf(key, index),
-        ),
-      };
+  switch (deferredDimension) {
+    case "all": {
+      chart = deferredShaded
+        ? {
+            points: survivalRows.map((row) => {
+              const values: Record<string, number> = {};
+              for (const [cohortMonth, value] of Object.entries(row.byCohort)) {
+                const bucket = survivalYearScale.bucketOf(
+                  cohortMonth.slice(0, 4),
+                );
+                values[bucket] = (values[bucket] ?? 0) + value;
+              }
+              return { dateMs: new Date(row.date).getTime(), values };
+            }),
+            seriesKeys: survivalYearScale.buckets,
+            colors: survivalYearScale.buckets.map((bucket) =>
+              survivalYearScale.colorOf(cohortBaseColor, bucket),
+            ),
+          }
+        : {
+            points: flatRows.map((row) => ({
+              dateMs: new Date(row.date).getTime(),
+              values: { [allSeriesLabel]: sumValues(row.values) },
+            })),
+            seriesKeys: [allSeriesLabel],
+            colors: [cohortBaseColor],
+            // A one-entry legend explains nothing — hide it.
+            legendItems: [],
+          };
+      break;
     }
-  } else {
-    if (deferredShaded) {
-      chart = shapeYearBands(
-        survivalRows.map((row) => ({
-          date: row.date,
-          byGroupYear: row.byContributorYear ?? {},
-        })),
-        maxContributorsInCharts,
-        survivalYearScale,
-        colorScales.contributorColorOf,
-      );
-    } else {
-      const flat = shapeStacked(
-        survivalRows.map((row) => ({
-          date: row.date,
-          values: row.byContributor,
-        })),
-        maxContributorsInCharts,
-      );
-      chart = {
-        ...flat,
-        colors: flat.seriesKeys.map((key, index) =>
-          key === "Other"
-            ? otherColor
-            : colorScales.contributorColorOf(key, index),
-        ),
-      };
+    case "language": {
+      if (deferredShaded) {
+        // Blame-based counterpart to the per-commit stack: the same units over
+        // the same files, shaded by the year each was authored. The shared scale
+        // keeps a language's color identical to the flat variant's — and to the
+        // other chart's — even where the rankings disagree.
+        chart = shapeYearBands(
+          survivalRows.map((row) => ({
+            date: row.date,
+            byGroupYear: row.byLanguageYear ?? {},
+          })),
+          maxLanguagesInCharts,
+          survivalYearScale,
+          colorScales.languageColorOf,
+        );
+      } else {
+        const flat = shapeStacked([...flatRows], maxLanguagesInCharts);
+        chart = {
+          ...flat,
+          colors: flat.seriesKeys.map((key, index) =>
+            key === "Other"
+              ? otherColor
+              : colorScales.languageColorOf(key, index),
+          ),
+        };
+      }
+      break;
+    }
+    case "purpose": {
+      if (deferredShaded) {
+        chart = shapeYearBands(
+          purposeRows.map((row) => ({
+            date: row.date,
+            byGroupYear: row.byPurposeYear,
+          })),
+          purposeOrder.length,
+          survivalYearScale,
+          colorScales.purposeColorOf,
+          purposeOrder,
+        );
+      } else {
+        const flat = shapeStacked(
+          purposeRows.map((row) => ({ date: row.date, values: row.byPurpose })),
+          purposeOrder.length,
+          purposeOrder,
+        );
+        chart = {
+          ...flat,
+          colors: flat.seriesKeys.map((key, index) =>
+            colorScales.purposeColorOf(key, index),
+          ),
+        };
+      }
+      break;
+    }
+    case "contributor": {
+      if (deferredShaded) {
+        chart = shapeYearBands(
+          survivalRows.map((row) => ({
+            date: row.date,
+            byGroupYear: row.byContributorYear ?? {},
+          })),
+          maxContributorsInCharts,
+          survivalYearScale,
+          colorScales.contributorColorOf,
+        );
+      } else {
+        const flat = shapeStacked(
+          survivalRows.map((row) => ({
+            date: row.date,
+            values: row.byContributor,
+          })),
+          maxContributorsInCharts,
+        );
+        chart = {
+          ...flat,
+          colors: flat.seriesKeys.map((key, index) =>
+            key === "Other"
+              ? otherColor
+              : colorScales.contributorColorOf(key, index),
+          ),
+        };
+      }
+      break;
     }
   }
 
@@ -500,6 +565,14 @@ export function SurvivalTimeline({
                   : "No survival samples collected yet",
               },
               {
+                value: "purpose",
+                label: "by purpose",
+                disabled: !canDraw("purpose"),
+                title: canDraw("purpose")
+                  ? undefined
+                  : "No per-purpose data collected yet",
+              },
+              {
                 value: "all",
                 label: `all ${unit}`,
                 disabled: !canDraw("all"),
@@ -567,7 +640,7 @@ export function SurvivalTimeline({
         domainEndMs={domainEndMs}
         domainPeak={domainPeak}
         secondaryLegendItems={yearLegendItems}
-        // Languages and contributors can be hidden to read the rest; the
+        // Languages, contributors and purposes can be hidden to read the rest; the
         // all-units legend names year shades (or nothing), where hiding a
         // band would mean nothing.
         legendToggles={deferredDimension !== "all"}

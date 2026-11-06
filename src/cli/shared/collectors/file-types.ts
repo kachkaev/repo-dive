@@ -2,7 +2,8 @@ import { Effect } from "effect";
 
 import { numberAt, recordAt } from "../../../shared/json.ts";
 import { runGit } from "../git.ts";
-import { type Collector, extensionOf, type Fact } from "./shared/types.ts";
+import { extensionOf } from "../languages.ts";
+import type { Collector, Fact } from "./shared/types.ts";
 
 type FileTypeStats = {
   files: number;
@@ -62,9 +63,12 @@ export const fileTypesCollector: Collector = {
     ),
   normalize: (raw) => {
     const facts: Fact[] = [];
-    for (const [extension, stats] of Object.entries(
+    for (const [rawExtension, stats] of Object.entries(
       recordAt(raw, "byExtension"),
     )) {
+      // `ls-tree` quotes a path holding a non-ASCII character, closing quote
+      // and all: "naïve.js" arrives with the extension `.js"`.
+      const extension = rawExtension.replace(/"$/, "");
       facts.push(
         {
           metric: "files.count",

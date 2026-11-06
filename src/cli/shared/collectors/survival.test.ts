@@ -1,6 +1,12 @@
 import { expect, test } from "vitest";
 
-import { parseBlamePorcelain } from "./survival.ts";
+import {
+  parseBlamePorcelain,
+  selectBlameableFiles,
+  summarizeBlames,
+  survivalCollector,
+  tallyBlame,
+} from "./survival.ts";
 
 test("parseBlamePorcelain attributes lines to authors and cohorts", () => {
   const stdout = [
@@ -35,4 +41,109 @@ test("parseBlamePorcelain attributes lines to authors and cohorts", () => {
     authorEmail: "bob@example.com",
     cohortMonth: "2025-07",
   });
+});
+
+const blameOf = (lines: number) =>
+  Array.from(
+    { length: lines },
+    () => "author-mail <alice@example.com>\nauthor-time 1767322800\n\tcontent",
+  ).join("\n");
+
+const classifyFile = (filePath: string) =>
+  filePath.endsWith(".snap")
+    ? { label: "Test data", source: false }
+    : filePath.endsWith(".test.ts")
+      ? { label: "Tests", source: true }
+      : { label: "Production", source: true };
+
+test("summarizeBlames keeps paths, for index to classify", () => {
+  const output = summarizeBlames([
+    { filePath: "src/a.ts", tally: tallyBlame(blameOf(3)) },
+    { filePath: "src/a.test.ts", tally: tallyBlame(blameOf(2)) },
+    { filePath: "binary.ts", tally: tallyBlame(`${blameOf(1)}\0`) },
+  ]);
+  expect(output.paths).toStrictEqual(["src/a.ts", "src/a.test.ts"]);
+  expect(output.authors).toStrictEqual(["alice@example.com"]);
+  expect(output.totalLines).toBe(5);
+  expect(output.fileCount).toBe(3);
+
+  expect(survivalCollector.normalize(output, { classifyFile })).toStrictEqual([
+    {
+      metric: "survival.lines",
+      value: 3,
+      categories: {
+        extension: ".ts",
+        author: "alice@example.com",
+        cohort: "2026-01",
+        purpose: "Production",
+      },
+    },
+    {
+      metric: "survival.lines",
+      value: 2,
+      categories: {
+        extension: ".ts",
+        author: "alice@example.com",
+        cohort: "2026-01",
+        purpose: "Tests",
+      },
+    },
+  ]);
+});
+
+test("normalize drops lines of files the rules no longer call source", () => {
+  const output = summarizeBlames([
+    { filePath: "a.snap", tally: tallyBlame(blameOf(4)) },
+  ]);
+  expect(survivalCollector.normalize(output, { classifyFile })).toStrictEqual(
+    [],
+  );
+});
+
+test("normalize still reads outputs from before paths were kept", () => {
+  expect(
+    survivalCollector.normalize(
+      {
+        rows: [
+          {
+            extension: ".ts",
+            authorEmail: "alice@example.com",
+            cohortMonth: "2025-01",
+            lines: 7,
+          },
+        ],
+      },
+      { classifyFile },
+    ),
+  ).toStrictEqual([
+    {
+      metric: "survival.lines",
+      value: 7,
+      categories: {
+        extension: ".ts",
+        author: "alice@example.com",
+        cohort: "2025-01",
+      },
+    },
+  ]);
+});
+
+const blob = (filePath: string, sizeBytes = 10) => ({
+  blobSha: "aaa",
+  filePath,
+  sizeBytes,
+});
+
+test("selectBlameableFiles leaves out what blame cannot or should not read", () => {
+  expect(
+    selectBlameableFiles(
+      [
+        blob("src/a.ts"),
+        blob("logo.png"),
+        blob("src/huge.ts", 3 * 1024 * 1024),
+        blob("src/caf\u{FFFD}.ts"),
+      ],
+      (filePath) => filePath.endsWith(".ts"),
+    ),
+  ).toStrictEqual(["src/a.ts"]);
 });

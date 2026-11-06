@@ -6,12 +6,18 @@ import {
   summarizeLineCounts,
 } from "./languages.ts";
 
+/** None of these outputs depend on file purposes. */
+const context = {
+  classifyFile: () => ({ label: "Production", source: true }),
+};
+
 test("countLines counts a trailing-newline-less last line, but not an empty file", () => {
   expect(countLines("")).toBe(0);
   expect(countLines("\n")).toBe(1);
   expect(countLines("a\nb\n")).toBe(2);
   expect(countLines("a\nb")).toBe(2);
   expect(countLines("\n".repeat(3))).toBe(3);
+  expect(countLines("binary\0\nblob\n")).toBe(0);
 });
 
 test("summarizeLineCounts groups per extension and totals", () => {
@@ -30,15 +36,18 @@ test("summarizeLineCounts groups per extension and totals", () => {
 });
 
 test("normalize folds extensions of one language into a single series", () => {
-  const facts = languagesCollector.normalize({
-    byExtension: {
-      ".ts": { files: 2, lines: 100 },
-      ".mts": { files: 1, lines: 20 },
-      ".toml": { files: 1, lines: 5 },
+  const facts = languagesCollector.normalize(
+    {
+      byExtension: {
+        ".ts": { files: 2, lines: 100 },
+        ".mts": { files: 1, lines: 20 },
+        ".toml": { files: 1, lines: 5 },
+      },
+      totalLines: 125,
+      totalFiles: 4,
     },
-    totalLines: 125,
-    totalFiles: 4,
-  });
+    context,
+  );
 
   const linesOf = (language: string) =>
     facts.find(

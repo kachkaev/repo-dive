@@ -61,7 +61,7 @@ CREATE TABLE blob_results (
 
 - **Keying.** A row is identified by collector name, cache fingerprint and blob sha.
   The fingerprint is the very same `cacheKey` written into `collector.json` (see the design notes below), so the cache is namespaced per (collector version, relevant config) and invalidates in lockstep with per-commit outputs: bumping a collector's version or changing the config it depends on moves it to a fresh namespace, and the previous namespace's rows simply stop being read.
-- **Who writes it.** Only content-scanning `tree` collectors, through two shared helpers: `scanTreeWithBlobCache` (whole source tree, 2 MiB blob cap — used by `directives` and `todo-comments`) and `scanTreeFilesWithBlobCache` (path-selected files, 32 MiB cap — used by `dependencies` for lockfiles).
+- **Who writes it.** Only content-scanning `tree` collectors, through two shared helpers: `scanTreeWithBlobCache` (every source file, 2 MiB blob cap — used by `directives` and `todo-comments`) and `scanTreeFilesWithBlobCache` (path-selected files, 32 MiB cap — used by `dependencies` for lockfiles).
   Both take the fingerprint from the `cacheKey` on their collect context, so a collector never invents its own namespace.
 - **Three levels.** A lookup checks an in-process memo of already-parsed results first, then this table, and only then reads the blobs nobody has seen — all missing blobs of a commit in a single `git cat-file --batch`. The memo is bounded and cleared wholesale when it overflows.
 - **Schema versioning.** `PRAGMA user_version` records the table shape. On a mismatch `blob_results` is dropped and recreated rather than migrated: every row is derived from content that is still in the object database.
