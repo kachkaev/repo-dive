@@ -216,8 +216,8 @@ type SplitDimension = "all" | "language" | "contributor" | "purpose";
 /** Split options in display order, which is also the fallback order. */
 const splitDimensions: readonly SplitDimension[] = [
   "language",
-  "contributor",
   "purpose",
+  "contributor",
   "all",
 ];
 
@@ -557,20 +557,20 @@ export function SurvivalTimeline({
                   : "No per-language data collected yet",
               },
               {
-                value: "contributor",
-                label: "by contributor",
-                disabled: !canDraw("contributor"),
-                title: canDraw("contributor")
-                  ? undefined
-                  : "No survival samples collected yet",
-              },
-              {
                 value: "purpose",
                 label: "by purpose",
                 disabled: !canDraw("purpose"),
                 title: canDraw("purpose")
                   ? undefined
                   : "No per-purpose data collected yet",
+              },
+              {
+                value: "contributor",
+                label: "by contributor",
+                disabled: !canDraw("contributor"),
+                title: canDraw("contributor")
+                  ? undefined
+                  : "No survival samples collected yet",
               },
               {
                 value: "all",
