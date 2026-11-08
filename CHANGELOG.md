@@ -1,5 +1,23 @@
 # repo-dive
 
+## 0.20.0
+
+### Minor Changes
+
+- [#364](https://github.com/kachkaev/repo-dive/pull/364) [`f0335e3`](https://github.com/kachkaev/repo-dive/commit/f0335e3cb0887db6e0a390decf081534fddf365d) - Give the language, purpose and contributor splits their own colors, so switching the split no longer leaves the top band the same blue.
+  Languages now wear fixed colors based on GitHub's language colors (TypeScript blue, JavaScript yellow, Go cyan…), the same in every report.
+  Purposes have their own fixed set (Production wine, Tests green, Docs lavender…), and humans are now teal on every chart, with the top contributor in the human color.
+  `contributors.maxInCharts` now defaults to `8` instead of `10`.
+  The year shading fades the oldest years less, and folds years older than seven into a single band.
+
+### Patch Changes
+
+- [#363](https://github.com/kachkaev/repo-dive/pull/363) [`30e6d62`](https://github.com/kachkaev/repo-dive/commit/30e6d6207b21353b67ba906b508a8e7c5ea4ac1e) - Show the by-purpose split before the by-contributor split in the lines and files charts.
+  The split control now reads `by language · by purpose · by contributor · all lines`.
+
+- [#352](https://github.com/kachkaev/repo-dive/pull/352) [`e3575b8`](https://github.com/kachkaev/repo-dive/commit/e3575b81abe0b185af37680bdcdc32c51ec0b018) - Report what `scan` is still running when it goes quiet.
+  After 30 seconds without output, it now prints a line such as `Scanned 24677/24678 commits, still running: survival on 1a2b3c4d5e (2m 30s)…` instead of appearing frozen, and it always finishes the counter with a final `Scanned 24678/24678 commits` line.
+
 ## 0.19.0
 
 ### Minor Changes
