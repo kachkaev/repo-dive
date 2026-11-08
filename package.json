@@ -111,7 +111,7 @@
     "eslint": "10.14.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "husky": "9.1.7",
-    "knip": "6.44.1",
+    "knip": "6.44.2",
     "lint-staged": "17.6.0",
     "lucide-react": "1.69.0",
     "markdownlint-cli": "0.50.0",
