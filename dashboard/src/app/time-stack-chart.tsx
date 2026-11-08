@@ -367,7 +367,7 @@ function HoverTooltip({
             .filter((entry) => entry.value !== 0 || seriesKeys.length <= 3)
             // A card that sums its rows lists all of them, or the rows would
             // fall short of the total with nothing to say why — e.g. the
-            // default 10 contributors plus "Other". Those stacks are bounded
+            // default 8 contributors plus "Other". Those stacks are bounded
             // by config; only the others need a cap.
             .slice(0, showSummary ? entries.length : 10)
             .map((entry) => (

@@ -23,7 +23,7 @@ export default defineConfig({
       },
     ],
     // How many contributors charts keep before folding the rest into "Other".
-    maxInCharts: 10,
+    maxInCharts: 8,
   },
   charts: {
     // First day of the week in calendar-shaped charts.
@@ -122,9 +122,9 @@ The dashboard badges bots (🤖) and AI agents (✨) with an icon and colors eve
 ### `contributors.maxInCharts`
 
 How many contributors the per-contributor charts keep before folding the remainder into an "Other" band.
-Defaults to `10`, must be an integer between 1 and 100.
+Defaults to `8`, must be an integer between 1 and 100.
 The stacked survival-by-contributor area keeps up to `maxInCharts` series; the contributors bar list keeps twice that, per kind — so a repo with hundreds of humans can't crowd out its handful of agents and bots.
-The categorical palette provides 20 distinct colors and cycles beyond that.
+The contributor palette provides 10 distinct colors and cycles beyond that.
 
 ## `charts`
 

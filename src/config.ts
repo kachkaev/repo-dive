@@ -20,7 +20,7 @@
  *         url: "https://github.com/bob",
  *       },
  *     ],
- *     maxInCharts: 10,
+ *     maxInCharts: 8,
  *   },
  *   charts: {
  *     weekStartsOn: "monday",
@@ -71,7 +71,7 @@ export type ContributorsConfig = {
   readonly aliases?: ReadonlyArray<readonly string[] | ContributorAliasGroup>;
   /**
    * How many contributors the per-contributor charts keep before folding the
-   * rest into "Other". Defaults to 10.
+   * rest into "Other". Defaults to 8.
    */
   readonly maxInCharts?: number;
 };

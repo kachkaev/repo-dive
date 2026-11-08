@@ -48,7 +48,7 @@ const configFileNames = [
   "repo-dive.config.js",
 ];
 
-export const defaultMaxInCharts = 10;
+export const defaultMaxInCharts = 8;
 
 export const defaultWeekStartsOn: WeekStart = "monday";
 

@@ -77,15 +77,56 @@
   /*
    * Reserved contributor-kind colors, used by every authorship-aware chart
    * (calendar, commits per month, churn, survival, contributor lists) so
-   * "human", "AI" and "bot" read as the same hue everywhere. Human and bot
-   * alias palette slots (the alias re-resolves per theme); the AI plum is its
-   * own value — unlike the palette purples, it keeps enough red to stay
-   * distinguishable from the human blue under simulated color-vision
-   * deficiency in both themes (validated).
+   * "human", "AI" and "bot" read as the same hue everywhere. Humans are teal
+   * rather than blue because the language split owns the blues (TypeScript,
+   * Python, Go) — a top contributor and the top language must not share a
+   * color. The AI plum keeps enough red to stay distinguishable from the
+   * human teal under simulated color-vision deficiency in both themes.
    */
-  --kind-human: var(--series-1);
-  --kind-bot: var(--series-3);
+  --kind-human: #008c8d;
+  --kind-bot: #c8850d;
   --kind-ai: #93278f;
+  /*
+   * Contributors in rank order. Slot 1 is the human teal, so the top
+   * contributor wears the color of their kind; slots 2–5 avoid blue (the
+   * language split's leads) and green (the purpose split's Tests and
+   * Tooling), so switching the split repaints the leading bands. Blues only
+   * come back from slot 6. Adjacent slots alternate dark and light.
+   */
+  --contributor-1: var(--kind-human);
+  --contributor-2: #523a9a;
+  --contributor-3: #f58a8f;
+  --contributor-4: #716400;
+  --contributor-5: #b7679a;
+  --contributor-6: #67addd;
+  --contributor-7: #2c488e;
+  --contributor-8: #389bb0;
+  --contributor-9: #844500;
+  --contributor-10: #ad86c5;
+  /*
+   * Built-in file purposes, the same in every repository. Source purposes
+   * take colors that no common language or leading contributor wears, so the
+   * purpose split reads as its own kind of chart; AI instructions take the AI
+   * plum. The non-source purposes (files chart only) are muted earth tones:
+   * a different register than the vivid source bands, without the hatching
+   * that already marks AI assistance elsewhere on the page.
+   */
+  --purpose-production: #8f263a;
+  --purpose-tests: #68a945;
+  --purpose-docs: #b191ea;
+  --purpose-examples: #5ac7d2;
+  --purpose-tooling: #00654e;
+  --purpose-test-data: #95ac92;
+  --purpose-assets: #887050;
+  --purpose-generated: #654c47;
+  /*
+   * Files the language table does not know (".json", "No extension", …):
+   * muted greys, so the files chart reads as colorful code next to neutral
+   * data.
+   */
+  --unknown-type-1: #b4a285;
+  --unknown-type-2: #3d5f63;
+  --unknown-type-3: #756c88;
   --seq-100: #cde2fb;
   --seq-200: #9ec5f4;
   --seq-300: #6da7ec;
@@ -126,7 +167,29 @@
     --series-20: #425ad1;
     --diverge-pos: #3987e5;
     --diverge-neg: #e66767;
+    --kind-human: #30a5a6;
+    --kind-bot: #c17f00;
     --kind-ai: #b02fa8;
+    --contributor-2: #644fb1;
+    --contributor-3: #f88d92;
+    --contributor-4: #716400;
+    --contributor-5: #c473a7;
+    --contributor-6: #60a7d6;
+    --contributor-7: #4160a7;
+    --contributor-8: #3fa1b6;
+    --contributor-9: #915114;
+    --contributor-10: #ba92d2;
+    --purpose-production: #a3394a;
+    --purpose-tests: #78b955;
+    --purpose-docs: #be9df7;
+    --purpose-examples: #79e4f0;
+    --purpose-tooling: #1b735b;
+    --purpose-test-data: #556a52;
+    --purpose-assets: #ad9473;
+    --purpose-generated: #7c625d;
+    --unknown-type-1: #6b5b40;
+    --unknown-type-2: #94b9bd;
+    --unknown-type-3: #d5cbeb;
   }
 }
 
