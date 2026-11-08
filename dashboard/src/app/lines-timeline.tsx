@@ -11,13 +11,13 @@ import { SurvivalTimeline } from "./survival-timeline.tsx";
  * scroll cut, so anonymous ghost bars flashing into the real heading would be
  * the first thing a reload shows. The subtitle is constant across every
  * toggle combination (see {@link SurvivalTimeline}): language splits count
- * source files at each commit, while contributor and purpose splits and age
+ * source files at each commit, while purpose and contributor splits and age
  * shading are attributed via git blame at sampled commits.
  */
 export const linesTimelineHeading = {
   title: "Lines of code",
   subtitle:
-    "lines in source files over the whole history; contributor split, purpose split and age shading come from git blame at sampled commits; test data, assets, generated and vendored files are not counted",
+    "lines in source files over the whole history; purpose split, contributor split and age shading come from git blame at sampled commits; test data, assets, generated and vendored files are not counted",
 };
 
 /**
