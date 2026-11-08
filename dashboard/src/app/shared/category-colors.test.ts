@@ -282,8 +282,8 @@ describe.each<Mode>(["light", "dark"])("%s theme", (mode) => {
       )
       // About 3:1 for the near-greys; the pale linguist colors (TSX,
       // JavaScript) sit just above it.
-      .filter(([, distance]) => distance < 23)
-      .map(([label, distance]) => `${label}: ΔE ${distance.toFixed(1)}`);
+      .filter(([, fromSurface]) => fromSurface < 23)
+      .map(([label, fromSurface]) => `${label}: ΔE ${fromSurface.toFixed(1)}`);
     expect(faint).toStrictEqual([]);
   });
 });
