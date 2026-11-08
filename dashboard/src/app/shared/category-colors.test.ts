@@ -280,8 +280,8 @@ describe.each<Mode>(["light", "dark"])("%s theme", (mode) => {
         ([label, color]) =>
           [label, deltaE(hexOf(color, mode), surface)] as const,
       )
-      // About 3:1 for the near-greys; the pale linguist colors (TSX,
-      // JavaScript) sit just above it.
+      // About 3:1 for the near-greys; the palest bands (light TSX and
+      // Examples) sit just above it.
       .filter(([, fromSurface]) => fromSurface < 23)
       .map(([label, fromSurface]) => `${label}: ΔE ${fromSurface.toFixed(1)}`);
     expect(faint).toStrictEqual([]);
