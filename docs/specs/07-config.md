@@ -124,7 +124,7 @@ The dashboard badges bots (🤖) and AI agents (✨) with an icon and colors eve
 How many contributors the per-contributor charts keep before folding the remainder into an "Other" band.
 Defaults to `8`, must be an integer between 1 and 100.
 The stacked survival-by-contributor area keeps up to `maxInCharts` series; the contributors bar list keeps twice that, per kind — so a repo with hundreds of humans can't crowd out its handful of agents and bots.
-The contributor palette provides 10 distinct colors and cycles beyond that.
+The contributor palette provides 12 distinct colors and cycles beyond that.
 
 ## `charts`
 

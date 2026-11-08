@@ -1,7 +1,12 @@
 import type { DashboardData } from "../../data.ts";
+import {
+  contributorColors,
+  customPurposeColors,
+  languageColors,
+  unknownTypeColors,
+} from "./category-colors.ts";
 import { kindColors } from "./contributor-kinds.tsx";
-import { languageColors, unknownTypeColors } from "./language-colors.ts";
-import { categoricalColors, otherColor } from "./stacked-series.ts";
+import { otherColor } from "./stacked-series.ts";
 
 /**
  * Survival series that indexing folds non-human contributors into (must match
@@ -12,17 +17,6 @@ const kindGroupSeriesColors: Record<string, string> = {
   Bots: kindColors.bot,
   "AI agents": kindColors.ai,
 };
-
-/**
- * The contributor palette (see styles.css), handed out in rank order. Its own
- * set rather than the generic series slots: slot 1 is the human teal, and the
- * leading slots stay clear of the blues the language split leads with and the
- * greens of the purpose split, so switching the split repaints the chart.
- */
-const contributorColors = Array.from(
-  { length: 10 },
-  (_, index) => `var(--contributor-${index + 1})`,
-);
 
 /**
  * Built-in file purposes keep one color in every repository, so that charts read
@@ -44,22 +38,12 @@ const builtInPurposeColors: Record<string, string> = {
 };
 
 /**
- * What custom file purposes draw from: the generic series slots, minus the
- * amber that reads as Bots and the purples that read as AI agents.
- */
-const customPurposeColors = categoricalColors.filter(
-  (color) =>
-    !["var(--series-3)", "var(--series-11)", "var(--series-16)"].includes(
-      color,
-    ),
-);
-
-/**
  * One base color per language, contributor and file purpose, shared by every
  * survival timeline on the page. Languages and purposes are fixed tables;
- * contributors take the contributor palette in rank order. Both charts pass these to {@link SurvivalTimeline},
- * so a series keeps its color across "Lines of code" and "Number of files"
- * (and across each chart's flat and year-shaded variants). The `rank` is the
+ * contributors take the contributor palette in rank order. Both charts pass
+ * these to {@link SurvivalTimeline}, so a series keeps its color across "Lines
+ * of code" and "Number of files" (and across each chart's flat and
+ * year-shaded variants). The `rank` is the
  * calling chart's own ranking, used only as a fallback for a label the scale
  * has never seen.
  */
@@ -73,9 +57,13 @@ export type SurvivalColorScales = {
 export const filePurposeLabelsOf = (data: DashboardData): string[] =>
   (data.config?.filePurposes ?? []).map((purpose) => purpose.label);
 
-/** Keys of a value record, largest value first — the order charts rank by. */
+/**
+ * Keys of a value record, largest value first — the order charts rank by. A
+ * tail the data arrives with already folded is never a named series.
+ */
 const rankedKeys = (values: Record<string, number> | undefined): string[] =>
   Object.entries(values ?? {})
+    .filter(([key]) => key !== "Other")
     .toSorted(([, left], [, right]) => right - left)
     .map(([key]) => key);
 
@@ -89,14 +77,14 @@ const append = (into: string[], keys: readonly string[]) => {
 
 /**
  * Builds the page's shared color scales from the latest snapshot of every
- * source a survival timeline can draw from. Languages wear their fixed color
- * (see language-colors.ts); only the files chart's unknown types and the
- * contributors take slots. Slots are handed out in the lines chart's own
- * ranking first, so that chart still reads in palette order; unknown types and
- * contributors that only the file-grain sources add take the slots after it. The file chart therefore shows shared series in the
- * lines chart's colors — possibly "out of rank order" within its own stack,
- * which is the point: color identifies the series, its position carries the
- * rank.
+ * source a survival timeline can draw from. Languages and purposes wear fixed
+ * colors; only contributors and the files chart's unknown types (".json", "No
+ * extension", …) take slots, in rank order. Contributor slots follow the lines
+ * chart's own ranking first, so that chart still reads in palette order;
+ * contributors that only the file-grain sources add take the slots after it.
+ * The file chart therefore shows shared contributors in the lines chart's
+ * colors — possibly "out of rank order" within its own stack, which is the
+ * point: color identifies the series, its position carries the rank.
  */
 export function survivalColorScalesOf(
   data: DashboardData,

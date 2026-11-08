@@ -83,50 +83,53 @@
    * color. The AI plum keeps enough red to stay distinguishable from the
    * human teal under simulated color-vision deficiency in both themes.
    */
-  --kind-human: #008c8d;
+  --kind-human: #1d756f;
   --kind-bot: #c8850d;
   --kind-ai: #93278f;
   /*
    * Contributors in rank order. Slot 1 is the human teal, so the top
    * contributor wears the color of their kind; slots 2–5 avoid blue (the
-   * language split's leads) and green (the purpose split's Tests and
-   * Tooling), so switching the split repaints the leading bands. Blues only
-   * come back from slot 6. Adjacent slots alternate dark and light.
+   * language split's leads) and green (the purpose split's Tests), so
+   * switching the split repaints the leading bands. Blues only come back from
+   * slot 6. The first eight, Bots, AI agents and Other stay apart pairwise,
+   * under simulated color-vision deficiency too (category-colors.test.ts).
    */
   --contributor-1: var(--kind-human);
-  --contributor-2: #523a9a;
-  --contributor-3: #f58a8f;
-  --contributor-4: #716400;
-  --contributor-5: #b7679a;
-  --contributor-6: #67addd;
-  --contributor-7: #2c488e;
-  --contributor-8: #389bb0;
+  --contributor-2: #5d2eb8;
+  --contributor-3: #f38c8d;
+  --contributor-4: #716e0a;
+  --contributor-5: #9d5e94;
+  --contributor-6: #6fafeb;
+  --contributor-7: #354e70;
+  --contributor-8: #109fb4;
   --contributor-9: #844500;
   --contributor-10: #ad86c5;
   /*
    * Built-in file purposes, the same in every repository. Source purposes
    * take colors that no common language or leading contributor wears, so the
    * purpose split reads as its own kind of chart; AI instructions take the AI
-   * plum. The non-source purposes (files chart only) are muted earth tones:
-   * a different register than the vivid source bands, without the hatching
-   * that already marks AI assistance elsewhere on the page.
+   * plum. The non-source purposes (files chart only) are muted tones: a
+   * different register than the vivid source bands, without the hatching
+   * that already marks AI assistance elsewhere on the page. All ten stay
+   * apart pairwise, under simulated color-vision deficiency too
+   * (category-colors.test.ts).
    */
   --purpose-production: #8f263a;
   --purpose-tests: #68a945;
   --purpose-docs: #b191ea;
   --purpose-examples: #5ac7d2;
-  --purpose-tooling: #00654e;
-  --purpose-test-data: #95ac92;
-  --purpose-assets: #887050;
-  --purpose-generated: #654c47;
+  --purpose-tooling: #6c6fe8;
+  --purpose-test-data: #9b5a35;
+  --purpose-assets: #a3a98d;
+  --purpose-generated: #5c4468;
   /*
    * Files the language table does not know (".json", "No extension", …):
-   * muted greys, so the files chart reads as colorful code next to neutral
-   * data.
+   * near-greys, so the files chart reads as colorful code next to neutral
+   * data, yet clear of the common languages and Other.
    */
-  --unknown-type-1: #b4a285;
-  --unknown-type-2: #3d5f63;
-  --unknown-type-3: #756c88;
+  --unknown-type-1: #99aa96;
+  --unknown-type-2: #c5bdcb;
+  --unknown-type-3: #4f6d6a;
   --seq-100: #cde2fb;
   --seq-200: #9ec5f4;
   --seq-300: #6da7ec;
@@ -167,29 +170,29 @@
     --series-20: #425ad1;
     --diverge-pos: #3987e5;
     --diverge-neg: #e66767;
-    --kind-human: #30a5a6;
+    --kind-human: #257b74;
     --kind-bot: #c17f00;
     --kind-ai: #b02fa8;
-    --contributor-2: #644fb1;
-    --contributor-3: #f88d92;
-    --contributor-4: #716400;
-    --contributor-5: #c473a7;
-    --contributor-6: #60a7d6;
-    --contributor-7: #4160a7;
-    --contributor-8: #3fa1b6;
+    --contributor-2: #734ad3;
+    --contributor-3: #f48e8e;
+    --contributor-4: #ce4116;
+    --contributor-5: #ef64a9;
+    --contributor-6: #6eaff7;
+    --contributor-7: #3870fa;
+    --contributor-8: #1fa5bb;
     --contributor-9: #915114;
     --contributor-10: #ba92d2;
     --purpose-production: #a3394a;
     --purpose-tests: #78b955;
     --purpose-docs: #be9df7;
     --purpose-examples: #79e4f0;
-    --purpose-tooling: #1b735b;
-    --purpose-test-data: #556a52;
-    --purpose-assets: #ad9473;
-    --purpose-generated: #7c625d;
-    --unknown-type-1: #6b5b40;
-    --unknown-type-2: #94b9bd;
-    --unknown-type-3: #d5cbeb;
+    --purpose-tooling: #7578f9;
+    --purpose-test-data: #d2b7a9;
+    --purpose-assets: #505c11;
+    --purpose-generated: #704a83;
+    --unknown-type-1: #3e5548;
+    --unknown-type-2: #473340;
+    --unknown-type-3: #a0b19c;
   }
 }
 

@@ -1,4 +1,11 @@
 /**
+ * Category palettes of the survival splits: fixed colors for languages,
+ * ranked ones for contributors, and the pools for unknown file types and
+ * custom purposes. The built-in purposes live next to the kind colors in
+ * survival-colors.tsx.
+ */
+
+/**
  * One fixed color per language, the same in every repository, so that a
  * language reads alike from one report to the next and never depends on how
  * it ranks.
@@ -14,18 +21,20 @@
  *   the dark theme) instead of linguist's little-known navy.
  * - C is a warm graphite rather than linguist's gray, which would read as
  *   "Other".
- * - A few pairs that share charts are pulled apart: Python is deepened away
- *   from TypeScript, CMake moves off YAML's crimson, and Perl and Prisma move
- *   off the human teal (`--kind-human`).
+ * - Pairs that share charts are pulled apart: Python is deepened away from
+ *   TypeScript, PHP away from Python, CMake moves off YAML's crimson, TSX off
+ *   Go, and Dart, Groovy, Perl and Prisma off the human teal
+ *   (`--kind-human`).
  *
- * Must cover every language in src/cli/shared/languages.ts (a test checks).
+ * Must cover every language in src/cli/shared/languages.ts, and the common
+ * ones must stay apart pairwise (category-colors.test.ts checks both).
  * Values are `light-dark()` pairs, resolved by the page's `color-scheme`.
  */
 const languageColorPairs: Record<string, readonly [string, string]> = {
   JavaScript: ["#cbba2a", "#d8c73c"],
   JSX: ["#a39400", "#968800"],
   TypeScript: ["#3178c6", "#478fde"],
-  TSX: ["#7ab7ff", "#74b5ff"],
+  TSX: ["#82bcfc", "#89a7fa"],
   Python: ["#225b90", "#2e669c"],
   Markdown: ["#28394f", "#b1c6e2"],
   reStructuredText: ["#5d7089", "#8ca0bb"],
@@ -35,7 +44,7 @@ const languageColorPairs: Record<string, readonly [string, string]> = {
   Rust: ["#d7926a", "#e49f76"],
   Java: ["#b37100", "#b37100"],
   C: ["#6c4932", "#7e5a42"],
-  "C Header": ["#4a2913", "#bc957b"],
+  "C Header": ["#4b270e", "#c6889e"],
   "C++": ["#ef4c90", "#ef4c90"],
   "C++ Header": ["#ff90b6", "#8f004b"],
   HTML: ["#fe4916", "#f15a35"],
@@ -46,13 +55,13 @@ const languageColorPairs: Record<string, readonly [string, string]> = {
   PowerShell: ["#867bd3", "#9b90ea"],
   Ruby: ["#9f5055", "#b66569"],
   Swift: ["#ff7874", "#ff7874"],
-  PHP: ["#005194", "#3b6ba1"],
+  PHP: ["#043785", "#7c719b"],
   "C#": ["#754ced", "#8a6cff"],
   Kotlin: ["#a97bff", "#a97bff"],
   Vue: ["#1c9f6b", "#31ab77"],
   Svelte: ["#fa347f", "#ff247e"],
   Astro: ["#c56d00", "#ab5f00"],
-  Dart: ["#00b4ab", "#00b4ab"],
+  Dart: ["#27b492", "#1baf6a"],
   Elixir: ["#9a5acd", "#ad6ce1"],
   Erlang: ["#c1249d", "#b83998"],
   Scala: ["#b6317e", "#b6317e"],
@@ -68,8 +77,8 @@ const languageColorPairs: Record<string, readonly [string, string]> = {
   Julia: ["#a94e99", "#b04b8b"],
   Zig: ["#bc662f", "#b97500"],
   OCaml: ["#866300", "#c99500"],
-  Groovy: ["#50abce", "#41b2b3"],
-  Prisma: ["#3f5f86", "#5b7fa8"],
+  Groovy: ["#99a2ce", "#63a19b"],
+  Prisma: ["#465d8b", "#6e76a0"],
   "Protocol Buffers": ["#006246", "#007654"],
 };
 
@@ -90,3 +99,28 @@ export const unknownTypeColors = [
   "var(--unknown-type-2)",
   "var(--unknown-type-3)",
 ];
+
+/**
+ * The contributor palette (see styles.css), handed out in rank order. Its own
+ * set rather than the generic series slots: slot 1 is the human teal, and the
+ * leading slots stay clear of the blues the language split leads with, so
+ * switching the split repaints the chart. Past the ten dedicated slots come
+ * the only series slots that stay clear of all of them and of the kind colors
+ * (a test checks); a `contributors.maxInCharts` beyond that cycles.
+ */
+export const contributorColors = [
+  ...Array.from(
+    { length: 10 },
+    (_, index) => `var(--contributor-${index + 1})`,
+  ),
+  "var(--series-2)",
+  "var(--series-4)",
+];
+
+/**
+ * What custom file purposes draw from: the series slots that stay clear of
+ * every built-in purpose color and of the kind colors (a test checks).
+ */
+export const customPurposeColors = [4, 6, 7, 18, 20].map(
+  (slot) => `var(--series-${slot})`,
+);

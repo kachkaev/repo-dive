@@ -21,6 +21,7 @@ cva
 Datasette
 DDL
 dedupe
+deutan
 Devine
 dsl
 Dus
@@ -68,6 +69,7 @@ LLM
 lockfiles
 loglevel
 maat
+Machado
 matplotlib
 MCP
 mdc
@@ -83,6 +85,7 @@ noxfile
 npmjs
 numstat
 okhttp
+oklab
 ollama
 onefetch
 opencode
@@ -92,6 +95,7 @@ oxc
 Picci
 Pijul
 pnp
+protan
 pyi
 pyproject
 rasterizes
