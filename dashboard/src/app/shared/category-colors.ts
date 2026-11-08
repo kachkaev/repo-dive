@@ -23,7 +23,7 @@
  *   "Other".
  * - Pairs that share charts are pulled apart: Python is deepened away from
  *   TypeScript, PHP away from Python, CMake moves off YAML's crimson, TSX off
- *   Go, and Dart, Groovy, Perl and Prisma off the human teal
+ *   Go, and Dart, Groovy, Perl, Prisma and Protocol Buffers off the human teal
  *   (`--kind-human`).
  *
  * Must cover every language in src/cli/shared/languages.ts, and the common
@@ -79,7 +79,7 @@ const languageColorPairs: Record<string, readonly [string, string]> = {
   OCaml: ["#866300", "#c99500"],
   Groovy: ["#99a2ce", "#63a19b"],
   Prisma: ["#465d8b", "#6e76a0"],
-  "Protocol Buffers": ["#006246", "#007654"],
+  "Protocol Buffers": ["#195b32", "#00722a"],
 };
 
 export const languageColors: Readonly<Record<string, string>> =

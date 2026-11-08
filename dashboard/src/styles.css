@@ -127,8 +127,8 @@
    * near-greys, so the files chart reads as colorful code next to neutral
    * data, yet clear of the common languages and Other.
    */
-  --unknown-type-1: #99aa96;
-  --unknown-type-2: #c5bdcb;
+  --unknown-type-1: #92ad91;
+  --unknown-type-2: #bda4c2;
   --unknown-type-3: #4f6d6a;
   --seq-100: #cde2fb;
   --seq-200: #9ec5f4;
@@ -188,11 +188,11 @@
     --purpose-examples: #79e4f0;
     --purpose-tooling: #7578f9;
     --purpose-test-data: #d2b7a9;
-    --purpose-assets: #505c11;
+    --purpose-assets: #747830;
     --purpose-generated: #704a83;
-    --unknown-type-1: #3e5548;
-    --unknown-type-2: #473340;
-    --unknown-type-3: #a0b19c;
+    --unknown-type-1: #dbd6b0;
+    --unknown-type-2: #345f56;
+    --unknown-type-3: #9eaf9a;
   }
 }
 

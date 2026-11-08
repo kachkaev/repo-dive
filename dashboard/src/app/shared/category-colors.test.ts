@@ -265,4 +265,25 @@ describe.each<Mode>(["light", "dark"])("%s theme", (mode) => {
       ),
     ).toStrictEqual([]);
   });
+
+  test("every category color stands out from the chart surface", () => {
+    const surface = hexOf("var(--surface-1)", mode);
+    const faint = [
+      ...contributorEntries,
+      ...kinds,
+      ...builtInPurposes,
+      ...customPurposeColors.map((color) => ["custom purpose", color] as const),
+      ...Object.entries(languageColors),
+      ...unknownTypeColors.map((color) => ["unknown type", color] as const),
+    ]
+      .map(
+        ([label, color]) =>
+          [label, deltaE(hexOf(color, mode), surface)] as const,
+      )
+      // About 3:1 for the near-greys; the pale linguist colors (TSX,
+      // JavaScript) sit just above it.
+      .filter(([, distance]) => distance < 23)
+      .map(([label, distance]) => `${label}: ΔE ${distance.toFixed(1)}`);
+    expect(faint).toStrictEqual([]);
+  });
 });
