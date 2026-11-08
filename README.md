@@ -101,8 +101,8 @@ export default defineConfig({
         url: "https://github.com/bob",
       },
     ],
-    // How many contributors charts keep before folding the rest into "Other" (default 10).
-    maxInCharts: 10,
+    // How many contributors charts keep before folding the rest into "Other" (default 8).
+    maxInCharts: 8,
   },
   charts: {
     // First day of the week in calendar-shaped charts (default "monday").

@@ -1,6 +1,12 @@
 import type { DashboardData } from "../../data.ts";
+import {
+  contributorColors,
+  customPurposeColors,
+  languageColors,
+  unknownTypeColors,
+} from "./category-colors.ts";
 import { kindColors } from "./contributor-kinds.tsx";
-import { categoricalColors, otherColor } from "./stacked-series.ts";
+import { otherColor } from "./stacked-series.ts";
 
 /**
  * Survival series that indexing folds non-human contributors into (must match
@@ -13,45 +19,31 @@ const kindGroupSeriesColors: Record<string, string> = {
 };
 
 /**
- * Palette slots a person may take in a chart that also draws the folded Bots /
- * AI agents bands. `--series-3` is skipped because `--kind-bot` aliases it (see
- * styles.css) — otherwise a human and the Bots band render in the very same
- * amber within one stack, which is exactly what the reserved colors exist to
- * prevent. `--series-1` stays in: it *is* `--kind-human`.
- */
-const humanCategoricalColors = categoricalColors.filter(
-  (color) => color !== "var(--series-3)",
-);
-
-/**
  * Built-in file purposes keep one color in every repository, so that charts read
- * alike from one report to the next. Test data sits in the green family of
- * tests, AI instructions in the color AI agents have among contributors. Must
- * match the labels in src/cli/shared/file-purposes.ts.
+ * alike from one report to the next. AI instructions wear the color AI agents
+ * have among contributors. Must match the labels in
+ * src/cli/shared/file-purposes.ts.
  */
 const builtInPurposeColors: Record<string, string> = {
-  Production: "var(--series-1)",
-  Tests: "var(--series-2)",
-  Docs: "var(--series-3)",
-  Examples: "var(--series-5)",
-  Tooling: "var(--series-8)",
+  Production: "var(--purpose-production)",
+  Tests: "var(--purpose-tests)",
+  Docs: "var(--purpose-docs)",
+  Examples: "var(--purpose-examples)",
+  Tooling: "var(--purpose-tooling)",
   "AI instructions": kindColors.ai,
-  "Test data": "var(--series-14)",
-  Assets: "var(--series-13)",
-  "Generated & vendored": "var(--series-12)",
+  "Test data": "var(--purpose-test-data)",
+  Assets: "var(--purpose-assets)",
+  "Generated & vendored": "var(--purpose-generated)",
   Other: otherColor,
 };
 
-/** What custom file purposes draw from: whatever no built-in one has reserved. */
-const customPurposeColors = categoricalColors.filter(
-  (color) => !Object.values(builtInPurposeColors).includes(color),
-);
-
 /**
  * One base color per language, contributor and file purpose, shared by every
- * survival timeline on the page. Both charts pass these to {@link SurvivalTimeline},
- * so a series keeps its color across "Lines of code" and "Number of files"
- * (and across each chart's flat and year-shaded variants). The `rank` is the
+ * survival timeline on the page. Languages and purposes are fixed tables;
+ * contributors take the contributor palette in rank order. Both charts pass
+ * these to {@link SurvivalTimeline}, so a series keeps its color across "Lines
+ * of code" and "Number of files" (and across each chart's flat and
+ * year-shaded variants). The `rank` is the
  * calling chart's own ranking, used only as a fallback for a label the scale
  * has never seen.
  */
@@ -65,9 +57,13 @@ export type SurvivalColorScales = {
 export const filePurposeLabelsOf = (data: DashboardData): string[] =>
   (data.config?.filePurposes ?? []).map((purpose) => purpose.label);
 
-/** Keys of a value record, largest value first — the order charts rank by. */
+/**
+ * Keys of a value record, largest value first — the order charts rank by. A
+ * tail the data arrives with already folded is never a named series.
+ */
 const rankedKeys = (values: Record<string, number> | undefined): string[] =>
   Object.entries(values ?? {})
+    .filter(([key]) => key !== "Other")
     .toSorted(([, left], [, right]) => right - left)
     .map(([key]) => key);
 
@@ -81,13 +77,14 @@ const append = (into: string[], keys: readonly string[]) => {
 
 /**
  * Builds the page's shared color scales from the latest snapshot of every
- * source a survival timeline can draw from. Palette slots are handed out in
- * the lines chart's own ranking first, so that chart still reads in palette
- * order; languages and contributors that only the file-grain sources add take
- * the slots after it. The file chart therefore shows shared series in the
- * lines chart's colors — possibly "out of rank order" within its own stack,
- * which is the point: color identifies the series, its position carries the
- * rank.
+ * source a survival timeline can draw from. Languages and purposes wear fixed
+ * colors; only contributors and the files chart's unknown types (".json", "No
+ * extension", …) take slots, in rank order. Contributor slots follow the lines
+ * chart's own ranking first, so that chart still reads in palette order;
+ * contributors that only the file-grain sources add take the slots after it.
+ * The file chart therefore shows shared contributors in the lines chart's
+ * colors — possibly "out of rank order" within its own stack, which is the
+ * point: color identifies the series, its position carries the rank.
  */
 export function survivalColorScalesOf(
   data: DashboardData,
@@ -108,8 +105,10 @@ export function survivalColorScalesOf(
     rankedKeys(data.fileSurvival?.at(-1)?.byContributor),
   );
 
-  const languageSlots = new Map(
-    languageOrder.map((label, slot) => [label, slot]),
+  const unknownTypeSlots = new Map(
+    languageOrder
+      .filter((label) => !Object.hasOwn(languageColors, label))
+      .map((label, slot) => [label, slot]),
   );
   // The kind groups draw reserved colors, so they must not consume the human
   // palette slots — a person's color cannot depend on whether bots rank above
@@ -125,8 +124,12 @@ export function survivalColorScalesOf(
 
   return {
     languageColorOf: (label, rank) => {
-      const slot = languageSlots.get(label) ?? languageOrder.length + rank;
-      return categoricalColors[slot % categoricalColors.length] ?? otherColor;
+      const fixed = languageColors[label];
+      if (fixed !== undefined) {
+        return fixed;
+      }
+      const slot = unknownTypeSlots.get(label) ?? unknownTypeSlots.size + rank;
+      return unknownTypeColors[slot % unknownTypeColors.length] ?? otherColor;
     },
     contributorColorOf: (label, rank) => {
       const reserved = kindGroupSeriesColors[label];
@@ -134,10 +137,7 @@ export function survivalColorScalesOf(
         return reserved;
       }
       const slot = humanSlots.get(label) ?? humanSlots.size + rank;
-      return (
-        humanCategoricalColors[slot % humanCategoricalColors.length] ??
-        otherColor
-      );
+      return contributorColors[slot % contributorColors.length] ?? otherColor;
     },
     purposeColorOf: (label, rank) => {
       const slot = customPurposes.indexOf(label);

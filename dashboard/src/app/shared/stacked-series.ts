@@ -5,7 +5,7 @@
  */
 type TimePoint = { dateMs: number; values: Record<string, number> };
 
-export const categoricalColors = Array.from(
+const categoricalColors = Array.from(
   { length: 20 },
   (_, index) => `var(--series-${index + 1})`,
 );

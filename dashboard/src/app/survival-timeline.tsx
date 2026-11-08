@@ -19,17 +19,24 @@ import {
  * How many age bands the year-shaded variants distinguish before folding the
  * oldest years together. The actual count is the repo's age in years capped at
  * this, kept constant across every variant so a given year reads the same
- * shade everywhere. (Intended to become a config option.)
+ * shade everywhere. Sized with {@link maxYearFade} so that one year of age
+ * still fades a band by about 8% (55% over seven steps): fewer shades would
+ * fold too much history, more would leave neighboring years hard to tell
+ * apart. (Intended to become a config option.)
  */
-const maxYearShades = 10;
+const maxYearShades = 8;
 
-/** How far the oldest band fades toward the surface at most; newest stays full color. */
-const maxYearFade = 70;
+/**
+ * How far the oldest band fades toward the surface at most; newest stays full
+ * color. Kept at about half, so even the oldest band keeps enough of its
+ * category's color to tell it from the neighboring categories.
+ */
+const maxYearFade = 55;
 
 /**
  * The most one year of age may fade a band. With only a few years the full
  * {@link maxYearFade} range would put adjacent years far apart (two years
- * would jump straight from full color to 70% faded), so short histories use a
+ * would jump straight from full color to 55% faded), so short histories use a
  * narrower range; from four years on the steps fall below this cap and the
  * oldest band reaches the full fade.
  */

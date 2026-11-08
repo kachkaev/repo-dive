@@ -16,7 +16,7 @@ import {
 import type { DashboardData } from "./data.ts";
 
 /** Falls back when serving a dashboard.json written before configurable caps. */
-const defaultMaxContributorsInCharts = 10;
+const defaultMaxContributorsInCharts = 8;
 
 export function App({ data }: { data: DashboardData }) {
   const maxContributorsInCharts =
