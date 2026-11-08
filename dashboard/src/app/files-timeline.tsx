@@ -9,7 +9,7 @@ import { SurvivalTimeline } from "./survival-timeline.tsx";
  * The file-count timeline: the file grain of {@link SurvivalTimeline}, sitting
  * right under the lines-of-code chart it mirrors. It counts every file git
  * tracks, where that chart only counts source files: the flat variants come from
- * the per-commit tree listing, the contributor and purpose splits and age shading
+ * the per-commit tree listing, the purpose and contributor splits and age shading
  * from the `file-survival` collector, which attributes each living file to the
  * commit that created it — so a file keeps its creator and creation year through
  * every later edit, until it is deleted.
@@ -24,7 +24,7 @@ export function FilesTimeline({
   return (
     <SurvivalTimeline
       title="Number of files"
-      subtitle="every file git tracks over the whole history; contributor split, purpose split and age shading come from each file's creating commit, sampled like survival — a file keeps its creator and creation year until deleted, later edits don't re-bin it"
+      subtitle="every file git tracks over the whole history; purpose split, contributor split and age shading come from each file's creating commit, sampled like survival — a file keeps its creator and creation year until deleted, later edits don't re-bin it"
       annotation={data.config?.charts?.annotations?.["number-of-files"]}
       unit="files"
       flatRows={data.fileTypes.flatMap((row) =>
