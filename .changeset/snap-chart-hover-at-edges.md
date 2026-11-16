@@ -2,6 +2,6 @@
 "repo-dive": patch
 ---
 
-Snap the chart hover card to the first and last points at the chart edges.
-The edges of the lines, files and dependencies charts used to read "No data" when the cursor landed a fraction of a pixel past the last point or on a day the current split had no sample for.
-Their hover area now reaches 4px past both the plot and the data, and the commits bar chart no longer shows an empty month past its last bar.
+Snap chart hover to the first and last points at the edges.
+Hovering just past either end of a time chart used to read "No data", e.g. `2026-11-17 · Tuesday · No data` on a report made on Monday, or `Dec 2026 · No data` in commits per month.
+The edges now show the first or last point, while genuine gaps, such as the dependencies chart before the first lockfile, still read "No data".

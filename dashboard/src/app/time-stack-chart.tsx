@@ -32,13 +32,13 @@ const height = 260;
 
 /**
  * How far an area or line chart's hover reaches past its data: the hover area
- * overhangs the plot's left and right edges by this much, and the cursor snaps
- * to the first or last point from this far outside the data's span. Those
- * points sit on (or within a few days of) the plot edges, so without the
- * overhang the cursor had to land on a single pixel column to read them, and a
- * slightly wider axis — a sibling variant's samples reaching a day further —
- * left an edge that read "No data". Bars need none: the outer bars span half a
- * slot inwards, and that slot is already their hover target.
+ * overhangs the plot's left and right edges by this much, and the cursor still
+ * snaps to the first or last point this far outside the data's span. Overshoot
+ * the edge a little and the card shows the outermost point, as does an edge a
+ * few pixels past a variant whose samples start or end inside an axis widened
+ * for its siblings. A genuine gap, wider than this, still reads "No data".
+ * Bars need none: the edge bars are centred half a slot inside the plot, and
+ * the snap slack already spans that half slot.
  */
 const hoverOverhangPx = 4;
 
@@ -794,7 +794,9 @@ export function TimeSeriesChart(props: {
     const bounds = event.currentTarget.getBoundingClientRect();
     // Clamped to the plot: the overhang reads as its nearest edge, and so does
     // a sub-pixel overshoot of the hit area. At around a day per pixel, half a
-    // pixel past the last point used to land on the next, empty day.
+    // pixel past the last point used to land on the next, empty day. The clamp
+    // is the fix, not the overhang: it keeps the cursor inside the axis, which
+    // without widening is the data's span (plus the bars' half slot).
     const x = Math.min(
       innerWidth,
       Math.max(0, event.clientX - bounds.left - overhangPx),
@@ -818,8 +820,8 @@ export function TimeSeriesChart(props: {
   // treat as a possible mutation and fuse into the hover-reactive scope. Lines
   // and areas put their points on the range edges, so `xInset` is 0 for them;
   // their slack is the hover overhang instead (see `hoverOverhangPx`). Half a
-  // pixel more absorbs the rounding in `xScale.invert`, so the clamped edge
-  // pixel of a bar chart never falls just outside the span.
+  // pixel more absorbs floating-point error at the clamped edge, which a bar
+  // chart's slack would otherwise match exactly.
   const snapSlackMs =
     ((xInset + overhangPx + 0.5) * (xMax - xMin)) /
     Math.max(1, innerWidth - 2 * xInset);
