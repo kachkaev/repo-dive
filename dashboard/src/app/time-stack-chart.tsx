@@ -793,8 +793,9 @@ export function TimeSeriesChart(props: {
   const handleMove = (event: React.MouseEvent<SVGRectElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
     // Clamped to the plot: the overhang reads as its nearest edge, and so does
-    // a sub-pixel overshoot of the hit area. At around a day per pixel, half a
-    // pixel past the last point used to land on the next, empty day. The clamp
+    // a sub-pixel overshoot of the hit area. Even a fraction of a pixel past the
+    // last point used to read as a gap, and at around a day per pixel the
+    // card's date could already be the next day. The clamp
     // is the fix, not the overhang: it keeps the cursor inside the axis, which
     // without widening is the data's span (plus the bars' half slot).
     const x = Math.min(
@@ -813,8 +814,7 @@ export function TimeSeriesChart(props: {
   // eslint-disable-next-line unicorn/prefer-at -- see the comment above
   const dataMaxMs = rows[rows.length - 1]?.["dateMs"];
   // The outermost bars are centred on the first and last points, so their outer
-  // halves hang past the data's span — that overhang is exactly what `xInset`
-  // reserves. Without the same slack here, those edge pixels sit over a bar yet
+  // halves hang past the data's span — the half slot that `xInset` reserves. Without the same slack here, those edge pixels sit over a bar yet
   // fall outside the span and read as a gap ("No data"). Converted from px to
   // ms by hand: `xScale.invert` is an opaque call, which the compiler would
   // treat as a possible mutation and fuse into the hover-reactive scope. Lines
