@@ -30,6 +30,18 @@ export type SeriesGroup = { label: string; color: string; keys: string[] };
 const margin = { top: 8, right: 12, bottom: 24, left: 44 };
 const height = 260;
 
+/**
+ * How far an area or line chart's hover reaches past its data: the hover area
+ * overhangs the plot's left and right edges by this much, and the cursor snaps
+ * to the first or last point from this far outside the data's span. Those
+ * points sit on (or within a few days of) the plot edges, so without the
+ * overhang the cursor had to land on a single pixel column to read them, and a
+ * slightly wider axis — a sibling variant's samples reaching a day further —
+ * left an edge that read "No data". Bars need none: the outer bars span half a
+ * slot inwards, and that slot is already their hover target.
+ */
+const hoverOverhangPx = 4;
+
 const axisTickLabelProps = {
   fill: "var(--text-muted)",
   fontSize: 10,
@@ -777,9 +789,16 @@ export function TimeSeriesChart(props: {
     }
   }
 
+  const overhangPx = mode === "bar" ? 0 : hoverOverhangPx;
   const handleMove = (event: React.MouseEvent<SVGRectElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - bounds.left;
+    // Clamped to the plot: the overhang reads as its nearest edge, and so does
+    // a sub-pixel overshoot of the hit area. At around a day per pixel, half a
+    // pixel past the last point used to land on the next, empty day.
+    const x = Math.min(
+      innerWidth,
+      Math.max(0, event.clientX - bounds.left - overhangPx),
+    );
     setHoverMs(xScale.invert(x).getTime());
   };
 
@@ -797,10 +816,13 @@ export function TimeSeriesChart(props: {
   // fall outside the span and read as a gap ("No data"). Converted from px to
   // ms by hand: `xScale.invert` is an opaque call, which the compiler would
   // treat as a possible mutation and fuse into the hover-reactive scope. Lines
-  // and areas put their points on the range edges, so `xInset` — and the slack
-  // with it — is 0.
+  // and areas put their points on the range edges, so `xInset` is 0 for them;
+  // their slack is the hover overhang instead (see `hoverOverhangPx`). Half a
+  // pixel more absorbs the rounding in `xScale.invert`, so the clamped edge
+  // pixel of a bar chart never falls just outside the span.
   const snapSlackMs =
-    (xInset * (xMax - xMin)) / Math.max(1, innerWidth - 2 * xInset);
+    ((xInset + overhangPx + 0.5) * (xMax - xMin)) /
+    Math.max(1, innerWidth - 2 * xInset);
   const hoverInData =
     hoverMs !== undefined &&
     dataMinMs !== undefined &&
@@ -925,7 +947,8 @@ export function TimeSeriesChart(props: {
               })}
             />
             <rect
-              width={innerWidth}
+              x={-overhangPx}
+              width={innerWidth + 2 * overhangPx}
               height={innerHeight}
               fill="transparent"
               onMouseMove={handleMove}
