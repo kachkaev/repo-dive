@@ -1,5 +1,13 @@
 # repo-dive
 
+## 0.20.1
+
+### Patch Changes
+
+- [#379](https://github.com/kachkaev/repo-dive/pull/379) [`268dff9`](https://github.com/kachkaev/repo-dive/commit/268dff96291e663e0b22060ca4e1b5f724585474) - Snap chart hover to the first and last points at the edges.
+  Hovering just past either end of a time chart used to read "No data", e.g. `2026-11-17 · Tuesday · No data` on a report made on Monday, or `Dec 2026 · No data` in commits per month.
+  The edges now show the first or last point, while genuine gaps, such as the dependencies chart before the first lockfile, still read "No data".
+
 ## 0.20.0
 
 ### Minor Changes
