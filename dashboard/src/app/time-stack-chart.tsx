@@ -30,6 +30,18 @@ export type SeriesGroup = { label: string; color: string; keys: string[] };
 const margin = { top: 8, right: 12, bottom: 24, left: 44 };
 const height = 260;
 
+/**
+ * How far an area or line chart's hover reaches past its data: the hover area
+ * overhangs the plot's left and right edges by this much, and the cursor still
+ * snaps to the first or last point this far outside the data's span. Overshoot
+ * the edge a little and the card shows the outermost point, as does an edge a
+ * few pixels past a variant whose samples start or end inside an axis widened
+ * for its siblings. A genuine gap, wider than this, still reads "No data".
+ * Bars need none: the edge bars are centred half a slot inside the plot, and
+ * the snap slack already spans that half slot.
+ */
+const hoverOverhangPx = 4;
+
 const axisTickLabelProps = {
   fill: "var(--text-muted)",
   fontSize: 10,
@@ -777,9 +789,19 @@ export function TimeSeriesChart(props: {
     }
   }
 
+  const overhangPx = mode === "bar" ? 0 : hoverOverhangPx;
   const handleMove = (event: React.MouseEvent<SVGRectElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - bounds.left;
+    // Clamped to the plot: the overhang reads as its nearest edge, and so does
+    // a sub-pixel overshoot of the hit area. Even a fraction of a pixel past the
+    // last point used to read as a gap, and at around a day per pixel the
+    // card's date could already be the next day. The clamp
+    // is the fix, not the overhang: it keeps the cursor inside the axis, which
+    // without widening is the data's span (plus the bars' half slot).
+    const x = Math.min(
+      innerWidth,
+      Math.max(0, event.clientX - bounds.left - overhangPx),
+    );
     setHoverMs(xScale.invert(x).getTime());
   };
 
@@ -792,15 +814,17 @@ export function TimeSeriesChart(props: {
   // eslint-disable-next-line unicorn/prefer-at -- see the comment above
   const dataMaxMs = rows[rows.length - 1]?.["dateMs"];
   // The outermost bars are centred on the first and last points, so their outer
-  // halves hang past the data's span — that overhang is exactly what `xInset`
-  // reserves. Without the same slack here, those edge pixels sit over a bar yet
+  // halves hang past the data's span — the half slot that `xInset` reserves. Without the same slack here, those edge pixels sit over a bar yet
   // fall outside the span and read as a gap ("No data"). Converted from px to
   // ms by hand: `xScale.invert` is an opaque call, which the compiler would
   // treat as a possible mutation and fuse into the hover-reactive scope. Lines
-  // and areas put their points on the range edges, so `xInset` — and the slack
-  // with it — is 0.
+  // and areas put their points on the range edges, so `xInset` is 0 for them;
+  // their slack is the hover overhang instead (see `hoverOverhangPx`). Half a
+  // pixel more absorbs floating-point error at the clamped edge, which a bar
+  // chart's slack would otherwise match exactly.
   const snapSlackMs =
-    (xInset * (xMax - xMin)) / Math.max(1, innerWidth - 2 * xInset);
+    ((xInset + overhangPx + 0.5) * (xMax - xMin)) /
+    Math.max(1, innerWidth - 2 * xInset);
   const hoverInData =
     hoverMs !== undefined &&
     dataMinMs !== undefined &&
@@ -925,7 +949,8 @@ export function TimeSeriesChart(props: {
               })}
             />
             <rect
-              width={innerWidth}
+              x={-overhangPx}
+              width={innerWidth + 2 * overhangPx}
               height={innerHeight}
               fill="transparent"
               onMouseMove={handleMove}
