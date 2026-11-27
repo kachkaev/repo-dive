@@ -59,7 +59,11 @@ export const TooltipContent = <M>(
   h: Html.H<M>,
   tooltip: TooltipParts,
   content: View.Input<M>,
-  options?: { readonly arrow?: boolean | undefined },
+  options?: {
+    readonly arrow?: boolean | undefined;
+    /** Added to the popup's classes, as the React `className` prop is. */
+    readonly className?: string | undefined;
+  },
 ) =>
   tooltip
     .positioner(
@@ -74,6 +78,7 @@ export const TooltipContent = <M>(
             .attr("data-slot", "tooltip-content")
             .class(
               "w-fit max-w-xs origin-(--transform-origin) rounded-md border border-border bg-muted px-2.5 py-1.5 text-xs text-balance text-foreground shadow-sm transition-[opacity,transform] duration-100 starting:scale-95 starting:opacity-0",
+              options?.className,
             ),
         )
         .children(
