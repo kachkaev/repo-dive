@@ -39,7 +39,7 @@ const CommitCalendarSectionMessage = UiSchema.TaggedEnum({
  * section is that owner, and the calendar below it can be re-keyed on the
  * range without losing them.
  */
-const CommitCalendarSection = Html.component({
+export const CommitCalendarSection = Html.component({
   name: "CommitCalendarSection",
   props: Schema.Struct({ data: DashboardDataSchema }),
   model: Schema.Struct({

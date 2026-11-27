@@ -61,7 +61,11 @@ export const TooltipContent = <M>(
   content: View.Input<M>,
   options?: {
     readonly arrow?: boolean | undefined;
-    /** Added to the popup's classes, as the React `className` prop is. */
+    /**
+     * Appended to the popup's classes as they are, where the React
+     * `className` prop is merged with `cn` (tailwind-merge): pass classes
+     * that don't compete with the popup's own.
+     */
     readonly className?: string | undefined;
   },
 ) =>

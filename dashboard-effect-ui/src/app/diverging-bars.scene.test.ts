@@ -74,3 +74,10 @@ it.effect(
         .toExist();
     }),
 );
+
+it.effect("says so when there is nothing to chart", () =>
+  Effect.gen(function* () {
+    const s = yield* HtmlScene.make(DivergingBars, { ...props, points: [] });
+    s.expect(Locator.text("No data collected yet.")).toExist();
+  }),
+);

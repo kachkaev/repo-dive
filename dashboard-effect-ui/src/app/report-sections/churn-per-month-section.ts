@@ -71,7 +71,7 @@ const ChurnPerMonthSectionMessage = UiSchema.TaggedEnum({
  * commits" and reading "who moves lines" are separate questions, and both
  * sections carry their own control anyway.
  */
-const ChurnPerMonthSection = Html.component({
+export const ChurnPerMonthSection = Html.component({
   name: "ChurnPerMonthSection",
   props: Schema.Struct({ data: DashboardDataSchema }),
   model: Schema.Struct({ kindFilter: KindFilterSchema }),
