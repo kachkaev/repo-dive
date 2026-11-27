@@ -6,6 +6,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "./shared/@ui-primitive/tooltip.tsx";
+import { cn } from "./shared/cn.ts";
 import { formatDate } from "./shared/format.ts";
 
 const repoDiveUrl = "https://github.com/kachkaev/repo-dive";
@@ -156,8 +157,9 @@ function RepoHeading({
 }
 
 /** The dotted underline that marks "this tooltip trigger is also a link". */
-const tooltipUnderline =
-  "underline decoration-dotted decoration-(--text-muted) underline-offset-4";
+const tooltipUnderlineClassName = cn(
+  "underline decoration-(--text-muted) decoration-dotted underline-offset-4",
+);
 
 /**
  * A date whose exact meaning lives in a tooltip, optionally linking out. When
@@ -189,7 +191,10 @@ function AnnotatedDate({
               href={href}
               target="_blank"
               rel="noreferrer"
-              className={`${tooltipUnderline} cursor-pointer whitespace-nowrap hover:text-(--series-1)`}
+              className={cn(
+                tooltipUnderlineClassName,
+                "cursor-pointer whitespace-nowrap hover:text-(--series-1)",
+              )}
             />
           )
         }
@@ -265,7 +270,7 @@ export function ReportHeader({
       {/* `tabular-nums` for the dates: the coverage pair sits side by side, and
           two dates of the same shape should measure the same. The tooltips are
           portaled out of here and keep the prose figures their sentences want. */}
-      <p className="mt-1.5 text-sm tabular-nums text-(--text-secondary)">
+      <p className="mt-1.5 text-sm text-(--text-secondary) tabular-nums">
         Analyzed by{" "}
         <Tooltip>
           <TooltipTrigger
@@ -275,7 +280,10 @@ export function ReportHeader({
                 href={repoDiveUrl}
                 target="_blank"
                 rel="noreferrer"
-                className={`${tooltipUnderline} cursor-pointer hover:text-(--series-1)`}
+                className={cn(
+                  tooltipUnderlineClassName,
+                  "cursor-pointer hover:text-(--series-1)",
+                )}
               />
             }
           >

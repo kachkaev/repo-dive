@@ -1,9 +1,77 @@
 import {
   generateBaseConfigs,
   ruleArgsForIdLength,
+  ruleArgsForNoRestrictedSyntax,
 } from "@kachkaev/eslint-config-base";
+import type { Linter } from "eslint";
 import { defineConfig } from "eslint/config";
+import eslintPluginBetterTailwindcss from "eslint-plugin-better-tailwindcss";
+import {
+  MatcherType,
+  SelectorKind,
+  type Selectors,
+} from "eslint-plugin-better-tailwindcss/api/types";
 import reactHooks from "eslint-plugin-react-hooks";
+
+/**
+ * Rules for every dashboard that styles with Tailwind. Each dashboard gets its
+ * own config block with these rules, its own `entryPoint` and the selectors
+ * that find its class strings.
+ */
+const ruleArgsForBetterTailwindcss = {
+  "better-tailwindcss/enforce-consistent-class-order": "warn",
+  "better-tailwindcss/enforce-consistent-important-position": "warn",
+  "better-tailwindcss/enforce-consistent-variable-syntax": "warn",
+  "better-tailwindcss/enforce-shorthand-classes": "warn",
+  "better-tailwindcss/no-conflicting-classes": "warn",
+  "better-tailwindcss/no-deprecated-classes": "warn",
+  "better-tailwindcss/no-duplicate-classes": "warn",
+  "better-tailwindcss/no-restricted-classes": "error",
+  "better-tailwindcss/no-unknown-classes": "error",
+  "better-tailwindcss/no-unnecessary-whitespace": "warn",
+} satisfies Linter.RulesRecord;
+
+/**
+ * `className` and `xyzClassName` JSX attributes: a lone string, and every
+ * string inside an expression (a ternary branch, a `cn(…)` argument).
+ */
+const selectorsForClassNameAttributes = [
+  { kind: SelectorKind.Attribute, name: "^(.+C|c)lassName$" },
+  {
+    kind: SelectorKind.Attribute,
+    name: "^(.+C|c)lassName$",
+    match: [{ type: MatcherType.String }],
+  },
+] satisfies Selectors;
+
+/**
+ * Keeps the React dashboard's class strings where the selectors above see
+ * them, so none escapes the better-tailwindcss rules.
+ */
+const ruleArgsForNoRestrictedClassNameSyntax = [
+  {
+    selector: "Property[key.name=/^(.+C|c)lassName$/] > Literal",
+    message:
+      'Wrap the class string in `cn("…")`, so better-tailwindcss lints it.',
+  },
+  {
+    selector: "VariableDeclarator[id.name=/^(.+C|c)lassName$/] > Literal",
+    message:
+      'Wrap the class string in `cn("…")`, so better-tailwindcss lints it.',
+  },
+  {
+    selector:
+      "JSXAttribute[name.name=/^(.+C|c)lassName$/] TemplateLiteral[expressions.length>0]",
+    message:
+      'Replace the template literal with `cn(…)`, e.g. `cn(someClassName, "…")`, so better-tailwindcss lints it and tailwind-merge resolves conflicts.',
+  },
+  {
+    selector:
+      "JSXAttribute[name.name=/^(.+C|c)lassName$/] > JSXExpressionContainer > CallExpression[callee.name=cn][arguments.length=1][arguments.0.type=Literal]",
+    message:
+      'Replace `className={cn("…")}` with `className="…"`: `cn` only earns its place when it merges several values, and the attribute is linted on its own.',
+  },
+];
 
 export default defineConfig([
   generateBaseConfigs({ tsconfigRootDir: import.meta.dirname }),
@@ -31,6 +99,28 @@ export default defineConfig([
       "import/no-default-export": "off", // Vite config files must default-export.
       "import/no-extraneous-dependencies": "off", // The dashboard is bundled by Vite, so its packages live in devDependencies by design.
       "unicorn/no-array-callback-reference": "off", // Passing named pure helpers to map/filter is idiomatic in the chart-shaping code.
+    },
+  },
+
+  {
+    // Every Tailwind class value in the React dashboard is linted: the
+    // `className` / `xyzClassName` JSX attributes (on top of the plugin's
+    // default selectors, which already cover `cn(…)` and `cva(…)`), and any
+    // other class string once it is wrapped in `cn("…")`.
+    files: ["dashboard/src/**/*.ts", "dashboard/src/**/*.tsx"],
+    plugins: { "better-tailwindcss": eslintPluginBetterTailwindcss },
+    settings: {
+      "better-tailwindcss": {
+        entryPoint: `${import.meta.dirname}/dashboard/src/styles.css`,
+        selectors: { extends: selectorsForClassNameAttributes },
+      },
+    },
+    rules: {
+      ...ruleArgsForBetterTailwindcss,
+      "no-restricted-syntax": [
+        ...ruleArgsForNoRestrictedSyntax,
+        ...ruleArgsForNoRestrictedClassNameSyntax,
+      ],
     },
   },
 

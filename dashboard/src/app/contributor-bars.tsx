@@ -140,7 +140,7 @@ function Bar({
 /** A number cell, blank when the pairing can't happen or never did. */
 function CountCell({ value }: { value: number | undefined }) {
   return (
-    <span className="text-right text-xs tabular-nums text-(--text-secondary)">
+    <span className="text-right text-xs text-(--text-secondary) tabular-nums">
       {value === undefined || value === 0 ? (
         <span className="text-muted-foreground">·</span>
       ) : (

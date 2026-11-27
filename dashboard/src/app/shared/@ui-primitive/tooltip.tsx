@@ -16,7 +16,7 @@
  */
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 
-import { cn, type PropsWithPlainClassName } from "./shared/cn.ts";
+import { cn, type PropsWithPlainClassName } from "../cn.ts";
 
 export const Tooltip = TooltipPrimitive.Root;
 

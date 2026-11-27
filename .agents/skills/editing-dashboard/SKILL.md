@@ -14,7 +14,8 @@ Its primitives are `@effect/ui-kit` components rather than Base UI ones: see [it
 
 ## What already exists
 
-- `@ui-primitive/`: `select` (Select/SelectTrigger/SelectValue/SelectContent/SelectItem), `checkbox`, `label`, `toggle-group` (ToggleGroup/ToggleGroupItem, with `toggleVariants` folded in), `scroll-area` (both scrollbars built in — never use raw `overflow-*-auto` for scrollable dashboard content), `tooltip` (Tooltip/TooltipTrigger/TooltipContent, no provider — each trigger sets its own `delay`), and `shared/cn.ts` (`cn`, `PropsWithPlainClassName`).
+- `@ui-primitive/`: `select` (Select/SelectTrigger/SelectValue/SelectContent/SelectItem), `checkbox`, `label`, `toggle-group` (ToggleGroup/ToggleGroupItem, with `toggleVariants` folded in), `scroll-area` (both scrollbars built in — never use raw `overflow-*-auto` for scrollable dashboard content), `tooltip` (Tooltip/TooltipTrigger/TooltipContent, no provider — each trigger sets its own `delay`).
+- [`shared/cn.ts`](../../../dashboard/src/app/shared/cn.ts): `cn` (tailwind-merge) and `PropsWithPlainClassName`.
 - [`primitives.tsx`](../../../dashboard/src/app/shared/primitives.tsx): `Section`, `StatTile`, `Swatch`, `Legend`, `DataTable`.
 - Charts: `time-stack-chart` (area/bar/line + `#`/`%` toggle), `diverging-bars`, `bar-list`, `activity-calendar`.
 
@@ -63,6 +64,12 @@ API notes that differ from Radix: `Select` takes `items` (value→label) so `Sel
 - `cursor-pointer` is for links only (pointer = "ctrl+click opens a tab"); buttons, toggles and summaries keep the default cursor.
 - Hover states only on elements that respond to a click; a subtle text/underline shift is enough — never add hover feedback to static content (bars, tiles, legends).
 - `cn` merges only same-modifier classes, and a variant like `data-[size=sm]:h-8` carries class+attribute specificity that beats any bare utility passed via `className` — override inside the same modifier or not at all.
+
+## Class strings are linted
+
+`eslint-plugin-better-tailwindcss` checks every class string in `dashboard/src` against `styles.css`: any finding fails `pnpm lint` (unknown, conflicting or unsorted classes alike), and `pnpm fix:eslint` sorts classes and drops duplicates.
+It only sees strings in a `className` or `xyzClassName` attribute and in `cn(…)` or `cva(…)` calls, so a class string anywhere else (a constant, a lookup table, an object value) is wrapped in `cn("…")`.
+A lone string in an attribute stays bare (`className="…"`, not `className={cn("…")}`), and an attribute that mixes values uses `cn(a, "…")` rather than a template literal; `no-restricted-syntax` flags both.
 
 ## Verifying
 
