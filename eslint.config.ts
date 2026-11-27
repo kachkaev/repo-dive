@@ -68,11 +68,12 @@ const ruleArgsForNoRestrictedClassNameSyntax = [
     message: messageForWrappingInCn,
   },
   {
-    selector: `${classNameHolder} > :matches(ConditionalExpression, LogicalExpression) > Literal[value=type(string)]`,
+    selector: `${classNameHolder} > :matches(ConditionalExpression, LogicalExpression) > Literal[value=type(string)]:not([value=""])`,
     message: messageForWrappingInCn,
   },
   {
-    selector: `:matches(${classNameHolder}, CallExpression[callee.name="cn"]) > TemplateLiteral[expressions.length>0]`,
+    // A `cn(…)` in a class attribute is left to the attribute rule below.
+    selector: `:matches(${classNameHolder}, CallExpression[callee.name="cn"]:not(JSXAttribute[name.name=${classNamePattern}] CallExpression)) > TemplateLiteral[expressions.length>0]`,
     message: messageForTemplateLiteral,
   },
   {
@@ -120,11 +121,12 @@ const ruleArgsForNoRestrictedClassSyntax = [
     message: messageForWrappingInCn,
   },
   {
-    selector: `${classHolder} > :matches(ConditionalExpression, LogicalExpression) > Literal[value=type(string)]`,
+    selector: `${classHolder} > :matches(ConditionalExpression, LogicalExpression) > Literal[value=type(string)]:not([value=""])`,
     message: messageForWrappingInCn,
   },
   {
-    selector: `:matches(${classHolder}, CallExpression[callee.name="cn"]) > TemplateLiteral[expressions.length>0]`,
+    // A `cn(…)` in `.class(…)` arguments is left to the rules below.
+    selector: `:matches(${classHolder}, CallExpression[callee.name="cn"]:not(${classCall} > CallExpression.arguments, ${classCall} > .arguments CallExpression)) > TemplateLiteral[expressions.length>0]`,
     message:
       'Replace the template literal with `cn(…)` arguments, e.g. `cn(someClass, "…")`, so better-tailwindcss lints them.',
   },
