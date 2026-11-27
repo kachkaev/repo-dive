@@ -15,11 +15,7 @@ import {
   KindFilterSchema,
 } from "../shared/contributor-kinds.ts";
 import { formatCount } from "../shared/format.ts";
-import {
-  historyDaySpanOf,
-  type HistoryRange,
-  monthSpanOf,
-} from "../shared/history-range.ts";
+import { type HistoryRange, monthSpanOf } from "../shared/history-range.ts";
 import {
   DataTable,
   Section,
@@ -30,11 +26,8 @@ import {
   type ListedContributor,
 } from "./contributors-in-range.ts";
 import { HistoryRangeSelect } from "./history-range-select.ts";
-import {
-  calendarHistoryOf,
-  HistoryRangeSchema,
-  rangeItemsOf,
-} from "./shared/history-ranges.ts";
+import { cachedBy } from "./shared/cached-by.ts";
+import { historyOf, HistoryRangeSchema } from "./shared/history-ranges.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 
 /**
@@ -52,10 +45,18 @@ const contributorsTalliedIn = (data: DashboardData): boolean =>
  * years", the range the chart opens on.
  */
 const contributorsRangeOfferedIn = (data: DashboardData): boolean =>
-  contributorsTalliedIn(data) &&
-  calendarHistoryOf(
-    historyDaySpanOf(data.commits, data.repo.firstCommitDate, data.generatedAt),
-  ).years > 1;
+  contributorsTalliedIn(data) && historyOf(data).calendarHistory.years > 1;
+
+/**
+ * Kinds on the whole contributor list rather than in the range on show, so
+ * narrowing the range never takes a kind's button out from under the cursor.
+ */
+const contributorKindsOf = cachedBy(
+  (data: DashboardData): ReadonlySet<ContributorKind> =>
+    new Set(
+      data.contributors.map((contributor) => contributor.kind ?? "human"),
+    ),
+);
 
 const contributorsHeading = (data: DashboardData): SectionHeading => ({
   title: "Contributors",
@@ -78,15 +79,10 @@ const tallyContributors = (
       assisted: contributor.assisted ?? {},
     }));
   }
-  const historyDays = historyDaySpanOf(
-    data.commits,
-    data.repo.firstCommitDate,
-    data.generatedAt,
-  );
   return contributorsInRange(
     data.contributors,
     data.commits,
-    monthSpanOf(range, historyDays.last),
+    monthSpanOf(range, historyOf(data).historyDays.last),
     maxContributorsInCharts * 2,
   );
 };
@@ -200,16 +196,6 @@ const ContributorsSection = Html.component({
       model.range,
       maxContributorsInCharts,
     );
-    const historyDays = historyDaySpanOf(
-      data.commits,
-      data.repo.firstCommitDate,
-      data.generatedAt,
-    );
-    // Over the whole list rather than the range on show, so narrowing the
-    // range never takes a kind's button out from under the cursor.
-    const contributorKinds = new Set<ContributorKind>(
-      data.contributors.map((contributor) => contributor.kind ?? "human"),
-    );
     return Section(h, {
       ...contributorsHeading(data),
       controls: [
@@ -219,14 +205,14 @@ const ContributorsSection = Html.component({
           value: model.kindFilter,
           onChange: (kindFilter) =>
             ContributorsSectionMessage.ToggledKindFilter({ kindFilter }),
-          presentKinds: contributorKinds,
+          presentKinds: contributorKindsOf(data),
         }),
         contributorsRangeOfferedIn(data) &&
           HistoryRangeSelect(h, {
             props: {
               label: "Contributors range",
               value: model.range,
-              items: rangeItemsOf(calendarHistoryOf(historyDays), historyDays),
+              items: historyOf(data).rangeItems,
             },
             onEmit: {
               Picked: ({ value }) =>

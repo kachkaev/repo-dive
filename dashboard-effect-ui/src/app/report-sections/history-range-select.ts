@@ -1,15 +1,18 @@
 import { UiSchema } from "@effect/ui";
 import { Html } from "@effect/ui/html";
-import { Select } from "@effect/ui-kit";
+import { makeSelect } from "@effect/ui-kit";
 import { Schema } from "effect";
 
 import { SelectView } from "../shared/@ui-primitive/select.ts";
 import { HistoryRangeSchema } from "./shared/history-ranges.ts";
 
+/** ui-kit's Select, typed for history ranges: its `Picked` carries one. */
+const Select = makeSelect({ value: HistoryRangeSchema });
+
 export const HistoryRangeSelectMessage = UiSchema.TaggedEnum({
   RequestedOpenSelect: {},
   RequestedCloseSelect: {},
-  PickedSelectChoice: { value: Schema.String },
+  PickedSelectChoice: { value: HistoryRangeSchema },
 });
 
 /** What the select asks of its section: show this range instead. */
@@ -46,16 +49,11 @@ export const HistoryRangeSelect = Html.component({
   update: {
     RequestedOpenSelect: ($) => $.evolve({ open: true }),
     RequestedCloseSelect: ($) => $.evolve({ open: false }),
-    // A range select always has a value: an empty pick (the cleared state),
-    // and a pick of the range on show, ask for nothing. The value comes back
-    // from ui-kit as a plain string, so it is looked up among the items,
-    // which also types it.
-    PickedSelectChoice: ($, { value }) => {
-      const item = $.props.items.find((candidate) => candidate.value === value);
-      return item === undefined || item.value === $.props.value
+    // A pick of the range on show asks for nothing.
+    PickedSelectChoice: ($, { value }) =>
+      value === $.props.value
         ? $.model
-        : $.emit(HistoryRangeSelectEvents.Picked({ value: item.value }));
-    },
+        : $.emit(HistoryRangeSelectEvents.Picked({ value })),
   },
   view: (h, model) =>
     // A fixed-width slot for the trigger, which keeps hugging its own value:
@@ -76,6 +74,8 @@ export const HistoryRangeSelect = Html.component({
       onEmit: {
         RequestedOpen: () => HistoryRangeSelectMessage.RequestedOpenSelect(),
         RequestedClose: () => HistoryRangeSelectMessage.RequestedCloseSelect(),
+        // A range select always has a value: the cleared pick (`null`), which
+        // a single select never sends anyway, asks for nothing.
         Picked: ({ value }) =>
           typeof value === "string"
             ? HistoryRangeSelectMessage.PickedSelectChoice({ value })

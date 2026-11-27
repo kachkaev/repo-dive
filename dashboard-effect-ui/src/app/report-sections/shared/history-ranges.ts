@@ -1,6 +1,12 @@
 import { Schema } from "effect";
 
-import type { DaySpan, HistoryRange } from "../../shared/history-range.ts";
+import type { DashboardData } from "../../../data.ts";
+import {
+  type DaySpan,
+  historyDaySpanOf,
+  type HistoryRange,
+} from "../../shared/history-range.ts";
+import { cachedBy } from "./cached-by.ts";
 
 /**
  * A {@link HistoryRange} as a Schema, so the sections that narrow their chart
@@ -121,3 +127,23 @@ export const rangeItemsOf = (
       }))
     : []),
 ];
+
+/**
+ * The bounds the calendar and the contributors chart both draw the history
+ * in, and the ranges they offer over it, worked out once per data. Both draw
+ * the history as its authors' own days, so the bounds come from
+ * {@link historyDaySpanOf} rather than from the report's UTC date.
+ */
+export const historyOf = cachedBy((data: DashboardData) => {
+  const historyDays = historyDaySpanOf(
+    data.commits,
+    data.repo.firstCommitDate,
+    data.generatedAt,
+  );
+  const calendarHistory = calendarHistoryOf(historyDays);
+  return {
+    historyDays,
+    calendarHistory,
+    rangeItems: rangeItemsOf(calendarHistory, historyDays),
+  };
+});

@@ -15,7 +15,7 @@ export const kindColors: Record<ContributorKind, string> = {
  * Reading order used everywhere kinds are listed — humans first, bots last,
  * matching a calendar cell top-down.
  */
-const kindOrder: readonly ContributorKind[] = ["human", "ai", "bot"];
+export const kindOrder: readonly ContributorKind[] = ["human", "ai", "bot"];
 
 /** Icon + label for non-human contributor kinds; humans get no badge. */
 export const kindBadge: Record<
@@ -24,6 +24,19 @@ export const kindBadge: Record<
 > = {
   ai: { icon: "✨", title: "AI agent" },
   bot: { icon: "🤖", title: "Bot" },
+};
+
+export const kindLabels: Record<ContributorKind, string> = {
+  human: "Humans",
+  bot: "Bots",
+  ai: "AI agents",
+};
+
+/** Qualifies a count once a single kind is filtered: "4 bot commits". */
+export const kindNouns: Record<ContributorKind, string> = {
+  human: "human",
+  bot: "bot",
+  ai: "AI-agent",
 };
 
 /**

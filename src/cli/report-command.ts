@@ -2,7 +2,7 @@ import { Option } from "effect";
 import { Command, Flag } from "effect/cli";
 
 import { runReport } from "./report-command/run-report.ts";
-import { dashboardUiFlag } from "./shared/dashboard-server.ts";
+import { dashboardUiFlag } from "./shared/dashboard-ui-flag.ts";
 
 export const reportCommand = Command.make("report", {
   repoPath: Flag.String("repo").pipe(

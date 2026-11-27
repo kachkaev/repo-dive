@@ -1,6 +1,6 @@
 ---
 name: editing-dashboard
-description: Conventions for the dashboard's UI (dashboard/src) — reuse the @ui-primitive shadcn components on Base UI, style through the semantic tokens in styles.css, and follow the repo's interaction conventions. Use for ANY change to dashboard markup, styling, or controls, however small — a className tweak counts — and especially when adding a new shadcn/Base UI primitive.
+description: Conventions for the dashboard's UI (dashboard/src, and the experimental Effect UI port in dashboard-effect-ui/src) — reuse the @ui-primitive shadcn components on Base UI, style through the semantic tokens in styles.css, and follow the repo's interaction conventions. Use for ANY change to markup, styling, or controls in either dashboard, however small — a className tweak counts — and especially when adding a new shadcn/Base UI primitive.
 ---
 
 # Editing the dashboard UI

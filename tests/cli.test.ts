@@ -627,6 +627,44 @@ test.concurrent("scan fails gracefully outside a git repository", async () => {
   }
 });
 
+/**
+ * Starts a CLI invocation that ends up serving a dashboard and resolves once
+ * it says where, with everything it printed so far. The caller kills the
+ * child; a child that never gets there is killed here.
+ */
+async function spawnServing(args: readonly string[]) {
+  const server = spawn(process.execPath, ["src/cli.ts", ...args], {
+    cwd: rootDirectory,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`Timed out. Output so far:\n${output}`));
+      }, 30_000);
+      server.stdout.on("data", (chunk: Buffer) => {
+        output += chunk.toString();
+        if (output.includes("Serving on")) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+      server.stderr.on("data", (chunk: Buffer) => {
+        output += chunk.toString();
+      });
+      server.on("exit", () => {
+        clearTimeout(timer);
+        reject(new Error(`Exited before serving. Output:\n${output}`));
+      });
+    });
+  } catch (error) {
+    server.kill();
+    throw error;
+  }
+  return { server, output };
+}
+
 test
   .skipIf(!dashboardBuilt)
   .concurrent(
@@ -635,44 +673,29 @@ test
       const repoPath = createFixtureRepo();
       const port = 4900 + Math.floor(Math.random() * 90);
 
-      const pipeline = spawn(
-        process.execPath,
-        ["src/cli.ts", "--repo", repoPath, "--port", String(port), "--no-open"],
-        { cwd: rootDirectory, stdio: ["ignore", "pipe", "pipe"] },
-      );
-
       try {
-        let output = "";
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => {
-            reject(new Error(`Timed out. Output so far:\n${output}`));
-          }, 30_000);
-          pipeline.stdout.on("data", (chunk: Buffer) => {
-            output += chunk.toString();
-            if (output.includes("Serving on")) {
-              clearTimeout(timer);
-              resolve();
-            }
-          });
-          pipeline.stderr.on("data", (chunk: Buffer) => {
-            output += chunk.toString();
-          });
-          pipeline.on("exit", () => {
-            clearTimeout(timer);
-            reject(new Error(`Pipeline exited early. Output:\n${output}`));
-          });
-        });
+        const { server, output } = await spawnServing([
+          "--repo",
+          repoPath,
+          "--port",
+          String(port),
+          "--no-open",
+        ]);
+        try {
+          expect(output).toMatch(/Step 1\/3/);
+          expect(output).toMatch(/Step 2\/3/);
+          expect(output).toMatch(/Indexed 2 commits/);
 
-        expect(output).toMatch(/Step 1\/3/);
-        expect(output).toMatch(/Step 2\/3/);
-        expect(output).toMatch(/Indexed 2 commits/);
-
-        const response = await fetch(`http://localhost:${port}/dashboard.json`);
-        expect(response.ok).toBe(true);
-        const body = await response.text();
-        expect(body).toMatch(/"commitCount":2/);
+          const response = await fetch(
+            `http://localhost:${port}/dashboard.json`,
+          );
+          expect(response.ok).toBe(true);
+          const body = await response.text();
+          expect(body).toMatch(/"commitCount":2/);
+        } finally {
+          server.kill();
+        }
       } finally {
-        pipeline.kill();
         rmSync(repoPath, { force: true, recursive: true });
       }
     },
@@ -767,38 +790,6 @@ test
     },
   );
 
-/**
- * Starts a CLI invocation that ends up serving a dashboard and resolves once
- * it says where. The caller kills the child.
- */
-async function spawnServing(args: readonly string[]) {
-  const server = spawn(process.execPath, ["src/cli.ts", ...args], {
-    cwd: rootDirectory,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  let output = "";
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`Timed out. Output so far:\n${output}`));
-    }, 30_000);
-    server.stdout.on("data", (chunk: Buffer) => {
-      output += chunk.toString();
-      if (output.includes("Serving on")) {
-        clearTimeout(timer);
-        resolve();
-      }
-    });
-    server.stderr.on("data", (chunk: Buffer) => {
-      output += chunk.toString();
-    });
-    server.on("exit", () => {
-      clearTimeout(timer);
-      reject(new Error(`Exited before serving. Output:\n${output}`));
-    });
-  });
-  return server;
-}
-
 test.skipIf(!effectUiDashboardBuilt).concurrent.each([
   { command: "dashboard", indexFirst: true, firstPort: 4990 },
   { command: "the bare pipeline", indexFirst: false, firstPort: 4995 },
@@ -820,7 +811,7 @@ test.skipIf(!effectUiDashboardBuilt).concurrent.each([
         await runCli("index", "--repo", repoPath);
       }
 
-      const server = await spawnServing([
+      const { server } = await spawnServing([
         ...(indexFirst ? ["dashboard"] : []),
         "--repo",
         repoPath,
@@ -850,6 +841,20 @@ test.skipIf(!effectUiDashboardBuilt).concurrent.each([
     } finally {
       rmSync(repoPath, { force: true, recursive: true });
     }
+  },
+);
+
+const bundledCliPath = path.join(rootDirectory, "dist", "cli.js");
+
+test.skipIf(!existsSync(bundledCliPath))(
+  "the bundled CLI embeds none of the build output",
+  () => {
+    // `new URL(`…${name}`, import.meta.url)` makes Vite glob the folder and
+    // inline every match as a data: URL — the previous dist/cli.js included,
+    // so the bundle would grow with every build.
+    expect(readFileSync(bundledCliPath, "utf8")).not.toMatch(
+      /data:[\w+./-]+;base64,/,
+    );
   },
 );
 

@@ -2,17 +2,14 @@ import { UiSchema } from "@effect/ui";
 import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
-import {
-  type ContributorKind,
-  type DashboardData,
-  DashboardDataSchema,
-} from "../../data.ts";
+import { type DashboardData, DashboardDataSchema } from "../../data.ts";
 import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import {
   KindFilterControl,
   KindFilterSchema,
 } from "../shared/contributor-kinds.ts";
 import { Section, type SectionHeading } from "../shared/primitives.ts";
+import { commitKindsOf } from "./shared/commit-kinds.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 
 const churnPerMonthHeading = (
@@ -45,9 +42,6 @@ const ChurnPerMonthSection = Html.component({
   },
   view: (h, model) => {
     const { data } = h.props;
-    const commitKinds = new Set<ContributorKind>(
-      data.commits.map((commit) => commit.kind ?? "human"),
-    );
     return Section(h, {
       ...churnPerMonthHeading(
         data.config?.charts?.annotations?.["churn-per-month"],
@@ -59,7 +53,7 @@ const ChurnPerMonthSection = Html.component({
           value: model.kindFilter,
           onChange: (kindFilter) =>
             ChurnPerMonthSectionMessage.ToggledKindFilter({ kindFilter }),
-          presentKinds: commitKinds,
+          presentKinds: commitKindsOf(data),
         }),
       ],
       children: [

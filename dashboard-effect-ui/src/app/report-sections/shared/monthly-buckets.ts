@@ -1,4 +1,5 @@
 import type { ContributorKind, DashboardData } from "../../../data.ts";
+import { cachedBy } from "./cached-by.ts";
 
 /** The commits-per-month series: author kind, with humans split by AI assistance. */
 export const commitKindSeries = {
@@ -37,9 +38,10 @@ type MonthlyBucket = Record<keyof typeof commitKindSeries, number> & {
  * human series there, matching the old two-series chart.
  *
  * The React dashboard sums them once for both sections; here each section is
- * its own component and sums them itself, which costs one more linear pass.
+ * its own component, so {@link monthlyRowsOf} caches the sums per commits
+ * array instead.
  */
-export const monthlyRowsOf = (
+const sumMonthlyRows = (
   commits: DashboardData["commits"],
 ): Array<[month: string, bucket: MonthlyBucket]> => {
   const monthlyBuckets = new Map<string, MonthlyBucket>();
@@ -70,3 +72,5 @@ export const monthlyRowsOf = (
     left.localeCompare(right),
   );
 };
+
+export const monthlyRowsOf = cachedBy(sumMonthlyRows);

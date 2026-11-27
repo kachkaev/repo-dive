@@ -1,6 +1,8 @@
 import type { View } from "@effect/ui";
 import type { Html } from "@effect/ui/html";
 
+import { Tooltip } from "./@ui-primitive/tooltip.ts";
+import { formatDate, formatDayOfWeek } from "./format.ts";
 import { InfoIcon, LoaderCircleIcon } from "./icons.ts";
 import { Markdown } from "./markdown.ts";
 
@@ -212,3 +214,180 @@ export const DataTable = <M>(
             ),
         ),
     );
+
+/** The longest weekday name — what the slot below is sized against. */
+const widestDayName = "Wednesday";
+
+/**
+ * A date and the weekday it fell on, as a hover card stamps it. A card is only
+ * as wide as its widest line, so on charts with short value rows the weekday
+ * sets that width — and the card would grow and shrink under the cursor as the
+ * name changed length. The name therefore sits in a slot as wide as
+ * {@link widestDayName}: an invisible copy holds the width open and the real
+ * name overlays it in the same grid cell, which keeps the slot correct in any
+ * font rather than at one hand-measured pixel width.
+ */
+export const DateStamp = <M>(h: Html.H<M>, isoDate: string) =>
+  // `tabular-nums` does for the date what the slot does for the weekday: with
+  // both fixed, the whole stamp is one width for every day of the calendar.
+  h.span
+    .class("tabular-nums")
+    .children(
+      `${formatDate(isoDate)} · `,
+      h.span
+        .class("inline-grid")
+        .children(
+          h.span
+            .attr("aria-hidden", "true")
+            .class("invisible col-start-1 row-start-1")
+            .children(widestDayName),
+          h.span
+            .class("col-start-1 row-start-1")
+            .children(formatDayOfWeek(isoDate)),
+        ),
+    );
+
+export type LegendEntry = {
+  label: string;
+  color: string;
+  /** Overlays diagonal hatching in this color — "assisted by" in the kind legend. */
+  hatch?: string | undefined;
+};
+
+/**
+ * A legend/tooltip swatch: base color, plus the same hatch the marks use
+ * (2px lines at a 6px pitch — 2/3 base fill, 1/3 helper color).
+ *
+ * `135deg` is the CSS spelling of the charts' `rotate(45)` SVG patterns: CSS
+ * angles run clockwise from "to top" and the bands sit perpendicular to that
+ * axis, so 135deg — not 45deg — is what leans bottom-left to top-right.
+ */
+export const Swatch = <M>(
+  h: Html.H<M>,
+  options: {
+    readonly color: string;
+    readonly hatch?: string | undefined;
+    readonly className?: string | undefined;
+  },
+) =>
+  h.span.class(options.className ?? "inline-block size-2.5 rounded-xs").style({
+    backgroundColor: options.color,
+    backgroundImage: options.hatch
+      ? `repeating-linear-gradient(135deg, transparent 0 4px, ${options.hatch} 4px 6px)`
+      : undefined,
+  });
+
+/**
+ * How the legend tooltips name the modifier that isolates a series: the key
+ * is ⌥ on Apple keyboards and Alt everywhere else. Sniffed once — the report
+ * is a static page and the keyboard does not change under it.
+ */
+const altKeyName = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌥" : "Alt";
+
+/**
+ * The chart-side half of a {@link Legend} with toggles: which labels are
+ * hidden, and the chart's messages for a click and a modifier click on a
+ * label.
+ */
+export type LegendToggles<M> = {
+  hiddenLabels: ReadonlySet<string>;
+  /** A click: hides a visible label, shows a hidden one. */
+  onToggle: (label: string) => M;
+  /**
+   * An alt/option click: shows only this label while any other is showing,
+   * and shows every label again once none is — so a second modifier click
+   * undoes the first, and an emptied chart comes back with one click.
+   */
+  onSolo: (label: string) => M;
+};
+
+/**
+ * Rendered below its chart, centered like a figure caption: legends change
+ * with the controls, and above the marks a height change would shift them
+ * mid-read. Laid out as inline boxes rather than a wrapping flexbox so
+ * `text-balance` applies — it balances line boxes, which flex rows are not —
+ * and a wrapped legend fills its rows evenly instead of stranding the last
+ * item (usually "Other") alone on the final row. The margins reproduce the
+ * old flex gaps: `mx-2` meets another item's `mx-2` for the 16px column gap,
+ * `my-0.5` for the 4px row gap.
+ *
+ * With `toggles`, every item is a button that hides its series from the
+ * chart, with a tooltip saying so. A hidden item stays in place, crossed out
+ * at partial opacity, so the legend never reflows under the cursor. Each
+ * item's tooltip is a child component keyed by its label, so a chart draws
+ * one legend with toggles at most.
+ */
+export const Legend = <M>(
+  h: Html.H<M>,
+  options: {
+    readonly items: readonly LegendEntry[];
+    /** Replaces the default `mt-2` — e.g. a second legend standing further off. */
+    readonly marginClassName?: string | undefined;
+    readonly toggles?: LegendToggles<M> | undefined;
+  },
+) => {
+  const { items, toggles } = options;
+  const hiddenLabels = toggles?.hiddenLabels;
+  return h.div
+    .class(
+      `${options.marginClassName ?? "mt-2"} text-center text-xs text-balance text-(--text-secondary)`,
+    )
+    .children(
+      items.map((item) => {
+        const hidden = hiddenLabels?.has(item.label) ?? false;
+        const swatch = Swatch(h, {
+          color: item.color,
+          hatch: item.hatch,
+          className: hidden
+            ? "inline-block size-2.5 rounded-xs opacity-35"
+            : "inline-block size-2.5 rounded-xs",
+        });
+        if (toggles === undefined) {
+          return h.span
+            .key(item.label)
+            .class("mx-2 my-0.5 inline-flex items-center gap-1.5")
+            .children(swatch, item.label);
+        }
+        // What the modifier click will do, phrased from the current state:
+        // it isolates the item while anything else is showing, and brings
+        // everything back once nothing else is (see LegendToggles.onSolo).
+        const othersVisible = items.some(
+          (other) =>
+            other.label !== item.label && !hiddenLabels?.has(other.label),
+        );
+        return Tooltip(h, {
+          key: item.label,
+          props: {
+            delay: 400,
+            pressed: !hidden,
+            // `select-none`: quick repeated clicks would otherwise select the
+            // label as a word. `group` lets the label preview the click on
+            // hover; besides that and the text shift the ring is the only
+            // feedback — no fill, so the row stays a caption.
+            triggerClass:
+              "group mx-2 my-0.5 inline-flex items-center gap-1.5 rounded-xs outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
+          },
+          slots: {
+            trigger: [
+              swatch,
+              // Hovering a visible label previews the click with a faint
+              // strike-through — the line it will get. A hidden label keeps
+              // its crossed-out look on hover; the text shift is enough.
+              h.span
+                .class(
+                  hidden
+                    ? "line-through opacity-60"
+                    : "group-hover:line-through group-hover:decoration-muted-foreground/40",
+                )
+                .children(item.label),
+            ],
+            content: `Click to ${hidden ? "show" : "hide"} · ${altKeyName}-click to ${othersVisible ? "show only this" : "show all"}`,
+          },
+          onEmit: {
+            Clicked: ({ alt }) =>
+              alt ? toggles.onSolo(item.label) : toggles.onToggle(item.label),
+          },
+        });
+      }),
+    );
+};

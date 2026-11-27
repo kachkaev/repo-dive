@@ -5,10 +5,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Console, Data, Effect, type PlatformError, type Scope } from "effect";
-import { Flag } from "effect/cli";
 import { ChildProcess, type ChildProcessSpawner } from "effect/process";
 
 import { loadConfig } from "./config.ts";
+import type { DashboardUi } from "./dashboard-ui-flag.ts";
 import { resolveRepoRoot } from "./scan.ts";
 
 export class DashboardUnavailableError extends Data.TaggedError(
@@ -40,24 +40,6 @@ const mimeTypes: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-/**
- * The builds of the dashboard there are to serve or export. Both read the
- * same dashboard.json: `react` is the dashboard itself, `effect` an
- * experimental port to Effect UI that lives in dashboard-effect-ui/ and is
- * built next to it.
- */
-const dashboardUiOptions = ["react", "effect"] as const;
-
-export type DashboardUi = (typeof dashboardUiOptions)[number];
-
-/** The `--ui` flag, shared by every command that serves or exports the dashboard. */
-export const dashboardUiFlag = Flag.Literals("ui", dashboardUiOptions).pipe(
-  Flag.withDefault("react"),
-  Flag.withDescription(
-    "Which dashboard to use: react, or effect for the experimental Effect UI port (default: react)",
-  ),
-);
-
 /** The build of each dashboard implementation, as a folder of dist/. */
 const assetsDirNames: Record<DashboardUi, string> = {
   react: "dashboard",
@@ -71,9 +53,16 @@ const assetsDirNames: Record<DashboardUi, string> = {
  */
 export const resolveAssetsDir = (ui: DashboardUi): string | undefined => {
   const dirName = assetsDirNames[ui];
+  // The folder name is joined outside `new URL(…, import.meta.url)` on
+  // purpose: Vite rewrites a template literal there into a glob over the
+  // folder and embeds every match in dist/cli.js, the previous build of
+  // dist/cli.js included.
   const candidates = [
-    fileURLToPath(new URL(dirName, import.meta.url)),
-    fileURLToPath(new URL(`../../../dist/${dirName}`, import.meta.url)),
+    path.join(path.dirname(fileURLToPath(import.meta.url)), dirName),
+    path.join(
+      fileURLToPath(new URL("../../../dist", import.meta.url)),
+      dirName,
+    ),
   ];
   return candidates.find((candidate) =>
     existsSync(path.join(candidate, "index.html")),

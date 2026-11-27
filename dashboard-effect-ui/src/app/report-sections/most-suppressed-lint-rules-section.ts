@@ -18,7 +18,7 @@ export const mostSuppressedLintRulesSectionOf = (
       data.config?.charts?.annotations?.["most-suppressed-eslint-rules"],
   };
   return {
-    id: "most-suppressed-lint-rules",
+    id: "most-suppressed-eslint-rules",
     skeleton: heading,
     view: (h, key) =>
       Section(h, {

@@ -2,24 +2,19 @@ import { UiSchema } from "@effect/ui";
 import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
-import {
-  type ContributorKind,
-  type DashboardData,
-  DashboardDataSchema,
-} from "../../data.ts";
+import { type DashboardData, DashboardDataSchema } from "../../data.ts";
 import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import {
   KindFilterControl,
   KindFilterSchema,
 } from "../shared/contributor-kinds.ts";
-import { historyDaySpanOf } from "../shared/history-range.ts";
 import { Section, type SectionHeading } from "../shared/primitives.ts";
 import { HistoryRangeSelect } from "./history-range-select.ts";
+import { commitKindsOf } from "./shared/commit-kinds.ts";
 import {
-  calendarHistoryOf,
   defaultCalendarRangeOf,
+  historyOf,
   HistoryRangeSchema,
-  rangeItemsOf,
 } from "./shared/history-ranges.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 
@@ -54,16 +49,8 @@ const CommitCalendarSection = Html.component({
   message: CommitCalendarSectionMessage,
 }).make({
   init: ($) => {
-    // The calendar draws the history as its authors' own days, so its ranges
-    // come from these bounds rather than from the report's UTC date.
-    const { data } = $.props;
-    const historyDays = historyDaySpanOf(
-      data.commits,
-      data.repo.firstCommitDate,
-      data.generatedAt,
-    );
     return {
-      range: defaultCalendarRangeOf(calendarHistoryOf(historyDays)),
+      range: defaultCalendarRangeOf(historyOf($.props.data).calendarHistory),
       kindFilter: "all" as const,
     };
   },
@@ -73,17 +60,6 @@ const CommitCalendarSection = Html.component({
   },
   view: (h, model) => {
     const { data } = h.props;
-    const historyDays = historyDaySpanOf(
-      data.commits,
-      data.repo.firstCommitDate,
-      data.generatedAt,
-    );
-    // Kinds that ever committed — the contributor list can differ (it lists
-    // co-authors too, and dashboard.json written before per-commit
-    // contributor refs caps it per kind).
-    const commitKinds = new Set<ContributorKind>(
-      data.commits.map((commit) => commit.kind ?? "human"),
-    );
     return Section(h, {
       ...commitCalendarHeading(
         data.config?.charts?.annotations?.["commit-calendar"],
@@ -95,13 +71,13 @@ const CommitCalendarSection = Html.component({
           value: model.kindFilter,
           onChange: (kindFilter) =>
             CommitCalendarSectionMessage.ToggledKindFilter({ kindFilter }),
-          presentKinds: commitKinds,
+          presentKinds: commitKindsOf(data),
         }),
         HistoryRangeSelect(h, {
           props: {
             label: "Calendar range",
             value: model.range,
-            items: rangeItemsOf(calendarHistoryOf(historyDays), historyDays),
+            items: historyOf(data).rangeItems,
           },
           onEmit: {
             Picked: ({ value }) =>

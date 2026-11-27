@@ -8,11 +8,11 @@ import type { ChildProcessSpawner } from "effect/process";
 import { loadConfig } from "../shared/config.ts";
 import {
   assetsUnavailableError,
-  type DashboardUi,
   DashboardUnavailableError,
   openInBrowser,
   resolveAssetsDir,
 } from "../shared/dashboard-server.ts";
+import type { DashboardUi } from "../shared/dashboard-ui-flag.ts";
 import { resolveRepoRoot } from "../shared/scan.ts";
 
 /**

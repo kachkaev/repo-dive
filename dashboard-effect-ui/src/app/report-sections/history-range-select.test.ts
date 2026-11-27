@@ -38,19 +38,13 @@ it.effect("asks its section for a picked range", () =>
   }),
 );
 
-it.effect(
-  "asks for nothing when the pick is cleared, unchanged or unknown",
-  () =>
-    Effect.gen(function* () {
-      // The story's end check fails on any event that isn't acknowledged
-      // with `emitted`, so these steps prove that none was emitted.
-      const s = yield* Story.make(HistoryRangeSelect, props);
-      s.send(HistoryRangeSelectMessage.PickedSelectChoice({ value: "" }));
-      s.send(
-        HistoryRangeSelectMessage.PickedSelectChoice({
-          value: "last-12-months",
-        }),
-      );
-      s.send(HistoryRangeSelectMessage.PickedSelectChoice({ value: "nope" }));
-    }),
+it.effect("asks for nothing when the pick is the range on show", () =>
+  Effect.gen(function* () {
+    // The story's end check fails on any event that isn't acknowledged with
+    // `emitted`, so this step proves that none was emitted.
+    const s = yield* Story.make(HistoryRangeSelect, props);
+    s.send(
+      HistoryRangeSelectMessage.PickedSelectChoice({ value: "last-12-months" }),
+    );
+  }),
 );

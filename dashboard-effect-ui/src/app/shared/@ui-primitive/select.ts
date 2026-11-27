@@ -15,26 +15,26 @@
  * in the top layer where the view writes them instead of in a portal.
  */
 import type { Html } from "@effect/ui/html";
-import type { Select } from "@effect/ui-kit";
+import type { makeSelect } from "@effect/ui-kit";
 
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "../icons.ts";
 import { topLayerReset } from "./shared/top-layer-reset.ts";
 
-/** The parts of a ui-kit Select. */
-type SelectParts = Parameters<
-  NonNullable<Parameters<typeof Select>[1]["view"]>
+/** The parts of a ui-kit Select made by `makeSelect` for values of type `V`. */
+type SelectParts<V extends string> = Parameters<
+  NonNullable<Parameters<ReturnType<typeof makeSelect<V>>>[1]["view"]>
 >[0];
 
 const scrollArrowClass =
   "absolute z-10 flex w-full cursor-default items-center justify-center bg-popover py-1";
 
-export const SelectView = <M>(
+export const SelectView = <M, V extends string>(
   h: Html.H<M>,
-  select: SelectParts,
+  select: SelectParts<V>,
   options: {
     /** Accessible name of the trigger, not rendered. */
     readonly label: string;
-    readonly items: ReadonlyArray<{ value: string; label: string }>;
+    readonly items: ReadonlyArray<{ value: V; label: string }>;
   },
 ) => [
   select

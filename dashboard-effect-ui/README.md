@@ -18,6 +18,7 @@ Read it with the React file you are porting open next to it.
 - **Same markup, same classes.**
   `src/styles.css` is a verbatim copy of the React one, and every element carries the classes and `data-*` attributes its React counterpart renders, so the pixels match.
   When the React code computes a class with `cn(...)`, inspect the rendered DOM and paste the merged class string.
+  The semantic tokens and interaction conventions in the [editing-dashboard skill](../.agents/skills/editing-dashboard/SKILL.md) apply here as they do there.
 - **Replicate first, improve later.**
   When Effect UI cannot reproduce a React behavior exactly, say so in a comment next to the code and add it to [Deviations](#deviations-from-the-react-dashboard).
 - `@effect/ui` and `@effect/ui-kit` are not on npm yet: both are installed from pkg.pr.new snapshots pinned to one Effect-TS/ui commit (see `package.json`), tracked in [#393](https://github.com/kachkaev/repo-dive/issues/393).
@@ -53,7 +54,7 @@ src/
     │   ├── history-range-select.ts # ported (ui-kit Select)
     │   ├── frame-ticks.ts          # the reveal's clock: animation frames, or a task loop while hidden
     │   ├── contributors-in-range.ts (+ test, copied)
-    │   └── shared/                 # what several sections share: ReportSection, ranges, monthly buckets, decimate
+    │   └── shared/                 # what several sections share: ReportSection, cachedBy, ranges, kinds, monthly buckets, decimate
     ├── bar-list.ts                 # ported — the reference chart
     ├── lines-timeline.ts           # placeholder around SurvivalTimeline
     ├── files-timeline.ts           # placeholder around SurvivalTimeline
@@ -63,6 +64,7 @@ src/
         ├── markdown.ts, icons.ts, format.ts, history-range.ts, stacked-series.ts, …
         ├── measure-width.ts        # MeasureWidth mount (the React useMeasuredWidth)
         ├── track-pointer.ts        # TrackPointer mount (the React charts' onMouseMove)
+        ├── crosshair-line.ts, bar-path.ts, time-axis.ts, category-colors.ts, survival-colors.ts
         ├── dashboard-data-fixture.ts # a small dashboard.json for tests
         └── chart-placeholder.ts    # TEMPORARY, deleted with the last placeholder
 ```
@@ -125,9 +127,10 @@ export const DivergingBars = Html.component({
   Effect UI has no `useMemo`: wrap expensive, rarely changing subtrees (the marks of a dense series, a "View data" table) in `h.lazy(fn, firstArg, ...args)`, which rebuilds only when an argument changes by `===`.
   Keep hover-dependent drawing (crosshair, hover card) outside those lazy subtrees.
 - **Give every `h.lazy` call in one component instance its own first argument.**
-  The runtime keeps one cached node per first argument, so two calls that share it (the same `listedContributors` for a table and a chart, say) evict each other and rebuild on every render.
+  The runtime caches one node per first argument and gives it to the first call that uses that argument in a render; a later call in the same render with the same first argument (the same `listedContributors` for a table and a chart, say) is built afresh on every render.
   When two subtrees are built from the same data, lead one with a constant such as `h.lazy(Bars, "bars", rows, filter)`.
-  Make sure each argument keeps its identity across renders: compute derived arrays once per input (a module-level `WeakMap` keyed by `data`, as `listedContributorsOf` in `contributors-section.ts` and `reportSectionsOf` do), never fresh in `view`.
+  Make sure each argument keeps its identity across renders: compute derived arrays once per input, never fresh in `view`.
+  `cachedBy` in `report-sections/shared/cached-by.ts` caches a function of `data` in a module-level `WeakMap`, as `historyOf`, `monthlyRowsOf` and `commitKindsOf` do.
 - Props equality is shallow with a reference check first, so pass the same arrays on every render where possible (from `data`, or from a lazy builder) and keep large derived arrays out of props.
 - Data that is the same everywhere, such as `data`, travels as a prop typed with `DashboardDataSchema`.
 - The section calls the chart with its props and maps its events, if it has any, to its own messages:
@@ -204,7 +207,7 @@ Each pointer move is a message and a render of the chart's view.
 That is cheap when the marks are in `h.lazy` and only the crosshair and the hover card change, and when `update` returns the Model unchanged for a move that keeps the same hovered index.
 If a chart still lags, coalesce the moves: keep the last position in the mount and report it at most once per animation frame (a `requestAnimationFrame` in `TrackPointer`'s listener, or a variant of it), as browsers deliver `mousemove` far more often than they paint.
 
-The crosshair (`shared/crosshair-line.tsx`) and the hover card are plain elements next to the `<svg>`, positioned with inline styles from the Model, exactly as in React; port them as view functions.
+The crosshair (`shared/crosshair-line.ts`, ported) and the hover card are plain elements next to the `<svg>`, positioned with inline styles from the Model, exactly as in React; port the chart's hover card as a view function too.
 Keep the crosshair's `will-change-transform` overlay: the reason it exists (repainting the marks under it) holds in any framework.
 
 `mouseenter` / `mouseleave` do exist as element events (with the pointer's viewport position), which is enough for per-cell hover such as the calendar's.
@@ -214,25 +217,26 @@ Keep the crosshair's `will-change-transform` overlay: the reason it exists (repa
 - **A tooltip on one trigger** (a link, a button, a legend item) uses `Tooltip` from `shared/@ui-primitive/tooltip.ts`: a component that owns its open state, takes the trigger's and the card's content as slots, and draws the React dashboard's card and arrow.
   See `report-header.ts`.
 - **A tooltip that follows the hovered mark** (the calendar's day cells) is controlled by the chart: keep `open` and the hovered item in the chart's Model, give the hovered element an `id`, and call `@effect/ui-kit`'s `Tooltip` directly with `props: { open, anchor: thatId, … }` and its `RequestedOpen` / `RequestedClose` events mapped to the chart's messages.
-  Draw its positioner and popup with the same markup as `TooltipContent` in `tooltip.ts`; export that function when the first chart needs it.
+  Draw its positioner and popup with `TooltipContent(h, tooltip, content, { arrow: false })` from `tooltip.ts`, the counterpart of the React `TooltipContent` (`activity-calendar.tsx` passes `arrow={false}`); React's `anchor` is the ui-kit Tooltip's own `anchor` prop here.
 - `@effect/ui-kit` places popups in the top layer as manual popovers, not in a portal: a popup inherits text styles from where it is written.
   Give every positioner and backdrop `topLayerReset` from `shared/@ui-primitive/shared/top-layer-reset.ts`, which undoes the browser's popover box and the inherited styles a portal on `<body>` would not carry.
 - The native `title` attribute stays a native `title`, as in React (`bar-list.ts`, disabled segmented options).
 
 ### Controls and other primitives
 
-| React (`../dashboard/src/app/shared`)         | Effect UI (`src/app/shared`)                                                                                 |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `@ui-primitive/tooltip.tsx` (Base UI)         | `@ui-primitive/tooltip.ts` on ui-kit `Tooltip`                                                               |
-| `@ui-primitive/select.tsx` (Base UI)          | `@ui-primitive/select.ts` (markup) on ui-kit `Select`; `report-sections/history-range-select.ts` owns `open` |
-| `@ui-primitive/toggle-group.tsx` (Base UI)    | `@ui-primitive/toggle-group.ts` (markup) on ui-kit `ToggleGroup`                                             |
-| `@ui-primitive/scroll-area.tsx` (Base UI)     | not ported: use ui-kit `ScrollArea` with the React classes when the calendar needs it                        |
-| `segmented-control.tsx`                       | `segmented-control.ts` (`SegmentedControl`, `PercentControl`)                                                |
-| `contributor-kinds.tsx` (`KindFilterControl`) | `contributor-kinds.ts`                                                                                       |
-| `primitives.tsx` (`Section`, `DataTable`, …)  | `primitives.ts`; `Legend`, `Swatch` and `DateStamp` are not ported yet                                       |
-| `stale-overlay.tsx`                           | not needed: Effect UI renders synchronously, so there is no stale render to dim                              |
-| `lucide-react` icons                          | `icons.ts`, the icon paths copied with lucide-react's attributes                                             |
-| `use-measure.ts`                              | `measure-width.ts`                                                                                           |
+| React (`../dashboard/src/app/shared`)      | Effect UI (`src/app/shared`)                                                                                 |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `@ui-primitive/tooltip.tsx` (Base UI)      | `@ui-primitive/tooltip.ts` on ui-kit `Tooltip`                                                               |
+| `@ui-primitive/select.tsx` (Base UI)       | `@ui-primitive/select.ts` (markup) on ui-kit `Select`; `report-sections/history-range-select.ts` owns `open` |
+| `@ui-primitive/toggle-group.tsx` (Base UI) | `@ui-primitive/toggle-group.ts` (markup) on ui-kit `ToggleGroup`                                             |
+| `@ui-primitive/scroll-area.tsx` (Base UI)  | not ported: use ui-kit `ScrollArea` with the React classes when the calendar needs it                        |
+| `segmented-control.tsx`                    | `segmented-control.ts` (`SegmentedControl`, `PercentControl`)                                                |
+| `contributor-kinds.tsx`                    | `contributor-kinds.ts`, in full                                                                              |
+| `primitives.tsx`                           | `primitives.ts`, in full; `Legend` items with toggles are `Tooltip` children keyed by label                  |
+| `crosshair-line.tsx`                       | `crosshair-line.ts`, taking the x scale as a plain function                                                  |
+| `stale-overlay.tsx`                        | not needed: Effect UI renders synchronously, so there is no stale render to dim                              |
+| `lucide-react` icons                       | `icons.ts`, the icon paths copied with lucide-react's attributes                                             |
+| `use-measure.ts`                           | `measure-width.ts`                                                                                           |
 
 ui-kit components are headless and mostly controlled: the consumer owns `open` and `value` and maps their `Requested*` / `Picked` / `Toggled` events to its own messages.
 Draw each part with the classes and `data-slot` attributes the React primitive renders.
@@ -247,6 +251,8 @@ Tests sit next to what they test, as `*.test.ts`, and run with the rest of the r
   Nothing runs: no host, no Subscriptions, no Commands, and no DOM is needed.
   The test fails at the end if an event was emitted that it didn't acknowledge with `s.emitted`, so a story that sends messages and acknowledges nothing proves that none emitted.
   See `history-range-select.test.ts`, `report-sections.test.ts` and `commits-per-month-section.test.ts`.
+- **What the view shows** for a message goes in a `Scene`: `commits-per-month-section.scene.test.ts` checks that the kind filter presses the option picked.
+  A scene runs only the component under test, so a click on a ui-kit child (a toggle group's button) does nothing there: stand in for the child with `s.childEmit(ToggleGroup, key, event)`, or use an `HtmlPlay` to run the whole tree.
 - **What the user sees and does** goes in an `HtmlScene` from `@effect/ui/html/testing` (clicks, typing, locators, `expectMount`), and **mounts and other DOM code** in a real `BrowserHost.mountEffect` under `// @vitest-environment happy-dom` with `it.live` (see `measure-width.test.ts`, `track-pointer.test.ts` and `frame-ticks.test.ts`).
   happy-dom lays nothing out: stub what the browser would measure.
 - Build test data with `dashboardDataOf()` from `shared/dashboard-data-fixture.ts`, overriding what the section under test needs.
@@ -271,17 +277,18 @@ Ported:
 - `app/report-sections.tsx` (page structure, every section with its title, subtitle and annotation; every section's controls and "View data" table except those of "Lines of code" and "Number of files", which come with `SurvivalTimeline`)
 - `app/report-sections/history-range-select.tsx`, `app/report-sections/contributors-in-range.ts`
 - `app/bar-list.tsx`
-- `app/shared/primitives.tsx` (`Section`, `SectionSkeleton`, `StatTile`, `DataTable`), `markdown.tsx`, `segmented-control.tsx`, `use-measure.ts`
-- `app/shared/contributor-kinds.tsx` (`KindFilterControl`, `kindColors`, `kindBadge`)
+- `app/shared/primitives.tsx`, `markdown.tsx`, `segmented-control.tsx`, `contributor-kinds.tsx`, `crosshair-line.tsx`, `use-measure.ts`
 - `app/shared/@ui-primitive/tooltip.tsx`, `select.tsx`, `toggle-group.tsx`
-- `app/shared/format.ts`, `history-range.ts`, `stacked-series.ts` (copied)
+- `app/shared/format.ts`, `history-range.ts`, `stacked-series.ts`, `bar-path.ts`, `time-axis.ts`, `category-colors.ts` (with its test), `survival-colors.tsx` (copied)
+
+Everything shared between charts is in place, most of it ahead of its first user (see the `knip.config.ts` exceptions), so the follow-up PRs a, b and c touch no file outside their own charts and section files.
 
 Still placeholders, by follow-up PR (a, b and c run in parallel; d follows a):
 
-- [ ] **a:** `app/time-stack-chart.tsx` with `shared/crosshair-line.tsx`, `shared/time-axis.ts`, `shared/bar-path.ts`, and `Legend`, `Swatch` and `DateStamp` from `primitives.tsx` — the commits per month, direct dependencies, dependencies and loose ends sections
-- [ ] **b:** `app/activity-calendar.tsx` (with `@ui-primitive/scroll-area.tsx`) and `app/diverging-bars.tsx` — the commit calendar and churn per month sections
-- [ ] **c:** `app/contributor-bars.tsx` with the rest of `shared/contributor-kinds.tsx` — the contributors section
-- [ ] **d:** `app/survival-timeline.tsx` with `shared/survival-colors.tsx` and `shared/category-colors.ts`, then `app/lines-timeline.tsx` and `app/files-timeline.tsx` (headings ported) — the lines of code and number of files sections, with their controls and "View data" tables
+- [ ] **a:** `app/time-stack-chart.tsx` — the commits per month, direct dependencies, dependencies and loose ends section files
+- [ ] **b:** `app/activity-calendar.tsx` (with ui-kit's `ScrollArea` for `@ui-primitive/scroll-area.tsx`) and `app/diverging-bars.tsx` — the commit calendar and churn per month section files
+- [ ] **c:** `app/contributor-bars.tsx` — the contributors section file
+- [ ] **d:** `app/survival-timeline.tsx` (on a's `time-stack-chart.ts`), then `app/lines-timeline.ts` and `app/files-timeline.ts` (headings ported) — the lines of code and number of files sections, with their controls and "View data" tables
 
 ## Deviations from the React dashboard
 
@@ -294,6 +301,9 @@ Still placeholders, by follow-up PR (a, b and c run in parallel; d follows a):
   React defers heavy re-renders (`useDeferredValue`) and dims the stale chart (`StaleOverlay`); Effect UI has no concurrent rendering, so expensive subtrees are memoized with `h.lazy` instead and nothing is ever stale.
 - **Tooltip triggers.**
   ui-kit's trigger part takes only `<button>` and `<a href>`, so the header's link-less dates are buttons styled like the React `<span tabIndex={0}>`.
+- **Tooltip positioners are `<div>`s.**
+  ui-kit's positioner and popup parts take only `<div>`, so a tooltip written inside a paragraph (the header's) puts a `<div>` inside a `<p>`.
+  The page builds its DOM directly rather than parsing HTML, so nothing moves, and the positioner is hidden or in the top layer.
 - **Tooltip exit.**
   The card fades and scales in through `@starting-style`, but closes at once: ui-kit's Tooltip hides its popover as soon as `open` turns false and has no `holdExit` for an exit transition.
 - **Popover placement.**

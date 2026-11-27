@@ -35,9 +35,50 @@ export default defineConfig([
   },
 
   {
+    // The two dashboards know nothing of each other, so either folder can be
+    // deleted on its own (see dashboard-effect-ui/README.md).
+    files: [
+      "dashboard/**/*.ts",
+      "dashboard/**/*.tsx",
+      "dashboard-effect-ui/**/*.ts",
+    ],
+    rules: {
+      "import/no-restricted-paths": [
+        "error",
+        {
+          zones: [
+            {
+              target: "./dashboard",
+              from: "./dashboard-effect-ui",
+              message:
+                "The React dashboard must not depend on the Effect UI port.",
+            },
+            {
+              target: "./dashboard-effect-ui",
+              from: "./dashboard",
+              message:
+                "The Effect UI port copies what it needs from the React dashboard instead of importing it.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
+    files: [
+      "dashboard-effect-ui/src/data.ts",
+      "dashboard-effect-ui/src/app/shared/category-colors.test.ts",
+      "dashboard-effect-ui/src/app/shared/measure-width.test.ts",
+    ],
+    rules: {
+      "@typescript-eslint/consistent-type-assertions": "off", // The fetched dashboard.json crosses a trusted local boundary (data.ts), the copied category-colors test reads its fixtures the same way, and the ResizeObserver stand-in builds a partial entry.
+    },
+  },
+
+  {
     files: ["dashboard-effect-ui/**/*.ts"],
     rules: {
-      "@typescript-eslint/consistent-type-assertions": "off", // The fetched dashboard.json crosses a trusted local boundary; a single cast beats hand-validating every series.
       "@typescript-eslint/explicit-module-boundary-types": "off", // Effect UI components and view functions infer large builder and component types; repeating them adds noise.
       "func-style": "off", // View functions are const arrows, as Effect UI's own docs write them.
       "id-length": [

@@ -2,11 +2,7 @@ import { UiSchema } from "@effect/ui";
 import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
-import {
-  type ContributorKind,
-  type DashboardData,
-  DashboardDataSchema,
-} from "../../data.ts";
+import { type DashboardData, DashboardDataSchema } from "../../data.ts";
 import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import {
   type KindFilter,
@@ -15,6 +11,7 @@ import {
 } from "../shared/contributor-kinds.ts";
 import { Section, type SectionHeading } from "../shared/primitives.ts";
 import { PercentControl } from "../shared/segmented-control.ts";
+import { commitKindsOf } from "./shared/commit-kinds.ts";
 import {
   type commitKindSeries,
   monthlyRowsOf,
@@ -69,9 +66,6 @@ export const CommitsPerMonthSection = Html.component({
   },
   view: (h, model) => {
     const { data } = h.props;
-    const commitKinds = new Set<ContributorKind>(
-      data.commits.map((commit) => commit.kind ?? "human"),
-    );
     const monthlyRows = monthlyRowsOf(data.commits);
     // Keep only kinds that ever occur, so a bot-free repo gets no empty series.
     const presentCommitKindKeys = commitKindOrder.filter((kind) =>
@@ -92,7 +86,7 @@ export const CommitsPerMonthSection = Html.component({
           value: model.kindFilter,
           onChange: (kindFilter) =>
             CommitsPerMonthSectionMessage.ToggledKindFilter({ kindFilter }),
-          presentKinds: commitKinds,
+          presentKinds: commitKindsOf(data),
         }),
         // Shown whenever the unfiltered chart stacks more than one series,
         // and merely disabled while a single-kind view leaves one — a control

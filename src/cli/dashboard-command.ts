@@ -1,7 +1,8 @@
 import { Command, Flag } from "effect/cli";
 
 import { defaultDashboardPort } from "./shared/config.ts";
-import { dashboardUiFlag, runDashboard } from "./shared/dashboard-server.ts";
+import { runDashboard } from "./shared/dashboard-server.ts";
+import { dashboardUiFlag } from "./shared/dashboard-ui-flag.ts";
 
 export const dashboardCommand = Command.make("dashboard", {
   repoPath: Flag.String("repo").pipe(

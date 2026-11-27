@@ -13,10 +13,8 @@ import { queryCommand } from "./cli/query-command.ts";
 import { reportCommand } from "./cli/report-command.ts";
 import { scanCommand } from "./cli/scan-command.ts";
 import { defaultDashboardPort } from "./cli/shared/config.ts";
-import {
-  dashboardUiFlag,
-  runDashboard,
-} from "./cli/shared/dashboard-server.ts";
+import { runDashboard } from "./cli/shared/dashboard-server.ts";
+import { dashboardUiFlag } from "./cli/shared/dashboard-ui-flag.ts";
 import { runIndex } from "./cli/shared/indexing.ts";
 import { runScan } from "./cli/shared/scan.ts";
 import { statusCommand } from "./cli/status-command.ts";
