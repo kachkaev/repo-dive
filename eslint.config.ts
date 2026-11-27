@@ -44,30 +44,43 @@ const selectorsForClassNameAttributes = [
   },
 ] satisfies Selectors;
 
+const classNamePattern = "/^(.+C|c)lassName$/";
+
+/**
+ * A `…ClassName` variable, object key or destructuring default. Keys inside
+ * `cva(…)` are left out: the plugin lints its variants and compoundVariants.
+ */
+const classNameHolder = `:matches(VariableDeclarator[id.name=${classNamePattern}], Property[key.name=${classNamePattern}][computed=false]:not(CallExpression[callee.name="cva"] Property), AssignmentPattern[left.name=${classNamePattern}])`;
+
+const messageForWrappingInCn =
+  'Wrap the class string in `cn("…")`, so better-tailwindcss lints it.';
+
+const messageForTemplateLiteral =
+  'Replace the template literal with `cn(…)`, e.g. `cn(someClassName, "…")`, so better-tailwindcss lints it and tailwind-merge resolves conflicts.';
+
 /**
  * Keeps the React dashboard's class strings where the selectors above see
  * them, so none escapes the better-tailwindcss rules.
  */
 const ruleArgsForNoRestrictedClassNameSyntax = [
   {
-    selector: "Property[key.name=/^(.+C|c)lassName$/] > Literal",
-    message:
-      'Wrap the class string in `cn("…")`, so better-tailwindcss lints it.',
+    selector: `${classNameHolder} > Literal[value=type(string)]`,
+    message: messageForWrappingInCn,
   },
   {
-    selector: "VariableDeclarator[id.name=/^(.+C|c)lassName$/] > Literal",
-    message:
-      'Wrap the class string in `cn("…")`, so better-tailwindcss lints it.',
+    selector: `${classNameHolder} > :matches(ConditionalExpression, LogicalExpression) > Literal[value=type(string)]`,
+    message: messageForWrappingInCn,
   },
   {
-    selector:
-      "JSXAttribute[name.name=/^(.+C|c)lassName$/] TemplateLiteral[expressions.length>0]",
-    message:
-      'Replace the template literal with `cn(…)`, e.g. `cn(someClassName, "…")`, so better-tailwindcss lints it and tailwind-merge resolves conflicts.',
+    selector: `${classNameHolder} > TemplateLiteral[expressions.length>0]`,
+    message: messageForTemplateLiteral,
   },
   {
-    selector:
-      "JSXAttribute[name.name=/^(.+C|c)lassName$/] > JSXExpressionContainer > CallExpression[callee.name=cn][arguments.length=1][arguments.0.type=Literal]",
+    selector: `JSXAttribute[name.name=${classNamePattern}] TemplateLiteral[expressions.length>0]:not(MemberExpression[computed=true] > TemplateLiteral)`,
+    message: messageForTemplateLiteral,
+  },
+  {
+    selector: `JSXAttribute[name.name=${classNamePattern}] > JSXExpressionContainer > CallExpression[callee.name=cn][arguments.length=1][arguments.0.type=Literal]`,
     message:
       'Replace `className={cn("…")}` with `className="…"`: `cn` only earns its place when it merges several values, and the attribute is linted on its own.',
   },

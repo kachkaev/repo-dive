@@ -68,7 +68,9 @@ API notes that differ from Radix: `Select` takes `items` (value→label) so `Sel
 ## Class strings are linted
 
 `eslint-plugin-better-tailwindcss` checks every class string in `dashboard/src` against `styles.css`: any finding fails `pnpm lint` (unknown, conflicting or unsorted classes alike), and `pnpm fix:eslint` sorts classes and drops duplicates.
-It only sees strings in a `className` or `xyzClassName` attribute and in `cn(…)` or `cva(…)` calls, so a class string anywhere else (a constant, a lookup table, an object value) is wrapped in `cn("…")`.
+It only sees strings in a `className` or `xyzClassName` attribute and in `cn(…)` or `cva(…)` calls, so a class string anywhere else is wrapped in `cn("…")`.
+Name a constant, object key or destructured prop that holds classes `…ClassName`: `no-restricted-syntax` then flags a bare string (or a ternary or `&&` branch) assigned to it.
+Values in a lookup table under other keys and strings returned from a helper are wrapped in `cn("…")` by hand, since nothing enforces it there.
 A lone string in an attribute stays bare (`className="…"`, not `className={cn("…")}`), and an attribute that mixes values uses `cn(a, "…")` rather than a template literal; `no-restricted-syntax` flags both.
 
 ## Verifying

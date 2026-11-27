@@ -15,8 +15,8 @@ export function cn(...inputs: ClassNameValue[]): string {
 
 /**
  * Narrows a Base UI component's `className` prop — natively a string or a
- * per-state callback — to the plain-string form these wrappers merge with
- * {@link cn}.
+ * per-state callback — to the plain-string form the `@ui-primitive` wrappers
+ * merge with {@link cn}.
  */
 export type PropsWithPlainClassName<Props> = Props & {
   className?: string | undefined;
