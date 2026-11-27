@@ -18,6 +18,6 @@ export const numberOfFilesSectionOf = (
         id: "number-of-files",
         skeleton: undefined,
         view: (h, key) =>
-          FilesTimeline(h, { data, maxContributorsInCharts }).key(key),
+          FilesTimeline(h, { key, data, maxContributorsInCharts }),
       }
     : undefined;
