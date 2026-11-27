@@ -3,7 +3,7 @@ import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
 import { type DashboardData, DashboardDataSchema } from "../../data.ts";
-import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
+import { CommitCalendar } from "../activity-calendar.ts";
 import {
   KindFilterControl,
   KindFilterSchema,
@@ -39,7 +39,7 @@ const CommitCalendarSectionMessage = UiSchema.TaggedEnum({
  * section is that owner, and the calendar below it can be re-keyed on the
  * range without losing them.
  */
-const CommitCalendarSection = Html.component({
+export const CommitCalendarSection = Html.component({
   name: "CommitCalendarSection",
   props: Schema.Struct({ data: DashboardDataSchema }),
   model: Schema.Struct({
@@ -86,13 +86,18 @@ const CommitCalendarSection = Html.component({
         }),
       ],
       children: [
-        // TEMPORARY until activity-calendar.tsx is ported. Key the calendar on
-        // `model.range` so a hovered day from the previous range is not
-        // reported over the new one.
-        ChartPlaceholder(h, {
-          reactFile: "activity-calendar.tsx",
-          description: "Commits per day as calendar strips",
-          height: 196,
+        CommitCalendar(h, {
+          // Restart on range change so a hovered day from the previous range
+          // is not reported over the new one (mouseleave never fires when
+          // the strips under the cursor are swapped).
+          key: model.range,
+          props: {
+            commits: data.commits,
+            historyDays: historyOf(data).historyDays,
+            weekStartsOn: data.config?.charts?.weekStartsOn ?? "monday",
+            range: model.range,
+            kindFilter: model.kindFilter,
+          },
         }),
       ],
     });

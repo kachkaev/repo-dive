@@ -7,10 +7,14 @@ import {
   type DashboardData,
   DashboardDataSchema,
 } from "../../data.ts";
-import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
+import {
+  ContributorBars,
+  type ContributorBarsItem,
+} from "../contributor-bars.ts";
 import {
   kindBadge,
   kindColors,
+  type KindFilter,
   KindFilterControl,
   KindFilterSchema,
 } from "../shared/contributor-kinds.ts";
@@ -95,8 +99,8 @@ const listedContributorsCache = new WeakMap<
 /**
  * The contributors list over a range, tallied from every commit once per data,
  * range and cap. The same array comes back for the same three, so the table
- * (and, once ported, the chart) can be built in `h.lazy` from it and skip
- * every render that changes neither — a kind filter click, say.
+ * and the chart can be built in `h.lazy` from it, and the table skips every
+ * render that changes neither — a kind filter click, say.
  */
 const listedContributorsOf = (
   data: DashboardData,
@@ -159,7 +163,45 @@ const ContributorsTable = <M>(
     ]),
   });
 
-const ContributorsSectionMessage = UiSchema.TaggedEnum({
+/**
+ * The chart's rows for a contributors list, built once per list, so the
+ * chart's `h.lazy` call sees the same array until the range changes.
+ */
+const contributorBarsItemsOf = cachedBy(
+  (listedContributors: readonly ListedContributor[]): ContributorBarsItem[] =>
+    listedContributors.map((contributor) => ({
+      // Email alone isn't unique: bots and AI agents are identified by name too
+      // (several Claude releases share noreply@anthropic.com), matching how
+      // indexing buckets them.
+      id: `${contributor.name} <${contributor.email}>`,
+      label: contributor.name || contributor.email,
+      href: contributor.url,
+      kind: contributor.kind ?? "human",
+      authored: contributor.commits,
+      assistedBy: contributor.assistedBy,
+      assisted: contributor.assisted,
+    })),
+);
+
+/**
+ * The chart, built through `h.lazy` with `"bars"` as the first argument: the
+ * table's call leads with `listedContributors`, and lazy calls in one instance
+ * are told apart by their first argument.
+ */
+const ContributorsChart = <M>(
+  h: Html.H<M>,
+  _lazyKey: "bars",
+  listedContributors: readonly ListedContributor[],
+  kindFilter: KindFilter,
+  maxItems: number,
+) =>
+  ContributorBars(h, {
+    items: contributorBarsItemsOf(listedContributors),
+    kindFilter,
+    maxItems,
+  });
+
+export const ContributorsSectionMessage = UiSchema.TaggedEnum({
   ToggledKindFilter: { kindFilter: KindFilterSchema },
   PickedRange: { range: HistoryRangeSchema },
 });
@@ -170,7 +212,7 @@ const ContributorsSectionMessage = UiSchema.TaggedEnum({
  * dims the stale chart meanwhile, while Effect UI re-renders synchronously, so
  * the tally is memoized per range (see `listedContributorsOf`).
  */
-const ContributorsSection = Html.component({
+export const ContributorsSection = Html.component({
   name: "ContributorsSection",
   props: Schema.Struct({
     data: DashboardDataSchema,
@@ -222,18 +264,13 @@ const ContributorsSection = Html.component({
       ],
       footer: [h.lazy(ContributorsTable, listedContributors)],
       children: [
-        // TEMPORARY until contributor-bars.tsx is ported: ContributorBars over
-        // `listedContributors`, narrowed to `model.kindFilter`, at most
-        // `maxContributorsInCharts * 2` rows. If its bars go in `h.lazy`, give
-        // that call a first argument of its own, such as
-        // `h.lazy(Bars, "bars", listedContributors, model.kindFilter)`: lazy
-        // calls in one instance are told apart by their first argument, and
-        // the table's is `listedContributors`.
-        ChartPlaceholder(h, {
-          reactFile: "contributor-bars.tsx",
-          description: "Commits authored and co-authored per contributor",
-          height: 288,
-        }),
+        h.lazy(
+          ContributorsChart,
+          "bars",
+          listedContributors,
+          model.kindFilter,
+          maxContributorsInCharts * 2,
+        ),
       ],
     });
   },
