@@ -1,12 +1,12 @@
 import { Schema } from "effect";
 
 import type { DashboardData } from "../../../data.ts";
+import { cachedBy } from "../../shared/cached-by.ts";
 import {
   type DaySpan,
   historyDaySpanOf,
   type HistoryRange,
 } from "../../shared/history-range.ts";
-import { cachedBy } from "./cached-by.ts";
 
 /**
  * A {@link HistoryRange} as a Schema, so the sections that narrow their chart

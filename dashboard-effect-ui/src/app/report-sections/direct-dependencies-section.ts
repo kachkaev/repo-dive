@@ -3,6 +3,7 @@ import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
 import { type DashboardData, DashboardDataSchema } from "../../data.ts";
+import { cachedBy } from "../shared/cached-by.ts";
 import { formatDate } from "../shared/format.ts";
 import {
   DataTable,
@@ -11,7 +12,6 @@ import {
 } from "../shared/primitives.ts";
 import { PercentControl } from "../shared/segmented-control.ts";
 import { TimeSeriesChart } from "../time-stack-chart.ts";
-import { cachedBy } from "./shared/cached-by.ts";
 import { decimate } from "./shared/decimate.ts";
 import { repoStartMsOf } from "./shared/repo-start-ms.ts";
 import type { ReportSection } from "./shared/report-section.ts";

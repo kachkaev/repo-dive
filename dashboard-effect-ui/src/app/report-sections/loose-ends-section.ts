@@ -1,7 +1,7 @@
 import type { DashboardData } from "../../data.ts";
+import { cachedBy } from "../shared/cached-by.ts";
 import { Section, type SectionHeading } from "../shared/primitives.ts";
 import { TimeSeriesChart } from "../time-stack-chart.ts";
-import { cachedBy } from "./shared/cached-by.ts";
 import { decimate } from "./shared/decimate.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 

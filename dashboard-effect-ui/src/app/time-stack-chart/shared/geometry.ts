@@ -5,12 +5,12 @@ import {
   scaleTime,
 } from "d3-scale";
 
+import { cachedBy } from "../../shared/cached-by.ts";
 import {
   type PointUnit,
   timeAxisTicks,
   type TimeTick,
-} from "../shared/time-axis.ts";
-import { memoBy } from "./memo-by.ts";
+} from "../../shared/time-axis.ts";
 import type { ChartMode, TimePoint } from "./schemas.ts";
 
 export const margin = { top: 8, right: 12, bottom: 24, left: 44 } as const;
@@ -48,7 +48,7 @@ export type ChartRows = {
  * writes chronological data, but a dashboard served against a catalog indexed
  * by an older version may not.
  */
-export const chartRowsOf = memoBy(
+export const chartRowsOf = cachedBy(
   (points: readonly TimePoint[], seriesKeys: readonly string[]): ChartRows => {
     const rows = points
       .toSorted((left, right) => left.dateMs - right.dateMs)
@@ -70,7 +70,7 @@ export const chartRowsOf = memoBy(
  * What the marks are drawn from: raw values, or per-row shares in % mode.
  * Tooltips always read the raw rows so both value and share can be shown.
  */
-export const displayRowsOf = memoBy(
+export const displayRowsOf = cachedBy(
   (chartRows: ChartRows, showPercent: boolean): readonly ChartRow[] =>
     showPercent
       ? chartRows.rows.map((row, index) => {
@@ -111,7 +111,7 @@ export type ChartLayout = {
   readonly snapSlackMs: number;
 };
 
-export const chartLayoutOf = memoBy(
+export const chartLayoutOf = cachedBy(
   (
     chartRows: ChartRows,
     mode: ChartMode,

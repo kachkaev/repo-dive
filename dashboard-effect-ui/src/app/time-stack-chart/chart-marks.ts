@@ -1,11 +1,18 @@
 // cspell:ignore linepath -- the class visx gives its LinePath
 import type { Html } from "@effect/ui/html";
-import { area, curveMonotoneX, line, type SeriesPoint, stack } from "d3-shape";
+import {
+  area,
+  curveMonotoneX,
+  line,
+  type Series,
+  type SeriesPoint,
+  stack,
+} from "d3-shape";
 
+import { GridRows } from "../shared/axes.ts";
 import { barPath } from "../shared/bar-path.ts";
-import { GridRows } from "./axes.ts";
-import type { ChartLayout, ChartRow } from "./geometry.ts";
-import type { ChartMode } from "./schemas.ts";
+import type { ChartLayout, ChartRow } from "./shared/geometry.ts";
+import type { ChartMode } from "./shared/schemas.ts";
 
 /** Everything the marks are drawn from; none of it follows the cursor. */
 export type ChartMarksInput = {
@@ -30,6 +37,77 @@ export type ChartMarksInput = {
 };
 
 const dateOf = (row: ChartRow): number => row["dateMs"] ?? 0;
+
+/** One drawn segment of a stacked bar, ready for `barPath`. */
+export type StackedBar = {
+  readonly key: string;
+  /** The segment's series, in stack order. */
+  readonly stackIndex: number;
+  /** The segment's data point. */
+  readonly index: number;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly roundTop: boolean;
+  readonly roundBottom: boolean;
+};
+
+/**
+ * visx's BarStack bars, empty segments dropped, in the order the React chart
+ * draws them (series by series). Per data point only the lowest and highest
+ * non-empty segments are rounded, on their outer end, so the seams inside a
+ * stack stay square and it reads as one bar.
+ */
+export const stackedBarsOf = (
+  stacks: ReadonlyArray<Series<ChartRow, string>>,
+  layout: ChartLayout,
+): StackedBar[] => {
+  const { xScale, yScale, barWidth } = layout;
+  const [rangeStart = 0, rangeEnd = 0] = xScale.range();
+  // visx's bandwidth of a continuous scale (range over domain size), which it
+  // centres each bar on and the chart then re-centres; kept so the
+  // coordinates come out to the same floating-point digits.
+  const bandwidth = Math.abs(rangeEnd - rangeStart) / 2;
+  const bars = stacks.map((series, stackIndex) =>
+    series.map((point, index) => ({
+      stackIndex,
+      index,
+      key: series.key,
+      x: Math.max((xScale(dateOf(point.data)) || 0) - bandwidth / 2) || 0,
+      y: yScale(point[1]) || 0,
+      height: (yScale(point[0]) || 0) - (yScale(point[1]) || 0),
+    })),
+  );
+  const lowestStack = new Map<number, number>();
+  const highestStack = new Map<number, number>();
+  for (const stackBars of bars) {
+    for (const bar of stackBars) {
+      if (bar.height <= 0) {
+        continue;
+      }
+      if (!lowestStack.has(bar.index)) {
+        lowestStack.set(bar.index, bar.stackIndex);
+      }
+      highestStack.set(bar.index, bar.stackIndex);
+    }
+  }
+  return bars.flatMap((stackBars) =>
+    stackBars
+      .filter((bar) => bar.height > 0)
+      .map((bar) => ({
+        key: bar.key,
+        stackIndex: bar.stackIndex,
+        index: bar.index,
+        x: bar.x + bandwidth / 2 - barWidth / 2,
+        y: bar.y,
+        width: barWidth,
+        height: bar.height,
+        roundTop: highestStack.get(bar.index) === bar.stackIndex,
+        roundBottom: lowestStack.get(bar.index) === bar.stackIndex,
+      })),
+  );
+};
 
 /**
  * The static marks — grid, stacked areas/bars/lines and single-point dots,
@@ -100,61 +178,19 @@ export const ChartMarks = <M>(h: Html.H<M>, input: ChartMarksInput) => {
         ];
       }
       case "bar": {
-        // Per data point, the stack index of its lowest and highest non-empty
-        // segment — the only two whose outer end is rounded, so the seams
-        // inside a stack stay square and it reads as one bar.
-        const [rangeStart = 0, rangeEnd = 0] = xScale.range();
-        // visx's bandwidth of a continuous scale (range over domain size),
-        // which it centres each bar on and the chart then re-centres; kept so
-        // the coordinates come out to the same floating-point digits.
-        const bandwidth = Math.abs(rangeEnd - rangeStart) / 2;
-        const bars = stacks.map((series, stackIndex) =>
-          series.map((point, index) => ({
-            stackIndex,
-            index,
-            key: series.key,
-            x: Math.max((xScale(dateOf(point.data)) || 0) - bandwidth / 2) || 0,
-            y: yScale(point[1]) || 0,
-            height: (yScale(point[0]) || 0) - (yScale(point[1]) || 0),
-          })),
-        );
-        const lowestStack = new Map<number, number>();
-        const highestStack = new Map<number, number>();
-        for (const stackBars of bars) {
-          for (const bar of stackBars) {
-            if (bar.height <= 0) {
-              continue;
-            }
-            if (!lowestStack.has(bar.index)) {
-              lowestStack.set(bar.index, bar.stackIndex);
-            }
-            highestStack.set(bar.index, bar.stackIndex);
-          }
-        }
-        return bars.flatMap((stackBars) =>
-          stackBars
-            .filter((bar) => bar.height > 0)
-            .map((bar) => {
-              const d = barPath({
-                x: bar.x + bandwidth / 2 - layout.barWidth / 2,
-                y: bar.y,
-                width: layout.barWidth,
-                height: bar.height,
-                roundTop: highestStack.get(bar.index) === bar.stackIndex,
-                roundBottom: lowestStack.get(bar.index) === bar.stackIndex,
-              });
-              const hatchUrl = hatchUrlOf(bar.key);
-              // No stroke: segment boundaries come from hue/hatch changes,
-              // so stacked heights read as exact totals (and match the
-              // gapless churn bars).
-              return h.g
-                .key(`${bar.stackIndex}-${bar.index}`)
-                .children(
-                  h.path.attrs({ d, fill: colorOf(bar.key) }),
-                  hatchUrl !== undefined && h.path.attrs({ d, fill: hatchUrl }),
-                );
-            }),
-        );
+        return stackedBarsOf(stacks, layout).map((bar) => {
+          const d = barPath(bar);
+          const hatchUrl = hatchUrlOf(bar.key);
+          // No stroke: segment boundaries come from hue/hatch changes, so
+          // stacked heights read as exact totals (and match the gapless
+          // churn bars).
+          return h.g
+            .key(`${bar.stackIndex}-${bar.index}`)
+            .children(
+              h.path.attrs({ d, fill: colorOf(bar.key) }),
+              hatchUrl !== undefined && h.path.attrs({ d, fill: hatchUrl }),
+            );
+        });
       }
       case "line": {
         return drawnKeys.map((key) =>
@@ -200,5 +236,12 @@ export const ChartMarks = <M>(h: Html.H<M>, input: ChartMarksInput) => {
         })
       : [];
 
-  return h.g.children(GridRows(h, layout), marks(), dots);
+  return h.g.children(
+    GridRows(h, {
+      ticksY: layout.gridTicks.map((tick) => yScale(tick)),
+      width: layout.innerWidth,
+    }),
+    marks(),
+    dots,
+  );
 };

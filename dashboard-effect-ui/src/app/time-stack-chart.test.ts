@@ -24,7 +24,7 @@ const props = {
 // plot's.
 const plotX = (day: number) => 4 + (day / 20) * 544;
 
-it.effect("snaps the hover to the nearest point and leaves on mouse out", () =>
+it.effect("follows the pointer and leaves on mouse out", () =>
   Effect.gen(function* () {
     const s = yield* Story.make(TimeSeriesChart, props);
     s.send(TimeSeriesChartMessage.ChangedWidth({ width: 600 }));
@@ -33,10 +33,10 @@ it.effect("snaps the hover to the nearest point and leaves on mouse out", () =>
     s.send(TimeSeriesChartMessage.MovedPointer({ x: plotX(9) }));
     expect(s.model.hoverMs).toBeCloseTo(startMs + 9 * dayMs, -3);
 
-    // Still nearest to day 10: the Model, and so the view, stays as it was.
-    const modelNearDayTen = s.model;
+    // Still nearest to day 10, but the Model keeps the latest instant, as
+    // React does, so a re-layout under a resting pointer snaps it afresh.
     s.send(TimeSeriesChartMessage.MovedPointer({ x: plotX(11) }));
-    expect(s.model).toBe(modelNearDayTen);
+    expect(s.model.hoverMs).toBeCloseTo(startMs + 11 * dayMs, -3);
 
     s.send(TimeSeriesChartMessage.MovedPointer({ x: plotX(16) }));
     expect(s.model.hoverMs).toBeCloseTo(startMs + 16 * dayMs, -3);

@@ -1,5 +1,5 @@
 import type { ContributorKind, DashboardData } from "../../../data.ts";
-import { cachedBy } from "./cached-by.ts";
+import { cachedBy } from "../../shared/cached-by.ts";
 
 /**
  * Kinds that ever committed, once per data — what the calendar's, the commits

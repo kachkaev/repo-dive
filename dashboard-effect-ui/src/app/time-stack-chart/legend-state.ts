@@ -1,11 +1,11 @@
-import { memoBy } from "./memo-by.ts";
-import type { LegendItem, SeriesGroup } from "./schemas.ts";
+import { cachedBy } from "../shared/cached-by.ts";
+import type { LegendItem, SeriesGroup } from "./shared/schemas.ts";
 
 const noLegendItems: readonly LegendItem[] = [];
 const noHatch: Readonly<Record<string, string>> = {};
 const noHiddenLabels: ReadonlySet<string> = new Set();
 
-const perSeriesLegendItemsOf = memoBy(
+const perSeriesLegendItemsOf = cachedBy(
   (
     seriesKeys: readonly string[],
     colors: readonly string[],
@@ -44,7 +44,7 @@ export const resolvedLegendItemsOf = (options: {
  * which wait, unseen, for that variant to come back. Nothing is hidden when
  * the legend has no toggles.
  */
-export const hiddenLabelSetOf = memoBy(
+export const hiddenLabelSetOf = cachedBy(
   (
     hiddenLabels: readonly string[],
     legendItems: readonly LegendItem[],
@@ -65,7 +65,7 @@ export const hiddenLabelSetOf = memoBy(
  * legend label stands for one series key of the same name, unless the tooltip
  * groups say it collapses several (a contributor's year bands).
  */
-export const drawnKeysOf = memoBy(
+export const drawnKeysOf = cachedBy(
   (
     seriesKeys: readonly string[],
     hiddenLabels: ReadonlySet<string>,
@@ -119,7 +119,7 @@ export const soloedLabels = (
  * The topmost sub-series of every group but the last — where a crisp divider
  * is drawn between adjacent primary categories.
  */
-export const groupBoundaryKeysOf = memoBy(
+export const groupBoundaryKeysOf = cachedBy(
   (tooltipGroups: readonly SeriesGroup[]): ReadonlySet<string> => {
     const keys = new Set<string>();
     for (const group of tooltipGroups.slice(0, -1)) {
@@ -133,7 +133,7 @@ export const groupBoundaryKeysOf = memoBy(
 );
 
 /** One `<pattern>` per distinct hatch color; series map to them by color. */
-export const hatchColorsOf = memoBy(
+export const hatchColorsOf = cachedBy(
   (seriesHatch: Readonly<Record<string, string>>): readonly string[] => [
     ...new Set(Object.values(seriesHatch)),
   ],

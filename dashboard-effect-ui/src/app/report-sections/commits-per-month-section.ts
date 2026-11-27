@@ -3,6 +3,7 @@ import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
 import { type DashboardData, DashboardDataSchema } from "../../data.ts";
+import { cachedBy } from "../shared/cached-by.ts";
 import {
   kindColors,
   type KindFilter,
@@ -17,7 +18,6 @@ import {
   type TimePoint,
   TimeSeriesChart,
 } from "../time-stack-chart.ts";
-import { cachedBy } from "./shared/cached-by.ts";
 import { commitKindsOf } from "./shared/commit-kinds.ts";
 import { commitKindSeries, monthlyRowsOf } from "./shared/monthly-buckets.ts";
 import type { ReportSection } from "./shared/report-section.ts";

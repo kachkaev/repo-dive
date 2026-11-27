@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   drawnKeysOf,
+  groupBoundaryKeysOf,
   hiddenLabelSetOf,
   resolvedLegendItemsOf,
   soloedLabels,
@@ -55,4 +56,17 @@ test("resolvedLegendItemsOf names one item per series unless overridden", () => 
   expect(
     resolvedLegendItemsOf({ seriesKeys: ["a"], colors: [], legendItems: [] }),
   ).toStrictEqual([]);
+});
+
+test("groupBoundaryKeysOf picks the top series of every group but the last", () => {
+  expect([
+    ...groupBoundaryKeysOf([
+      { label: "a", color: "red", keys: ["a 2025", "a 2026"] },
+      { label: "b", color: "blue", keys: [] },
+      { label: "c", color: "green", keys: ["c 2025", "c 2026"] },
+    ]),
+  ]).toStrictEqual(["a 2026"]);
+  expect(
+    groupBoundaryKeysOf([{ label: "a", color: "red", keys: ["a"] }]).size,
+  ).toBe(0);
 });

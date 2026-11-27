@@ -3,8 +3,8 @@ import type { Html } from "@effect/ui/html";
 import { formatMonth, formatPercent } from "../shared/format.ts";
 import { DateStamp, Swatch } from "../shared/primitives.ts";
 import type { PointUnit } from "../shared/time-axis.ts";
-import { type ChartRow, margin } from "./geometry.ts";
-import type { SeriesGroup } from "./schemas.ts";
+import { type ChartRow, margin } from "./shared/geometry.ts";
+import type { SeriesGroup } from "./shared/schemas.ts";
 
 /**
  * The floating value card next to the cursor, the React `HoverTooltip`.

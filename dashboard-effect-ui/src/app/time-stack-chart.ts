@@ -2,28 +2,17 @@ import { Mount, UiSchema } from "@effect/ui";
 import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
+import { AxisBottom, AxisLeft } from "./shared/axes.ts";
+import { cachedBy } from "./shared/cached-by.ts";
 import { CrosshairLine } from "./shared/crosshair-line.ts";
 import { formatCount } from "./shared/format.ts";
 import { MeasureWidth } from "./shared/measure-width.ts";
 import { Legend, type LegendToggles } from "./shared/primitives.ts";
 import { TrackPointer } from "./shared/track-pointer.ts";
-import { AxisBottom, AxisLeft } from "./time-stack-chart/axes.ts";
 import {
   ChartMarks,
   type ChartMarksInput,
 } from "./time-stack-chart/chart-marks.ts";
-import {
-  chartHeight,
-  type ChartLayout,
-  chartLayoutOf,
-  type ChartRows,
-  chartRowsOf,
-  displayRowsOf,
-  hoverIndexOf,
-  hoverMsAt,
-  innerHeight,
-  margin,
-} from "./time-stack-chart/geometry.ts";
 import {
   crosshairXOf,
   HoverTooltip,
@@ -37,7 +26,18 @@ import {
   soloedLabels,
   toggledLabels,
 } from "./time-stack-chart/legend-state.ts";
-import { memoBy } from "./time-stack-chart/memo-by.ts";
+import {
+  chartHeight,
+  type ChartLayout,
+  chartLayoutOf,
+  type ChartRows,
+  chartRowsOf,
+  displayRowsOf,
+  hoverIndexOf,
+  hoverMsAt,
+  innerHeight,
+  margin,
+} from "./time-stack-chart/shared/geometry.ts";
 import {
   ChartModeSchema,
   type LegendItem,
@@ -46,9 +46,13 @@ import {
   SeriesGroupSchema,
   TimePointSchema,
   ValueFormatSchema,
-} from "./time-stack-chart/schemas.ts";
+} from "./time-stack-chart/shared/schemas.ts";
 
-export type { LegendItem, TimePoint } from "./time-stack-chart/schemas.ts";
+export type {
+  LegendItem,
+  SeriesGroup,
+  TimePoint,
+} from "./time-stack-chart/shared/schemas.ts";
 
 const TimeSeriesChartProps = Schema.Struct({
   points: Schema.Array(TimePointSchema),
@@ -192,7 +196,7 @@ const canToggleOf = (
  * argument `h.lazy` compares: a hover keeps every part of it, and so the
  * whole object.
  */
-const marksInputOf = memoBy(
+const marksInputOf = cachedBy(
   (
     layout: ChartLayout,
     displayRows: ChartMarksInput["displayRows"],
@@ -242,12 +246,50 @@ const HatchPatterns = <M>(
     ),
   );
 
-/** The bottom axis, led by its own first argument for `h.lazy`. */
-const AxisBottomOf = <M>(
+/**
+ * The value axis: counts, or whole percentages in % mode. Each axis leads
+ * with its own first argument for `h.lazy`, since both are built from the
+ * layout.
+ */
+const ChartAxisLeft = <M>(
+  h: Html.H<M>,
+  _id: "axis-left",
+  layout: ChartLayout,
+) => {
+  const [rangeStart = 0, rangeEnd = 0] = layout.yScale.range();
+  return AxisLeft(h, {
+    ticks: layout.yTicks.map((tick) => ({
+      y: layout.yScale(tick),
+      label: layout.showPercent
+        ? `${Math.round(tick * 100)}%`
+        : formatCount(tick),
+    })),
+    range: [rangeStart, rangeEnd],
+  });
+};
+
+/**
+ * The time axis, at the calendar ticks `timeAxisTicks` picked. The axis line
+ * spans the scale's range, which `xInset` shrinks for bars; it is padded back
+ * out so the line runs the full plot width rather than relying on the zero
+ * grid line to cover the gap.
+ */
+const ChartAxisBottom = <M>(
   h: Html.H<M>,
   _id: "axis-bottom",
   layout: ChartLayout,
-) => AxisBottom(h, layout);
+) => {
+  const [rangeStart = 0, rangeEnd = 0] = layout.xScale.range();
+  return AxisBottom(h, {
+    top: innerHeight,
+    ticks: layout.xTicks.map((tick) => ({
+      x: layout.xScale(tick.valueMs),
+      label: tick.label,
+    })),
+    range: [rangeStart, rangeEnd],
+    rangePadding: layout.xInset,
+  });
+};
 
 /**
  * The legend under the frame, built through `h.lazy` so a hover reuses it.
@@ -282,9 +324,7 @@ const SecondaryLegend = <M>(
  * buckets, lines for non-stacked comparison — with a dashed crosshair and a
  * hover card that snaps to the nearest point, the port of the React
  * `TimeSeriesChart` (`time-stack-chart.tsx`). The props mirror the React
- * ones, with `TimePoint` and `LegendItem` exported here; `SeriesGroup` (the
- * `tooltipGroups` entry) is in `time-stack-chart/schemas.ts`, for this module
- * to export once a caller groups its series.
+ * ones, with `TimePoint`, `LegendItem` and `SeriesGroup` exported here.
  *
  * The chart owns what only it knows: its measured width, the instant under
  * the pointer and the legend labels the viewer has hidden (when
@@ -294,11 +334,10 @@ const SecondaryLegend = <M>(
  * above the frame) stays hidden in the next, and labels a variant does not
  * draw simply wait for it to come back. Re-key the chart to start over.
  *
- * Everything else is derived from the props and the width through memoized
+ * Everything else is derived from the props and the width through `cachedBy`
  * helpers keyed by the prop arrays, so pass the same arrays on every render
  * (from `cachedBy` in the section). The marks, axes and legends are lazy
- * nodes; a pointer move redraws only the crosshair and the card, and a move
- * that stays on the same data point changes nothing at all.
+ * nodes; a pointer move redraws only the crosshair and the card.
  *
  * Deviations from the React chart:
  *
@@ -325,28 +364,22 @@ export const TimeSeriesChart = Html.component({
     hiddenLabels: Schema.Array(Schema.String),
   }),
   message: TimeSeriesChartMessage,
-  // What only the pointer and the layout knew; after a reload the chart
-  // starts afresh.
+  // What only the pointer, the layout and the viewer's legend clicks knew;
+  // after a reload the chart starts afresh, hidden labels included, as the
+  // React one forgets them too.
   restore: false,
 }).make({
   init: () => ({ width: 0, hoverMs: undefined, hiddenLabels: [] }),
   update: {
     ChangedWidth: ($, { width }) => $.evolve({ width }),
-    MovedPointer: ($, { x }) => {
-      const { chartRows, layout } = geometryOf($.props, $.model.width);
-      const hoverMs = hoverMsAt(layout, x);
-      // A move that stays on the same data point draws the same crosshair
-      // and card: keep the Model, and the chart does not render again.
-      const index = hoverIndexOf(chartRows, layout, hoverMs);
-      if (
-        index !== undefined &&
-        $.model.hoverMs !== undefined &&
-        hoverIndexOf(chartRows, layout, $.model.hoverMs) === index
-      ) {
-        return $.model;
-      }
-      return $.evolve({ hoverMs });
-    },
+    // The latest instant, as React keeps it, even when it snaps to the same
+    // point: a re-layout under a resting pointer (new props, a new width)
+    // snaps the instant afresh. Such a move re-renders only the crosshair
+    // and the card; the marks, axes and legends are lazy.
+    MovedPointer: ($, { x }) =>
+      $.evolve({
+        hoverMs: hoverMsAt(geometryOf($.props, $.model.width).layout, x),
+      }),
     LeftPlot: ($) => $.evolve({ hoverMs: undefined }),
     ToggledLegendItem: ($, { label }) =>
       $.evolve({ hiddenLabels: (labels) => toggledLabels(labels, label) }),
@@ -439,10 +472,8 @@ export const TimeSeriesChart = Html.component({
               hatchIdBase,
             ),
           ),
-          h.lazy(AxisLeft, layout),
-          // The layout is the left axis's first argument, so this one leads
-          // with its own (see the README on `h.lazy`).
-          h.lazy(AxisBottomOf, "axis-bottom", layout),
+          h.lazy(ChartAxisLeft, "axis-left", layout),
+          h.lazy(ChartAxisBottom, "axis-bottom", layout),
           h.rect
             .attrs({
               x: String(-layout.overhangPx),

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// cspell:ignore linepath -- the class visx gives its LinePath
 import { HtmlScene } from "@effect/ui/html/testing";
 import { Locator } from "@effect/ui/testing";
 import { it } from "@effect/vitest";
@@ -7,7 +8,7 @@ import { Effect } from "effect";
 import { Tooltip, TooltipEvents } from "./shared/@ui-primitive/tooltip.ts";
 import { MeasureWidth } from "./shared/measure-width.ts";
 import { TrackPointer } from "./shared/track-pointer.ts";
-import { TimeSeriesChart } from "./time-stack-chart.ts";
+import { type SeriesGroup, TimeSeriesChart } from "./time-stack-chart.ts";
 
 const dayMs = 86_400_000;
 const startMs = Date.UTC(2026, 0, 1);
@@ -104,5 +105,105 @@ it.effect("reads a gap as no data, and an empty point by its zero label", () =>
       .mounted(TrackPointer, { x: 4 + 272, y: 50 })
       .expect(Locator.text("Nothing here"))
       .toExist();
+  }),
+);
+
+it.effect("sums each group's sub-series and divides only between groups", () =>
+  Effect.gen(function* () {
+    // Two languages, each split into year bands: the card lists the
+    // languages, and a crisp line runs only where one meets the next.
+    const tooltipGroups: SeriesGroup[] = [
+      { label: "TypeScript", color: "blue", keys: ["ts 2025", "ts 2026"] },
+      { label: "Markdown", color: "gray", keys: ["md 2025", "md 2026"] },
+      { label: "CSS", color: "pink", keys: ["css 2026"] },
+    ];
+    const seriesKeys = tooltipGroups.flatMap((group) => group.keys);
+    const s = yield* HtmlScene.make(TimeSeriesChart, {
+      mode: "area",
+      points: [0, 10, 20].map((day) => ({
+        dateMs: startMs + day * dayMs,
+        values: Object.fromEntries(
+          seriesKeys.map((key, index) => [key, index + 1]),
+        ),
+      })),
+      seriesKeys,
+      colors: seriesKeys.map(() => "red"),
+      tooltipGroups,
+      separateGroups: true,
+      legendItems: tooltipGroups.map(({ label, color }) => ({ label, color })),
+    });
+    s.expectMount(MeasureWidth())
+      .mounted(MeasureWidth, 600)
+      .expectMount(TrackPointer())
+      .expect(Locator.attr("class", "visx-linepath"))
+      .toHaveCount(2)
+      .mounted(TrackPointer, { x: plotX(10), y: 50 })
+      // TypeScript 1 + 2, Markdown 3 + 4, CSS 5, of 15.
+      .expect(Locator.text("TypeScript", { exact: true }))
+      .toExist()
+      .expect(Locator.text("ts 2025"))
+      .toBeAbsent()
+      .expect(Locator.text("7", { exact: true }))
+      .toExist()
+      .expect(Locator.text("15", { exact: true }))
+      .toExist();
+  }),
+);
+
+it.effect("marks a single snapshot with a dot per series", () =>
+  Effect.gen(function* () {
+    const s = yield* HtmlScene.make(TimeSeriesChart, {
+      ...props,
+      points: [{ dateMs: startMs, values: { a: 1, b: 2 } }],
+    });
+    s.expectMount(MeasureWidth())
+      .expect(Locator.tag("circle"))
+      .toBeAbsent()
+      .mounted(MeasureWidth, 600)
+      .expectMount(TrackPointer())
+      .expect(Locator.tag("circle"))
+      .toHaveCount(2);
+  }),
+);
+
+it.effect("sets a second legend apart below the first", () =>
+  Effect.gen(function* () {
+    const s = yield* HtmlScene.make(TimeSeriesChart, {
+      ...props,
+      legendToggles: false,
+      secondaryLegendItems: [
+        { label: "2025", color: "gray" },
+        { label: "2026", color: "black" },
+      ],
+    });
+    s.expectMount(MeasureWidth())
+      .expect(
+        Locator.inside(
+          Locator.attr(
+            "class",
+            "mt-3 text-center text-xs text-balance text-(--text-secondary)",
+          ),
+          Locator.text("2026", { exact: true }),
+        ),
+      )
+      .toExist()
+      .expect(
+        Locator.inside(
+          Locator.attr(
+            "class",
+            "mt-2 text-center text-xs text-balance text-(--text-secondary)",
+          ),
+          Locator.text("b", { exact: true }),
+        ),
+      )
+      .toExist();
+  }),
+);
+
+it.effect("says so when there are no points at all", () =>
+  Effect.gen(function* () {
+    const s = yield* HtmlScene.make(TimeSeriesChart, { ...props, points: [] });
+    // Nothing to measure or hover: no mounts to acknowledge.
+    s.expect(Locator.text("No data collected yet.")).toExist();
   }),
 );

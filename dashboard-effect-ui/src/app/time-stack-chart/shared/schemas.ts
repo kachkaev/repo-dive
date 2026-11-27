@@ -1,5 +1,7 @@
 import { Schema } from "effect";
 
+import type { PointUnit } from "../../shared/time-axis.ts";
+
 /** One instant of a time series: a value per series key. */
 export const TimePointSchema = Schema.Struct({
   dateMs: Schema.Number,
@@ -29,8 +31,20 @@ export type SeriesGroup = typeof SeriesGroupSchema.Type;
 export const ChartModeSchema = Schema.Literals(["area", "bar", "line"]);
 export type ChartMode = typeof ChartModeSchema.Type;
 
-/** Mirrors `PointUnit` in `shared/time-axis.ts`. */
-export const PointUnitSchema = Schema.Literals(["day", "month"]);
+/**
+ * `Schema.Literals` checked both ways against the union `T` it stands for:
+ * a literal outside `T` fails to compile, and so does a member of `T` that
+ * the list leaves out.
+ */
+const literalsOf =
+  <T extends string>() =>
+  <const L extends readonly T[]>(
+    literals: L & ([Exclude<T, L[number]>] extends [never] ? unknown : never),
+  ) =>
+    Schema.Literals(literals);
+
+/** `PointUnit` from `shared/time-axis.ts`, as a Schema. */
+export const PointUnitSchema = literalsOf<PointUnit>()(["day", "month"]);
 
 /**
  * A function prop, such as `valueFormat`: it has no Schema of its own, so it
