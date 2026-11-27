@@ -41,6 +41,10 @@ Live dashboards for a few popular repositories, produced by running the tool on 
 
 Each one is a single self-contained HTML file exported with `repo-dive report` and redeployed weekly by [a scheduled workflow](.github/workflows/examples.yaml) — see [examples](examples/README.md) for how they are defined.
 
+> [!NOTE]
+> We are experimenting with a port of the dashboard to [Effect UI](https://github.com/Effect-TS/ui).
+> The same examples are also available with it: [curl](https://kachkaev.github.io/repo-dive/examples/curl/effect-ui/), [effect](https://kachkaev.github.io/repo-dive/examples/effect/effect-ui/), [ollama](https://kachkaev.github.io/repo-dive/examples/ollama/effect-ui/), [prettier](https://kachkaev.github.io/repo-dive/examples/prettier/effect-ui/), [react](https://kachkaev.github.io/repo-dive/examples/react/effect-ui/), [transformers](https://kachkaev.github.io/repo-dive/examples/transformers/effect-ui/), [vite](https://kachkaev.github.io/repo-dive/examples/vite/effect-ui/).
+
 ## Usage
 
 Run from inside the repository you want to analyze (or pass `--repo /path/to/repo`).
