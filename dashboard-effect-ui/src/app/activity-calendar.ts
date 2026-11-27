@@ -12,6 +12,7 @@ import {
 import { CalendarStrip } from "./activity-calendar/calendar-strip.ts";
 import { ScrollArea } from "./shared/@ui-primitive/scroll-area.ts";
 import { TooltipContent } from "./shared/@ui-primitive/tooltip.ts";
+import { cn } from "./shared/cn.ts";
 import {
   ContributorKindSchema,
   kindColors,
@@ -119,7 +120,7 @@ export const CommitCalendar = Html.component({
         // right — and collapses to nothing once a strip has to scroll. pb
         // clears the overlay horizontal scrollbar (h-2.5) so it never covers
         // the last strip's bottom day row.
-        contentClassName: "mx-auto flex w-max flex-col gap-3 pb-2.5",
+        contentClass: cn("mx-auto flex w-max flex-col gap-3 pb-2.5"),
         children: calendar.strips.map((strip, index) =>
           h.lazy(
             CalendarStrip,
@@ -174,7 +175,7 @@ export const CommitCalendar = Html.component({
                       )
                   : h.div.children(summarize(hoveredCell.day, kindFilter)),
               ],
-              { arrow: false, className: "tabular-nums" },
+              { arrow: false, class: cn("tabular-nums") },
             ),
         }),
       // Centered under the strips like a figure caption (see Legend): the

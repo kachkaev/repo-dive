@@ -10,7 +10,7 @@
  * - ui-kit observes a content element inside the viewport to notice its
  *   content resizing, where Base UI's viewport holds the children directly.
  *   The consumer's own outermost element is that content
- *   (`contentClassName`), so the tree stays the same and that element gains
+ *   (`contentClass`), so the tree stays the same and that element gains
  *   ui-kit's `role="presentation"`, its data attributes and an inline
  *   `min-width: fit-content`.
  * - The native scrollbars are hidden by ui-kit's inline
@@ -44,19 +44,19 @@ const ScrollBar = <M>(
       .attr("data-slot", "scroll-area-thumb")
       .class(
         orientation === "vertical"
-          ? "rounded-full bg-border h-(--scroll-area-thumb-height) w-full"
-          : "rounded-full bg-border h-full w-(--scroll-area-thumb-width)",
+          ? "h-(--scroll-area-thumb-height) w-full rounded-full bg-border"
+          : "h-full w-(--scroll-area-thumb-width) rounded-full bg-border",
       ),
   });
 
 /**
  * A scroll area around `children`, which are laid out inside the content
- * element drawn with `contentClassName`.
+ * element drawn with `contentClass`.
  */
 export const ScrollArea = <M, C extends View.Children<M>>(
   h: Html.H<M>,
   options: {
-    readonly contentClassName: string;
+    readonly contentClass: string;
     readonly children: C;
   },
 ) =>
@@ -76,7 +76,7 @@ export const ScrollArea = <M, C extends View.Children<M>>(
             )
             .children(
               scrollArea
-                .content(h.div.class(options.contentClassName))
+                .content(h.div.class(options.contentClass))
                 .children(options.children),
             ),
           ScrollBar(h, scrollArea, "vertical"),

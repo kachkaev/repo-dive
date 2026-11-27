@@ -2,9 +2,10 @@ import { Story } from "@effect/ui/testing";
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
+import { cn } from "../cn.ts";
 import { Tooltip, TooltipEvents, TooltipMessage } from "./tooltip.ts";
 
-const props = { delay: 400, pressed: true, triggerClass: "" };
+const props = { delay: 400, pressed: true, triggerClass: cn() };
 
 it.effect("opens and closes as ui-kit's tooltip asks", () =>
   Effect.gen(function* () {

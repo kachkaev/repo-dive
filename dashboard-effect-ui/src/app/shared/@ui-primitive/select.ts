@@ -11,22 +11,24 @@
  * Deviations from the React primitive: only the `xs` trigger size exists
  * (the only one the dashboard draws), the popup always sits below the trigger
  * (`alignItemWithTrigger: false`, as the React primitive defaults to), and
- * the positioner and backdrop take `topLayerReset`, since ui-kit places them
- * in the top layer where the view writes them instead of in a portal.
+ * the positioner and backdrop take `topLayerResetClass`, since ui-kit places
+ * them in the top layer where the view writes them instead of in a portal.
  */
 import type { Html } from "@effect/ui/html";
 import type { makeSelect } from "@effect/ui-kit";
 
+import { cn } from "../cn.ts";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "../icons.ts";
-import { topLayerReset } from "./shared/top-layer-reset.ts";
+import { topLayerResetClass } from "./shared/top-layer-reset-class.ts";
 
 /** The parts of a ui-kit Select made by `makeSelect` for values of type `V`. */
 type SelectParts<V extends string> = Parameters<
   NonNullable<Parameters<ReturnType<typeof makeSelect<V>>>[1]["view"]>
 >[0];
 
-const scrollArrowClass =
-  "absolute z-10 flex w-full cursor-default items-center justify-center bg-popover py-1";
+const scrollArrowClass = cn(
+  "absolute z-10 flex w-full cursor-default items-center justify-center bg-popover py-1",
+);
 
 export const SelectView = <M, V extends string>(
   h: Html.H<M>,
@@ -58,8 +60,8 @@ export const SelectView = <M, V extends string>(
       ),
       select.icon(h.span).children(ChevronDownIcon(h)),
     ),
-  select.backdrop(h.div.class(topLayerReset)),
-  select.positioner(h.div.class(`isolate z-50 ${topLayerReset}`)).children(
+  select.backdrop(h.div.class(topLayerResetClass)),
+  select.positioner(h.div.class("isolate z-50", topLayerResetClass)).children(
     select
       .popup(
         h.div
@@ -75,9 +77,9 @@ export const SelectView = <M, V extends string>(
           .scrollUpArrow({
             element: h.div
               .attr("data-slot", "select-scroll-up-button")
-              .class(`${scrollArrowClass} top-0`),
+              .class(scrollArrowClass, "top-0"),
           })
-          ?.children(ChevronUpIcon(h, "size-4")),
+          ?.children(ChevronUpIcon(h, { class: cn("size-4") })),
         // The listbox inside the popup, where Base UI's `Select.List` draws it,
         // which turns the popup into a presentation. Base UI also gives it
         // its `base-ui-disable-scrollbar` class, which does nothing on an
@@ -90,7 +92,7 @@ export const SelectView = <M, V extends string>(
                 element: h.div
                   .attr("data-slot", "select-item")
                   .class(
-                    "relative flex w-full cursor-default items-center gap-2 py-1.5 pr-8 pl-2 outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 text-xs",
+                    "relative flex w-full cursor-default items-center gap-2 py-1.5 pr-8 pl-2 text-xs outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
                   ),
                 value: item.value,
               })
@@ -107,7 +109,7 @@ export const SelectView = <M, V extends string>(
                   })
                   // Drawn only for the selected item; Base UI marks it so.
                   ?.attr("data-selected", "")
-                  .children(CheckIcon(h, "pointer-events-none")),
+                  .children(CheckIcon(h, { class: cn("pointer-events-none") })),
               ),
           ),
         ),
@@ -115,9 +117,9 @@ export const SelectView = <M, V extends string>(
           .scrollDownArrow({
             element: h.div
               .attr("data-slot", "select-scroll-down-button")
-              .class(`${scrollArrowClass} bottom-0`),
+              .class(scrollArrowClass, "bottom-0"),
           })
-          ?.children(ChevronDownIcon(h, "size-4")),
+          ?.children(ChevronDownIcon(h, { class: cn("size-4") })),
       ),
   ),
 ];

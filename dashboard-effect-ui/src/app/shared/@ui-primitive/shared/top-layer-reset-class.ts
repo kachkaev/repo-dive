@@ -1,3 +1,5 @@
+import { cn } from "../../cn.ts";
+
 /**
  * Classes for every box `@effect/ui-kit` puts in the top layer: a popup's
  * positioner and backdrop. Base UI portals its popups to `<body>`; ui-kit
@@ -15,5 +17,6 @@
  *   inherited `--tw-leading` variable, which then overrides the line height
  *   of the popup's own `text-xs`.
  */
-export const topLayerReset =
-  "overflow-visible border-0 bg-transparent p-0 pointer-events-auto visible cursor-auto normal-case not-italic tracking-normal whitespace-normal font-normal normal-nums text-left";
+export const topLayerResetClass = cn(
+  "pointer-events-auto visible cursor-auto overflow-visible border-0 bg-transparent p-0 text-left font-normal tracking-normal whitespace-normal normal-case not-italic normal-nums",
+);

@@ -141,7 +141,7 @@ const Bar = <M>(
 const CountCell = <M>(h: Html.H<M>, key: string, value: number | undefined) =>
   h.span
     .key(key)
-    .class("text-right text-xs tabular-nums text-(--text-secondary)")
+    .class("text-right text-xs text-(--text-secondary) tabular-nums")
     .children(
       value === undefined || value === 0
         ? h.span.class("text-muted-foreground").children("·")

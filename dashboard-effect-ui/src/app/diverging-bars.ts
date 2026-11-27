@@ -12,6 +12,7 @@ import {
 } from "./diverging-bars/diverging-layout.ts";
 import { AxisBottom, AxisLeft, GridRows } from "./shared/axes.ts";
 import { barPath } from "./shared/bar-path.ts";
+import { cn } from "./shared/cn.ts";
 import { CrosshairLine } from "./shared/crosshair-line.ts";
 import { formatCount, formatMonth } from "./shared/format.ts";
 import { MeasureWidth } from "./shared/measure-width.ts";
@@ -175,7 +176,7 @@ const HoverCard = <M>(
     )
     .children(
       h.div
-        .class("mb-1 font-medium tabular-nums text-(--text-secondary)")
+        .class("mb-1 font-medium text-(--text-secondary) tabular-nums")
         .children(formatMonth(options.point.month)),
       options.rows.map((row) =>
         h.div
@@ -185,7 +186,7 @@ const HoverCard = <M>(
             Swatch(h, {
               color: row.color,
               hatch: row.hatch,
-              className: "inline-block size-2 rounded-xs",
+              class: cn("inline-block size-2 rounded-xs"),
             }),
             h.span.class("text-(--text-secondary)").children(row.label),
             h.span

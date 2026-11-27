@@ -18,7 +18,7 @@ const variantAttrs = { "data-variant": "outline", "data-size": "xs" } as const;
 
 export const ToggleGroupRoot = <M>(
   h: Html.H<M>,
-  options: { readonly label: string; readonly className?: string | undefined },
+  options: { readonly label: string; readonly class?: string | undefined },
 ) =>
   h.div
     .attrs({
@@ -28,7 +28,7 @@ export const ToggleGroupRoot = <M>(
     })
     .class(
       "flex w-fit items-center gap-2 data-[variant=outline]:gap-0 data-[variant=outline]:rounded-md",
-      options.className,
+      options.class,
     );
 
 /**
@@ -37,11 +37,11 @@ export const ToggleGroupRoot = <M>(
  */
 export const ToggleGroupItemButton = <M>(
   h: Html.H<M>,
-  options: { readonly className?: string | undefined },
+  options: { readonly class?: string | undefined },
 ) =>
   h.button
     .attrs({ "data-slot": "toggle-group-item", ...variantAttrs })
     .class(
-      "inline-flex items-center justify-center gap-2 rounded-md font-medium whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 data-pressed:bg-accent data-pressed:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent enabled:hover:bg-accent enabled:hover:text-accent-foreground h-7 px-2 text-xs shrink-0 focus:z-10 focus-visible:z-10 data-[variant=outline]:rounded-none data-[variant=outline]:border-l-0 data-[variant=outline]:first:rounded-l-md data-[variant=outline]:first:border-l data-[variant=outline]:last:rounded-r-md",
-      options.className,
+      "inline-flex h-7 shrink-0 items-center justify-center gap-2 rounded-md border border-input bg-transparent px-2 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] outline-none focus:z-10 focus-visible:z-10 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:opacity-50 data-pressed:bg-accent data-pressed:text-accent-foreground data-[variant=outline]:rounded-none data-[variant=outline]:border-l-0 data-[variant=outline]:first:rounded-l-md data-[variant=outline]:first:border-l data-[variant=outline]:last:rounded-r-md [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      options.class,
     );
