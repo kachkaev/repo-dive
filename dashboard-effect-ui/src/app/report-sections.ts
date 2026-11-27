@@ -88,9 +88,9 @@ export const ReportSectionsMessage = UiSchema.TaggedEnum({
  * can jump the queue. Effect UI renders synchronously and has no transitions,
  * so the reveal is a counter in the Model, advanced by a Subscription that
  * ticks once per frame (see `frame-ticks.ts`, which keeps ticking in a hidden
- * tab, and when frames stall) and runs only while sections are still hidden. A frame is short and
- * each section's render is small, so the page stays interactive between steps
- * all the same.
+ * tab, and while a frame is overdue) and runs only while sections are still
+ * hidden. A frame is short and each section's render is small, so the page
+ * stays interactive between steps all the same.
  */
 export const ReportSections = Html.component({
   name: "ReportSections",

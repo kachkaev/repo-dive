@@ -1,10 +1,12 @@
 import { Effect, Stream } from "effect";
 
 /**
- * How long a shown page waits for an animation frame before it stops counting
- * on them. A browser that paints sends one every 16 ms or so; an embedded
+ * How long a shown page waits for an animation frame before it ticks on a
+ * task instead. A browser that paints sends one every 16 ms or so; an embedded
  * webview that is out of sight, or a window covered by others, can stop
- * sending any while the page still reports itself visible.
+ * sending any while the page still reports itself visible. A frame that is
+ * merely late (a long task, a slow paint) trips it too, but only until that
+ * frame arrives.
  */
 export const frameFallbackMs = 100;
 
@@ -30,43 +32,58 @@ const nextTask = Effect.callback<undefined>((resume) => {
 });
 
 /**
- * Resumes on the next animation frame with `true`, or with `false` once
- * {@link frameFallbackMs} pass without one. A page hidden while it waits stops
- * waiting at once, with `true`: it has not shown that its frames stall, it
- * just has none to give while hidden.
+ * What one run of {@link frameTicks} knows about its frames: the animation
+ * frame it still waits for after a wait for it timed out, if any. While there
+ * is one, frames count as stalled; it clears itself when it arrives.
  */
-const nextFrameOrTimeout = Effect.callback<boolean>((resume) => {
-  // Whichever way the wait ends (or is interrupted), aborting releases all
-  // three: the frame, the timer and the listener.
-  const controller = new AbortController();
-  const { signal } = controller;
-  const finish = (gotFrame: boolean) => {
-    controller.abort();
-    resume(Effect.succeed(gotFrame));
-  };
-  const frame = requestAnimationFrame(() => {
-    finish(true);
+type FrameState = { probe: number | undefined };
+
+/**
+ * Resumes on the next animation frame, or once {@link frameFallbackMs} pass
+ * without one. When the timer wins, the frame stays requested as the run's
+ * probe, so its arrival tells the run that frames are back. A page hidden
+ * while it waits stops waiting at once: it has not shown that its frames
+ * stall, it just has none to give while hidden.
+ */
+const nextFrameOrTimeout = (state: FrameState) =>
+  Effect.callback<undefined>((resume) => {
+    // Aborting releases the timer and the listener, whichever way the wait
+    // ends; the frame is released by the ways that do not keep it as a probe.
+    const controller = new AbortController();
+    const { signal } = controller;
+    let waiting = true;
+    const finish = () => {
+      waiting = false;
+      controller.abort();
+      resume(Effect.undefined);
+    };
+    const frame = requestAnimationFrame(() => {
+      if (waiting) {
+        finish();
+      } else if (state.probe === frame) {
+        state.probe = undefined;
+      }
+    });
+    const timeout = setTimeout(() => {
+      state.probe = frame;
+      finish();
+    }, frameFallbackMs);
+    signal.addEventListener("abort", () => {
+      clearTimeout(timeout);
+    });
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+        cancelAnimationFrame(frame);
+        finish();
+      },
+      { signal },
+    );
+    return Effect.sync(() => {
+      cancelAnimationFrame(frame);
+      controller.abort();
+    });
   });
-  signal.addEventListener("abort", () => {
-    cancelAnimationFrame(frame);
-  });
-  const timeout = setTimeout(() => {
-    finish(false);
-  }, frameFallbackMs);
-  signal.addEventListener("abort", () => {
-    clearTimeout(timeout);
-  });
-  document.addEventListener(
-    "visibilitychange",
-    () => {
-      finish(true);
-    },
-    { signal },
-  );
-  return Effect.sync(() => {
-    controller.abort();
-  });
-});
 
 /**
  * One tick per chance to paint, pulled one at a time: the next wait only
@@ -75,23 +92,27 @@ const nextFrameOrTimeout = Effect.callback<boolean>((resume) => {
  *
  * While the page is shown, a tick is the next animation frame. While it is
  * hidden there are no frames, so a {@link nextTask} takes over. A shown page
- * whose frames stall (see {@link frameFallbackMs}) ticks on tasks too, for
- * the rest of the stream: what it drives finishes rather than waiting for a
- * frame that may never come.
+ * whose frame does not come within {@link frameFallbackMs} ticks on tasks too,
+ * until that frame arrives: what the ticks drive finishes even if it never
+ * does, and goes back to painting between ticks once frames come again.
  */
 export const frameTicks: Stream.Stream<undefined> = Stream.suspend(() => {
-  // Read and written by one wait at a time: the stream pulls sequentially.
-  let framesStalled = false;
+  // One run's state, on the main thread: written by one wait at a time (the
+  // stream pulls sequentially) and by its probe's frame callback.
+  const state: FrameState = { probe: undefined };
   return Stream.fromEffectRepeat(
     Effect.suspend(() =>
-      framesStalled || document.hidden
+      state.probe !== undefined || document.hidden
         ? nextTask
-        : nextFrameOrTimeout.pipe(
-            Effect.flatMap((gotFrame) => {
-              framesStalled = !gotFrame;
-              return Effect.undefined;
-            }),
-          ),
+        : nextFrameOrTimeout(state),
+    ),
+  ).pipe(
+    Stream.ensuring(
+      Effect.sync(() => {
+        if (state.probe !== undefined) {
+          cancelAnimationFrame(state.probe);
+        }
+      }),
     ),
   );
 });
