@@ -78,29 +78,35 @@ export const SelectView = <M, V extends string>(
               .class(`${scrollArrowClass} top-0`),
           })
           ?.children(ChevronUpIcon(h, "size-4")),
-        options.items.map((item) =>
-          select
-            .item({
-              element: h.div
-                .attr("data-slot", "select-item")
-                .class(
-                  "relative flex w-full cursor-default items-center gap-2 py-1.5 pr-8 pl-2 outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 text-xs",
-                ),
-              value: item.value,
-            })
-            .children(
-              select
-                .itemText(h.div.class("shrink-0 whitespace-nowrap"))
-                .children(item.label),
-              select
-                .itemIndicator({
-                  element: h.span.class(
-                    "absolute right-2 flex size-3.5 items-center justify-center",
+        // The listbox inside the popup, as Base UI's `Select.List` draws it
+        // (with an empty class), which turns the popup into a presentation.
+        select.list(h.div.attr("class", "")).children(
+          options.items.map((item) =>
+            select
+              .item({
+                element: h.div
+                  .attr("data-slot", "select-item")
+                  .class(
+                    "relative flex w-full cursor-default items-center gap-2 py-1.5 pr-8 pl-2 outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 text-xs",
                   ),
-                  value: item.value,
-                })
-                ?.children(CheckIcon(h, "pointer-events-none")),
-            ),
+                value: item.value,
+              })
+              .children(
+                select
+                  .itemText(h.div.class("shrink-0 whitespace-nowrap"))
+                  .children(item.label),
+                select
+                  .itemIndicator({
+                    element: h.span.class(
+                      "absolute right-2 flex size-3.5 items-center justify-center",
+                    ),
+                    value: item.value,
+                  })
+                  // Drawn only for the selected item; Base UI marks it so.
+                  ?.attr("data-selected", "")
+                  .children(CheckIcon(h, "pointer-events-none")),
+              ),
+          ),
         ),
         select
           .scrollDownArrow({
