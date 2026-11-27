@@ -35,6 +35,12 @@ inputs:
       upload-artifact is on.
     required: false
     default: repo-dive-report.html
+  ui:
+    description: >-
+      Which dashboard the report embeds: react, or effect for the
+      experimental Effect UI port.
+    required: false
+    default: react
   scan-timeout-minutes:
     description: >-
       Interrupt scan gracefully after this many minutes, so that the catalog
@@ -192,9 +198,16 @@ runs:
         BIN: ${{ steps.install.outputs.bin }}
         REPO: ${{ inputs.repo }}
         REPORT_PATH: ${{ inputs.report-path }}
+        UI: ${{ inputs.ui }}
+      # The default leaves --ui out, so a pinned version from before the flag
+      # still runs
       run: |
         mkdir -p "$(dirname "$REPORT_PATH")"
-        "$BIN" report --repo "$REPO" --out "$REPORT_PATH"
+        if [ -z "$UI" ] || [ "$UI" = "react" ]; then
+          "$BIN" report --repo "$REPO" --out "$REPORT_PATH"
+        else
+          "$BIN" report --repo "$REPO" --out "$REPORT_PATH" --ui "$UI"
+        fi
 
     - name: Add the report to the job summary
       shell: bash

@@ -23,6 +23,11 @@ const dashboardBuilt = existsSync(
   path.join(rootDirectory, "dist", "dashboard", "index.html"),
 );
 
+// `--ui effect` serves and exports the experimental Effect UI build instead.
+const effectUiDashboardBuilt = existsSync(
+  path.join(rootDirectory, "dist", "dashboard-effect-ui", "index.html"),
+);
+
 // A config importing `repo-dive/config` from a repository without node_modules
 // falls back to this package's own `exports`, which point at the built entry.
 const configEntryBuilt = existsSync(
@@ -622,6 +627,44 @@ test.concurrent("scan fails gracefully outside a git repository", async () => {
   }
 });
 
+/**
+ * Starts a CLI invocation that ends up serving a dashboard and resolves once
+ * it says where, with everything it printed so far. The caller kills the
+ * child; a child that never gets there is killed here.
+ */
+async function spawnServing(args: readonly string[]) {
+  const server = spawn(process.execPath, ["src/cli.ts", ...args], {
+    cwd: rootDirectory,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`Timed out. Output so far:\n${output}`));
+      }, 30_000);
+      server.stdout.on("data", (chunk: Buffer) => {
+        output += chunk.toString();
+        if (output.includes("Serving on")) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+      server.stderr.on("data", (chunk: Buffer) => {
+        output += chunk.toString();
+      });
+      server.on("exit", () => {
+        clearTimeout(timer);
+        reject(new Error(`Exited before serving. Output:\n${output}`));
+      });
+    });
+  } catch (error) {
+    server.kill();
+    throw error;
+  }
+  return { server, output };
+}
+
 test
   .skipIf(!dashboardBuilt)
   .concurrent(
@@ -630,44 +673,29 @@ test
       const repoPath = createFixtureRepo();
       const port = 4900 + Math.floor(Math.random() * 90);
 
-      const pipeline = spawn(
-        process.execPath,
-        ["src/cli.ts", "--repo", repoPath, "--port", String(port), "--no-open"],
-        { cwd: rootDirectory, stdio: ["ignore", "pipe", "pipe"] },
-      );
-
       try {
-        let output = "";
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => {
-            reject(new Error(`Timed out. Output so far:\n${output}`));
-          }, 30_000);
-          pipeline.stdout.on("data", (chunk: Buffer) => {
-            output += chunk.toString();
-            if (output.includes("Serving on")) {
-              clearTimeout(timer);
-              resolve();
-            }
-          });
-          pipeline.stderr.on("data", (chunk: Buffer) => {
-            output += chunk.toString();
-          });
-          pipeline.on("exit", () => {
-            clearTimeout(timer);
-            reject(new Error(`Pipeline exited early. Output:\n${output}`));
-          });
-        });
+        const { server, output } = await spawnServing([
+          "--repo",
+          repoPath,
+          "--port",
+          String(port),
+          "--no-open",
+        ]);
+        try {
+          expect(output).toMatch(/Step 1\/3/);
+          expect(output).toMatch(/Step 2\/3/);
+          expect(output).toMatch(/Indexed 2 commits/);
 
-        expect(output).toMatch(/Step 1\/3/);
-        expect(output).toMatch(/Step 2\/3/);
-        expect(output).toMatch(/Indexed 2 commits/);
-
-        const response = await fetch(`http://localhost:${port}/dashboard.json`);
-        expect(response.ok).toBe(true);
-        const body = await response.text();
-        expect(body).toMatch(/"commitCount":2/);
+          const response = await fetch(
+            `http://localhost:${port}/dashboard.json`,
+          );
+          expect(response.ok).toBe(true);
+          const body = await response.text();
+          expect(body).toMatch(/"commitCount":2/);
+        } finally {
+          server.kill();
+        }
       } finally {
-        pipeline.kill();
         rmSync(repoPath, { force: true, recursive: true });
       }
     },
@@ -703,6 +731,140 @@ test
       rmSync(repoPath, { force: true, recursive: true });
     }
   });
+
+test
+  .skipIf(!effectUiDashboardBuilt)
+  .concurrent(
+    "report --ui effect exports the Effect UI dashboard as one HTML file",
+    async () => {
+      const repoPath = createFixtureRepo();
+
+      try {
+        await runCli(
+          "scan",
+          "--repo",
+          repoPath,
+          "--collectors",
+          "commit-meta,churn",
+        );
+        await runCli("index", "--repo", repoPath);
+        const outPath = path.join(repoPath, "report-effect.html");
+        const result = await runCli(
+          "report",
+          "--repo",
+          repoPath,
+          "--ui",
+          "effect",
+          "--out",
+          outPath,
+        );
+        expect(result.status, result.stderr).toBe(0);
+
+        const reportHtml = readFileSync(outPath, "utf8");
+        const effectUiIndexHtml = readFileSync(
+          path.join(rootDirectory, "dist", "dashboard-effect-ui", "index.html"),
+          "utf8",
+        );
+        const effectUiScript = /src="\.\/(assets\/[^"]+\.js)"/.exec(
+          effectUiIndexHtml,
+        )?.[1];
+        expect(effectUiScript).toBeDefined();
+        // The inlined bundle is the Effect UI build's, not the React one's.
+        expect(reportHtml).toContain(
+          readFileSync(
+            path.join(
+              rootDirectory,
+              "dist",
+              "dashboard-effect-ui",
+              effectUiScript ?? "",
+            ),
+            "utf8",
+          ).slice(0, 200),
+        );
+        expect(reportHtml).toMatch(/window\.__REPO_DIVE_DATA__ = \{/);
+        expect(reportHtml).not.toMatch(/src="\.?\/assets/);
+        expect(reportHtml).not.toMatch(/<link rel="stylesheet"/);
+      } finally {
+        rmSync(repoPath, { force: true, recursive: true });
+      }
+    },
+  );
+
+test.skipIf(!effectUiDashboardBuilt).concurrent.each([
+  { command: "dashboard", indexFirst: true, firstPort: 20_000 },
+  { command: "the bare pipeline", indexFirst: false, firstPort: 25_000 },
+])(
+  "$command with --ui effect serves the Effect UI build",
+  async ({ indexFirst, firstPort }) => {
+    const repoPath = createFixtureRepo();
+    // Ranges of their own, wide enough that concurrent runs rarely meet.
+    const port = firstPort + Math.floor(Math.random() * 5000);
+
+    try {
+      if (indexFirst) {
+        await runCli(
+          "scan",
+          "--repo",
+          repoPath,
+          "--collectors",
+          "commit-meta,churn",
+        );
+        await runCli("index", "--repo", repoPath);
+      }
+
+      const { server } = await spawnServing([
+        ...(indexFirst ? ["dashboard"] : []),
+        "--repo",
+        repoPath,
+        "--port",
+        String(port),
+        "--no-open",
+        "--ui",
+        "effect",
+      ]);
+      try {
+        const response = await fetch(`http://localhost:${port}/`);
+        expect(response.ok).toBe(true);
+        expect(await response.text()).toBe(
+          readFileSync(
+            path.join(
+              rootDirectory,
+              "dist",
+              "dashboard-effect-ui",
+              "index.html",
+            ),
+            "utf8",
+          ),
+        );
+      } finally {
+        server.kill();
+      }
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  },
+);
+
+const bundledCliPath = path.join(rootDirectory, "dist", "cli.js");
+
+test.skipIf(!existsSync(bundledCliPath))(
+  "the bundled CLI embeds none of the build output",
+  () => {
+    // `new URL(`…${name}`, import.meta.url)` makes Vite glob the folder and
+    // inline every match as a data: URL — the previous dist/cli.js included,
+    // so the bundle would grow with every build.
+    expect(readFileSync(bundledCliPath, "utf8")).not.toMatch(
+      /data:[\w+./-]+;base64,/,
+    );
+  },
+);
+
+test.concurrent("--ui rejects an unknown dashboard", async () => {
+  const result = await runCli("report", "--ui", "vue");
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toMatch(/react/);
+  expect(result.stderr).toMatch(/effect/);
+});
 
 test.concurrent(
   "index splits lint disables by linter and merges their rules",

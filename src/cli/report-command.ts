@@ -2,6 +2,7 @@ import { Option } from "effect";
 import { Command, Flag } from "effect/cli";
 
 import { runReport } from "./report-command/run-report.ts";
+import { dashboardUiFlag } from "./shared/dashboard-ui-flag.ts";
 
 export const reportCommand = Command.make("report", {
   repoPath: Flag.String("repo").pipe(
@@ -21,6 +22,7 @@ export const reportCommand = Command.make("report", {
     Flag.withDefault(false),
     Flag.withDescription("Open the report in the default browser"),
   ),
+  ui: dashboardUiFlag,
 }).pipe(
   Command.withDescription(
     "Export the dashboard as one self-contained HTML file — shareable without installing anything",
@@ -30,6 +32,7 @@ export const reportCommand = Command.make("report", {
       repoPath: config.repoPath,
       outPath: Option.getOrUndefined(config.outPath),
       open: config.open,
+      ui: config.ui,
     }),
   ),
 );

@@ -1,0 +1,324 @@
+import { Query } from "@effect/ui";
+import { Effect, Predicate, Schema } from "effect";
+
+/**
+ * Rows carry whichever of a commit's two dates their chart is shaped for.
+ *
+ * {@link CommitRow} is a **histogram** row — the calendar and the monthly bars
+ * count commits and lines of work, binning them by an attribute of the commit
+ * itself, so it carries the **author** date. Every other row here is a **state
+ * sample** — "at time T the tree held V" — positioned by the instant the
+ * measurement was valid, so those carry the **committer** date, the only one
+ * of the two that runs forwards along the history.
+ *
+ * See docs/specs/04-collectors.md for why the boundary sits there.
+ */
+type CommitRow = {
+  sha: string;
+  /** When the commit was authored, in the author's own timezone (git `%aI`). */
+  date: string;
+  /**
+   * The author's position in {@link DashboardData.contributors}. Missing in
+   * dashboard.json written before per-commit contributor refs landed — that
+   * list then holds whole-history totals instead, and only for the top
+   * contributors, so the contributors chart cannot be narrowed to a range.
+   */
+  contributor?: number;
+  /**
+   * Positions in {@link DashboardData.contributors} of the commit's
+   * co-authors of another kind than its author — the cross-kind help the
+   * contributors chart hatches. Absent when there are none.
+   */
+  helpers?: number[];
+  /**
+   * The author's contributor kind. Missing in dashboard.json written before
+   * per-commit kinds landed — treat as "human".
+   */
+  kind?: ContributorKind;
+  /** At least one AI co-author trailer on the commit. */
+  ai: boolean;
+  added: number;
+  deleted: number;
+};
+
+/** When the snapshot's tree became part of the history (git `%cI`). */
+type SnapshotDate = string;
+
+type LanguagesRow = {
+  sha: string;
+  date: SnapshotDate;
+  byLanguage: Record<string, number>;
+};
+
+type FileTypesRow = {
+  sha: string;
+  date: SnapshotDate;
+  totalFiles: number;
+  totalBytes: number;
+  /**
+   * Every tracked file per language at the same commit. Optional: absent in
+   * dashboard.json written before the file chart covered every file.
+   */
+  byLanguage?: Record<string, number>;
+};
+
+type DirectivesRow = {
+  sha: string;
+  date: SnapshotDate;
+  eslintNextLine: number;
+  eslintLine: number;
+  eslintBlocks: number;
+  /** Optional: absent in dashboard.json written before oxlint disables were counted. */
+  oxlintNextLine?: number;
+  oxlintLine?: number;
+  oxlintBlocks?: number;
+  /** Lines inside block disables, eslint and oxlint ones alike. */
+  blockCoveredLines: number;
+  tsIgnore: number;
+  tsExpectError: number;
+  tsNocheck: number;
+  todos: number;
+};
+
+type DependenciesRow = {
+  sha: string;
+  date: SnapshotDate;
+  /** Total resolved packages across all lockfiles in the tree. */
+  resolved: number;
+  /**
+   * Number of package.json manifests in the tree (workspaces + root).
+   * Optional: absent in dashboard.json written before manifests were counted.
+   */
+  manifestCount?: number;
+  /** Direct dependencies declared across all package.json manifests. */
+  directProd: number;
+  directDev: number;
+  directOptional: number;
+  /** Resolved packages split by package manager (pnpm, …). */
+  byPackageManager: Record<string, number>;
+};
+
+/**
+ * One survival snapshot — the same shape at two grains: `survival` rows count
+ * living lines, `fileSurvival` rows count living files (a file belongs to its
+ * creator and creation cohort until it is deleted).
+ */
+type SurvivalRow = {
+  sha: string;
+  date: SnapshotDate;
+  byCohort: Record<string, number>;
+  byContributor: Record<string, number>;
+  /**
+   * Living units per contributor, split by the year each was authored.
+   * Optional: absent in dashboard.json written before per-year survival landed.
+   */
+  byContributorYear?: Record<string, Record<string, number>>;
+  byLanguage: Record<string, number>;
+  /**
+   * Living units per language, split by the year each was authored.
+   * Optional: absent in dashboard.json written before per-year survival by
+   * language landed.
+   */
+  byLanguageYear?: Record<string, Record<string, number>>;
+  /**
+   * Living units per file purpose, and split by the year each was authored.
+   * Optional: absent on samples collected before survival outputs kept paths.
+   */
+  byPurpose?: Record<string, number>;
+  byPurposeYear?: Record<string, Record<string, number>>;
+};
+
+export type ContributorKind = "human" | "bot" | "ai";
+
+/**
+ * Cross-kind collaboration counts, keyed by the *other* party's kind. Only
+ * kinds with a non-zero count are present; a contributor's own kind never is
+ * (same-kind co-authorship isn't tracked).
+ */
+export type CrossKindCounts = Partial<Record<ContributorKind, number>>;
+
+/**
+ * One person (or bot, or agent) who authored or co-authored commits. Commit
+ * rows refer to these by position, and the dashboard tallies them over the
+ * range on show — the counts below only come with dashboard.json written
+ * before per-commit contributor refs landed, where they cover the whole
+ * history.
+ */
+export type ContributorRow = {
+  email: string;
+  name: string;
+  /** Optional profile URL from the config's contributor aliases. */
+  url?: string;
+  /** Missing in dashboard.json written before contributor kinds landed. */
+  kind?: ContributorKind;
+  commits?: number;
+  added?: number;
+  deleted?: number;
+  /**
+   * Own commits carrying at least one co-author of that other kind — the
+   * hatched tail of the "authored" bar. Counted once per commit per kind, so
+   * the per-kind counts can sum above the number of assisted commits when one
+   * commit was helped by two kinds at once.
+   *
+   * Absent in dashboard.json written before cross-kind collaboration landed.
+   */
+  assistedBy?: CrossKindCounts;
+  /**
+   * Commits by an author of that other kind that this contributor co-authored
+   * — the "assisted" bar. Each commit has one author, so these sum exactly to
+   * the bar's total.
+   *
+   * Absent in dashboard.json written before cross-kind collaboration landed.
+   */
+  assisted?: CrossKindCounts;
+};
+
+/**
+ * Stable ids of the chart sections that accept annotations, mirroring
+ * `chartIds` in the
+ * CLI's public config surface (this file redeclares the dashboard.json shape
+ * rather than importing it, like the rest of {@link DashboardData}).
+ */
+type ChartAnnotationId =
+  | "lines-of-code"
+  | "number-of-files"
+  | "commit-calendar"
+  | "commits-per-month"
+  | "churn-per-month"
+  | "direct-dependencies"
+  | "dependencies"
+  | "loose-ends"
+  | "most-suppressed-eslint-rules"
+  | "contributors";
+
+export type DashboardData = {
+  generatedAt: string;
+  /** Optional: absent in dashboard.json written before configurable caps landed. */
+  config?: {
+    contributors: {
+      /** How many contributors per-contributor charts keep before folding into "Other". */
+      maxInCharts: number;
+    };
+    /** Optional: absent in dashboard.json written before chart config landed. */
+    charts?: {
+      /** Which day calendar-shaped charts start the week on. */
+      weekStartsOn: "monday" | "sunday";
+      /**
+       * Optional per-chart Markdown notes from the analyzed repo's config,
+       * rendered in a callout between the chart's heading and the chart.
+       * Keyed by the chart section's stable id.
+       */
+      annotations?: Partial<Record<ChartAnnotationId, string>>;
+    };
+    /**
+     * Every file purpose in stack order. Optional: absent in dashboard.json
+     * written before purposes landed.
+     */
+    filePurposes?: Array<{ label: string; source: boolean }>;
+  };
+  repo: {
+    /** The `origin` repo's own name, falling back to the checkout directory. */
+    name: string;
+    /**
+     * Browsable URL of the `origin` remote, credentials and ssh port stripped.
+     * Absent for a repo with no (or a purely local) origin, and in
+     * dashboard.json written before remotes were recorded.
+     */
+    remoteUrl?: string;
+    commitCount: number;
+    contributorCount: number;
+    /**
+     * The outer edges of both clocks — the earliest anything was authored and
+     * the latest anything landed — so this range covers the author-dated
+     * calendar and the committer-dated timelines alike.
+     */
+    firstCommitDate?: string;
+    lastCommitDate?: string;
+    /**
+     * Short shas of the oldest and newest indexed commits. Absent in
+     * dashboard.json written before they were recorded.
+     */
+    firstCommitSha?: string;
+    lastCommitSha?: string;
+  };
+  commits: CommitRow[];
+  languages: LanguagesRow[];
+  fileTypes: FileTypesRow[];
+  directives: DirectivesRow[];
+  dependencies: DependenciesRow[];
+  topRules: Array<{ rule: string; count: number }>;
+  survival: SurvivalRow[];
+  /**
+   * File-grain survival samples from the `file-survival` collector. Optional:
+   * absent in dashboard.json written before file survival landed.
+   */
+  fileSurvival?: SurvivalRow[];
+  contributors: ContributorRow[];
+};
+
+/** Inlined by `repo-dive report` so the export works from a single file. */
+const inlinedData = (globalThis as { __REPO_DIVE_DATA__?: DashboardData })
+  .__REPO_DIVE_DATA__;
+
+/**
+ * Why dashboard.json could not be loaded. A Schema error rather than a
+ * `Data.TaggedError`: it is a query's error, which the Effect UI runtime
+ * encodes into its message log.
+ */
+// eslint-disable-next-line unicorn/throw-new-error -- false positive: Schema.TaggedError is a class factory, not an error constructor
+class DashboardDataUnavailable extends Schema.TaggedError<DashboardDataUnavailable>()(
+  "DashboardDataUnavailable",
+  { reason: Schema.String },
+) {
+  override get message(): string {
+    return this.reason;
+  }
+}
+
+/**
+ * The fetched dashboard.json crosses a trusted local boundary, so it is
+ * declared rather than described field by field (the React dashboard casts it
+ * the same way). The JSON round trip is the identity, which is all the
+ * runtime's message log asks of it.
+ */
+export const DashboardDataSchema = Schema.declare<DashboardData>(
+  (input): input is DashboardData => Predicate.isObject(input),
+  { title: "DashboardData" },
+);
+
+const loadDashboardData = () =>
+  inlinedData
+    ? Effect.succeed(inlinedData)
+    : Effect.tryPromise({
+        try: async () => {
+          const response = await fetch("./dashboard.json");
+          if (!response.ok) {
+            throw new Error(
+              `Could not load dashboard.json (${response.status}). Run \`repo-dive index\` first.`,
+            );
+          }
+          return (await response.json()) as DashboardData;
+        },
+        catch: (cause) =>
+          new DashboardDataUnavailable({
+            reason: cause instanceof Error ? cause.message : String(cause),
+          }),
+      });
+
+/**
+ * dashboard.json as an Effect UI query: the app shell reads its result
+ * (`Initial`, `Success` or `Failure`) instead of awaiting it before mounting,
+ * as ../../dashboard/src/main.tsx does. It never goes stale: the file is the
+ * snapshot `repo-dive index` wrote, and a reload is how a reader picks up a
+ * newer one.
+ */
+export class LoadDashboardData extends Query.Service<LoadDashboardData>()(
+  "dashboard/LoadDashboardData",
+  {
+    success: DashboardDataSchema,
+    error: DashboardDataUnavailable,
+    staleTime: "Infinity",
+  },
+) {
+  static readonly layer = this.toLayer(loadDashboardData);
+}

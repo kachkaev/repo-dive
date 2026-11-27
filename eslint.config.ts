@@ -1,4 +1,7 @@
-import { generateBaseConfigs } from "@kachkaev/eslint-config-base";
+import {
+  generateBaseConfigs,
+  ruleArgsForIdLength,
+} from "@kachkaev/eslint-config-base";
 import { defineConfig } from "eslint/config";
 import reactHooks from "eslint-plugin-react-hooks";
 
@@ -25,6 +28,75 @@ export default defineConfig([
       "@typescript-eslint/consistent-type-assertions": "off", // The fetched dashboard.json crosses a trusted local boundary; a single cast beats hand-validating every series.
       "@typescript-eslint/explicit-module-boundary-types": "off", // React components and hooks are fine with inferred return types.
       "func-style": "off", // Small local helpers read naturally as const arrows next to component bodies.
+      "import/no-default-export": "off", // Vite config files must default-export.
+      "import/no-extraneous-dependencies": "off", // The dashboard is bundled by Vite, so its packages live in devDependencies by design.
+      "unicorn/no-array-callback-reference": "off", // Passing named pure helpers to map/filter is idiomatic in the chart-shaping code.
+    },
+  },
+
+  {
+    // The two dashboards know nothing of each other, so either folder can be
+    // deleted on its own (see dashboard-effect-ui/README.md).
+    files: [
+      "dashboard/**/*.ts",
+      "dashboard/**/*.tsx",
+      "dashboard-effect-ui/**/*.ts",
+    ],
+    rules: {
+      "import/no-restricted-paths": [
+        "error",
+        {
+          zones: [
+            {
+              target: "./dashboard",
+              from: "./dashboard-effect-ui",
+              message:
+                "The React dashboard must not depend on the Effect UI port.",
+            },
+            {
+              target: "./dashboard-effect-ui",
+              from: "./dashboard",
+              message:
+                "The Effect UI port copies what it needs from the React dashboard instead of importing it.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
+    files: [
+      "dashboard-effect-ui/src/data.ts",
+      "dashboard-effect-ui/src/app/shared/category-colors.test.ts",
+      "dashboard-effect-ui/src/app/shared/measure-width.test.ts",
+    ],
+    rules: {
+      "@typescript-eslint/consistent-type-assertions": "off", // The fetched dashboard.json crosses a trusted local boundary (data.ts), the copied category-colors test reads its fixtures the same way, and the ResizeObserver stand-in builds a partial entry.
+    },
+  },
+
+  {
+    files: ["dashboard-effect-ui/**/*.ts"],
+    rules: {
+      "@typescript-eslint/explicit-module-boundary-types": "off", // Effect UI components and view functions infer large builder and component types; repeating them adds noise.
+      "func-style": "off", // View functions are const arrows, as Effect UI's own docs write them.
+      "id-length": [
+        ruleArgsForIdLength[0],
+        {
+          ...ruleArgsForIdLength[1],
+          // The one-letter names Effect UI fixes: `h` for view builders, `$`
+          // in update handlers, `p` in headless components' parts and `s` for
+          // a Story or Scene.
+          exceptions: [
+            ...ruleArgsForIdLength[1].exceptions,
+            "h",
+            "$",
+            "p",
+            "s",
+          ],
+        },
+      ],
       "import/no-default-export": "off", // Vite config files must default-export.
       "import/no-extraneous-dependencies": "off", // The dashboard is bundled by Vite, so its packages live in devDependencies by design.
       "unicorn/no-array-callback-reference": "off", // Passing named pure helpers to map/filter is idiomatic in the chart-shaping code.

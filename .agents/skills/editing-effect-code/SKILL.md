@@ -9,6 +9,9 @@ metadata:
 
 # Editing Effect code
 
+The rules below are for the CLI in [`src/`](../../../src) — layers provided only at the entrypoint, `Data.TaggedError`, the child-process helpers and the rest.
+The experimental Effect UI dashboard in [`dashboard-effect-ui/`](../../../dashboard-effect-ui) follows `node_modules/@effect/ui/AGENTS.md` and [its own README](../../../dashboard-effect-ui/README.md) instead: there, each component provides its own Layers with `Component.provide`.
+
 ## Start from Effect's own guide
 
 Effect ships agent documentation inside its npm package, matching the installed version exactly.

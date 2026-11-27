@@ -5,6 +5,7 @@ export default defineConfig({
     include: [
       "src/**/*.test.ts",
       "dashboard/src/**/*.test.ts",
+      "dashboard-effect-ui/src/**/*.test.ts",
       "tests/**/*.test.ts",
     ],
     // The CLI end-to-end tests spawn real git repositories and subprocesses,

@@ -7,10 +7,12 @@ import type { ChildProcessSpawner } from "effect/process";
 
 import { loadConfig } from "../shared/config.ts";
 import {
+  assetsUnavailableError,
   DashboardUnavailableError,
   openInBrowser,
   resolveAssetsDir,
 } from "../shared/dashboard-server.ts";
+import type { DashboardUi } from "../shared/dashboard-ui-flag.ts";
 import { resolveRepoRoot } from "../shared/scan.ts";
 
 /**
@@ -22,10 +24,12 @@ export const runReport = Effect.fn("runReport")(function* ({
   repoPath,
   outPath,
   open,
+  ui,
 }: {
   readonly repoPath: string;
   readonly outPath?: string | undefined;
   readonly open: boolean;
+  readonly ui: DashboardUi;
 }): Effect.fn.Return<void, Error, ChildProcessSpawner.ChildProcessSpawner> {
   const repoRoot = yield* resolveRepoRoot(repoPath);
   const { catalogPath } = yield* loadConfig(repoRoot);
@@ -36,12 +40,9 @@ export const runReport = Effect.fn("runReport")(function* ({
     });
   }
 
-  const assetsDir = resolveAssetsDir();
+  const assetsDir = resolveAssetsDir(ui);
   if (assetsDir === undefined) {
-    return yield* new DashboardUnavailableError({
-      reason:
-        "Dashboard assets not found — run `pnpm build` first (dist/dashboard is missing).",
-    });
+    return yield* assetsUnavailableError(ui);
   }
 
   const html = yield* Effect.tryPromise(async () => {

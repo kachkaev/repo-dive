@@ -184,9 +184,15 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.5
         version: 4.1.5(effect@4.1.5)(redis@6.3.1)
+      '@effect/ui':
+        specifier: https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f
+        version: https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f(effect@4.1.5)
+      '@effect/ui-kit':
+        specifier: https://pkg.pr.new/Effect-TS/ui/@effect/ui-kit@859a30f
+        version: https://pkg.pr.new/Effect-TS/ui/@effect/ui-kit@859a30f(@effect/ui@https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f(effect@4.1.5))(effect@4.1.5)
       '@effect/vitest':
         specifier: 4.1.5
-        version: 4.1.5(effect@4.1.5)(vitest@5.1.1(@types/node@26.6.5)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 4.1.5(effect@4.1.5)(vitest@5.1.1(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)))
       '@kachkaev/eslint-config-base':
         specifier: 2.0.0
         version: 2.0.0(@typescript-eslint/parser@8.73.0(@typescript/typescript6@6.0.2)(eslint@10.15.0(jiti@2.7.0))(typescript@7.0.2))(@typescript/typescript6@6.0.2)(eslint@10.15.0(jiti@2.7.0))(typescript@7.0.2)
@@ -211,6 +217,12 @@ importers:
       '@types/babel__core':
         specifier: 7.20.5
         version: 7.20.5
+      '@types/d3-scale':
+        specifier: 4.0.2
+        version: 4.0.2
+      '@types/d3-shape':
+        specifier: 3.1.7
+        version: 3.1.7
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
@@ -256,6 +268,12 @@ importers:
       cspell:
         specifier: 10.5.2
         version: 10.5.2
+      d3-scale:
+        specifier: 4.0.2
+        version: 4.0.2
+      d3-shape:
+        specifier: 3.2.0
+        version: 3.2.0
       effect:
         specifier: 4.1.5
         version: 4.1.5
@@ -265,6 +283,9 @@ importers:
       eslint-plugin-react-hooks:
         specifier: 7.1.1
         version: 7.1.1(eslint@10.15.0(jiti@2.7.0))
+      happy-dom:
+        specifier: 21.0.4
+        version: 21.0.4
       husky:
         specifier: 9.1.7
         version: 9.1.7
@@ -312,7 +333,7 @@ importers:
         version: 8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)
       vitest:
         specifier: 5.1.1
-        version: 5.1.1(@types/node@26.6.5)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.1.1(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
       yaml:
         specifier: 2.9.1
         version: 2.9.1
@@ -802,6 +823,19 @@ packages:
     peerDependencies:
       effect: ^4.1.5
       redis: '>=5.1.0 <7.0.0'
+
+  '@effect/ui-kit@https://pkg.pr.new/Effect-TS/ui/@effect/ui-kit@859a30f':
+    resolution: {integrity: sha512-kzPODHD+4U5ZWFAY+kl8KUktZyzWeF+y1p1VQRQtiZ33AyfdFl2F1LNcKIsFmkDbeLkJQ8gGJWFlSzmcFatFPw==, tarball: https://pkg.pr.new/Effect-TS/ui/@effect/ui-kit@859a30f}
+    version: 0.0.0
+    peerDependencies:
+      '@effect/ui': ^0.0.0
+      effect: ^4.1.4
+
+  '@effect/ui@https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f':
+    resolution: {integrity: sha512-jiCKwNyfV/aKT5cfDL/8rFYwi4KXSuf/qCBtQz6ttwOw1aES81hk74noMKlDslAJ0ndQvd3Yv3EE+xWlkijH8A==, tarball: https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f}
+    version: 0.0.0
+    peerDependencies:
+      effect: ^4.1.4
 
   '@effect/vitest@4.1.5':
     resolution: {integrity: sha512-18u1013wkJtSelk1ZYLc/5aUnluTQyDfi2hAemkJW1GQ9qXw4mtPSiSf0AXZPhesmGCvG1Dk2C4JYD2sz+R72w==}
@@ -1613,6 +1647,9 @@ packages:
   '@types/unist@2.0.11':
     resolution: {integrity: sha512-CmBKiL6NNo/OqgmMn95Fk9Whlp2mtvIv+KNpQKN2F4SjvrEesubTRWGYSg+BnWZOnlCaSTU1sMpsBOzgbYhnsA==}
 
+  '@types/whatwg-mimetype@3.0.2':
+    resolution: {integrity: sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA==}
+
   '@types/ws@8.18.2':
     resolution: {integrity: sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==}
 
@@ -1991,6 +2028,10 @@ packages:
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
     hasBin: true
 
+  buffer-image-size@0.6.4:
+    resolution: {integrity: sha512-nEh+kZOPY1w+gcCMobZ6ETUp9WfibndnosbpwB1iJk/8Gt5ZF2bhS6+B6bPYz424KtwsR6Rflc3tCz1/ghX2dQ==}
+    engines: {node: '>=4.0'}
+
   builtin-modules@5.5.0:
     resolution: {integrity: sha512-2uhx+Lkzc2fnAcNEpzbJziSzwdv6cJjxxsi9oByBhSuy2wffAPzmazVDiWJk2xDKULFONl5gNOEOLOupQ8gsPg==}
     engines: {node: '>=18.20'}
@@ -2274,6 +2315,10 @@ packages:
   enhanced-resolve@5.27.0:
     resolution: {integrity: sha512-Do6BB2xzlcc/odFg+XEYyneAx4T/WfywO71yw9ePS2tVfRsf7JVR4mUeELadIeHzixkzbG5DpluiEFPi2WGfYQ==}
     engines: {node: '>=10.13.0'}
+
+  entities@7.0.1:
+    resolution: {integrity: sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==}
+    engines: {node: '>=0.12'}
 
   entities@8.1.0:
     resolution: {integrity: sha512-kxL7msIffSuh9aaFAMD7rxAIuTRMAHMeBtgHW2yUdWw732ZNh4MehkF2gdjvtdmikkaIP9bFDDJOPlsvm7avrA==}
@@ -2595,6 +2640,10 @@ packages:
 
   graceful-fs@4.2.12:
     resolution: {integrity: sha512-iuyGF2E4oafQfPsRrG2wtY2ILupMhvtdrhzrxB+0VcjsPpSPttpfYdjnGFGsTi5MaJFjI1jOKHPQ6UTbTj9TAw==}
+
+  happy-dom@21.0.4:
+    resolution: {integrity: sha512-tFm+GaLBgo6o0awHnvHaNoraVo27qJ+2tZEtZ+cIa08hXbeitrxAJajLI05hsUy/2/YTKcUjQYzHe5mCcraLBw==}
+    engines: {node: '>=20.0.0'}
 
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
@@ -3897,6 +3946,10 @@ packages:
   web-worker@1.5.0:
     resolution: {integrity: sha512-RiMReJrTAiA+mBjGONMnjVDP2u3p9R1vkcGz6gDIrOMT3oGuYwX2WRMYI9ipkphSuE5XKEhydbhNEJh4NY9mlw==}
 
+  whatwg-mimetype@3.0.0:
+    resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
+    engines: {node: '>=12'}
+
   which-boxed-primitive@1.1.1:
     resolution: {integrity: sha512-TbX3mj8n0odCBFVlY8AxkqcHASw3L60jIuF8jFP78az3C2YhmGvqbHBpAjTRH2/xqYunrJ9g1jSyjCjpoWzIAA==}
     engines: {node: '>= 0.4'}
@@ -4557,10 +4610,19 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.1.5(effect@4.1.5)(vitest@5.1.1(@types/node@26.6.5)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)))':
+  '@effect/ui-kit@https://pkg.pr.new/Effect-TS/ui/@effect/ui-kit@859a30f(@effect/ui@https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f(effect@4.1.5))(effect@4.1.5)':
+    dependencies:
+      '@effect/ui': https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f(effect@4.1.5)
+      effect: 4.1.5
+
+  '@effect/ui@https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f(effect@4.1.5)':
     dependencies:
       effect: 4.1.5
-      vitest: 5.1.1(@types/node@26.6.5)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
+
+  '@effect/vitest@4.1.5(effect@4.1.5)(vitest@5.1.1(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)))':
+    dependencies:
+      effect: 4.1.5
+      vitest: 5.1.1(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
 
   '@emnapi/core@1.11.2':
     dependencies:
@@ -5177,6 +5239,8 @@ snapshots:
 
   '@types/unist@2.0.11': {}
 
+  '@types/whatwg-mimetype@3.0.2': {}
+
   '@types/ws@8.18.2':
     dependencies:
       '@types/node': 26.6.5
@@ -5561,6 +5625,10 @@ snapshots:
       node-releases: 2.0.65
       update-browserslist-db: 1.4.0(browserslist@4.29.6)
 
+  buffer-image-size@0.6.4:
+    dependencies:
+      '@types/node': 26.6.5
+
   builtin-modules@5.5.0: {}
 
   cac@7.1.1: {}
@@ -5865,6 +5933,8 @@ snapshots:
     dependencies:
       graceful-fs: 4.2.12
       tapable: 2.3.4
+
+  entities@7.0.1: {}
 
   entities@8.1.0: {}
 
@@ -6292,6 +6362,19 @@ snapshots:
   gopd@1.2.0: {}
 
   graceful-fs@4.2.12: {}
+
+  happy-dom@21.0.4:
+    dependencies:
+      '@types/node': 26.6.5
+      '@types/whatwg-mimetype': 3.0.2
+      '@types/ws': 8.18.2
+      buffer-image-size: 0.6.4
+      entities: 7.0.1
+      whatwg-mimetype: 3.0.0
+      ws: 8.23.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   has-bigints@1.1.0: {}
 
@@ -7547,7 +7630,7 @@ snapshots:
       jiti: 2.7.0
       yaml: 2.9.1
 
-  vitest@5.1.1(@types/node@26.6.5)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)):
+  vitest@5.1.1(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.1.1(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
@@ -7565,6 +7648,7 @@ snapshots:
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@types/node': 26.6.5
+      happy-dom: 21.0.4
     transitivePeerDependencies:
       - msw
 
@@ -7575,6 +7659,8 @@ snapshots:
   walk-up-path@4.0.0: {}
 
   web-worker@1.5.0: {}
+
+  whatwg-mimetype@3.0.0: {}
 
   which-boxed-primitive@1.1.1:
     dependencies:

@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+/*
+ * shadcn-style semantic tokens (background, popover, accent, …) backed by the
+ * existing dashboard palette, so the @ui-primitive components can keep their
+ * canonical shadcn class names (bg-popover, border-input, ring-ring, …) and
+ * future shadcn components can be dropped in without restyling. Both themes
+ * come for free: the underlying palette vars flip via prefers-color-scheme.
+ */
+@theme inline {
+  --color-background: var(--surface-1);
+  --color-foreground: var(--text-primary);
+  --color-popover: var(--surface-1);
+  --color-popover-foreground: var(--text-primary);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--surface-2);
+  --color-accent-foreground: var(--text-primary);
+  --color-primary: var(--series-1);
+  --color-primary-foreground: #ffffff;
+  --color-border: var(--grid-line);
+  --color-input: var(--grid-line);
+  --color-ring: var(--series-1);
+}
+
+@theme {
+  /*
+   * A fade-in that only starts once the wait has lasted half a second, with
+   * `both` holding the invisible first frame through the delay. Used by the
+   * spinner over a chart re-rendering from a deferred value: a switch that
+   * lands in a few frames stays silent, and only a wait long enough to read as
+   * a freeze gets an answer.
+   */
+  --animate-late-fade-in: late-fade-in 150ms ease-out 500ms both;
+
+  @keyframes late-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* Data-viz palette (validated reference instance): series slots + surfaces. */
+:root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --surface-2: #f4f4f2;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #86847e;
+  --grid-line: #e7e6e2;
+  --series-1: #2a78d6;
+  --series-2: #1baf7a;
+  --series-3: #eda100;
+  --series-4: #008300;
+  --series-5: #4a3aa7;
+  --series-6: #e34948;
+  --series-7: #e87ba4;
+  --series-8: #eb6834;
+  --series-9: #8569e8;
+  --series-10: #958400;
+  --series-11: #a92172;
+  --series-12: #925001;
+  --series-13: #00b8bf;
+  --series-14: #59bc42;
+  --series-15: #df71d7;
+  --series-16: #8339b0;
+  --series-17: #5b6c00;
+  --series-18: #006a9e;
+  --series-19: #b51b34;
+  --series-20: #3d54cb;
+  --diverge-pos: #2a78d6;
+  --diverge-neg: #e34948;
+  /*
+   * Reserved contributor-kind colors, used by every authorship-aware chart
+   * (calendar, commits per month, churn, survival, contributor lists) so
+   * "human", "AI" and "bot" read as the same hue everywhere. Humans are teal
+   * rather than blue because the language split owns the blues (TypeScript,
+   * Python, Go) — a top contributor and the top language must not share a
+   * color. The AI plum keeps enough red to stay distinguishable from the
+   * human teal under simulated color-vision deficiency in both themes.
+   */
+  --kind-human: #1d756f;
+  --kind-bot: #c8850d;
+  --kind-ai: #93278f;
+  /*
+   * Contributors in rank order. Slot 1 is the human teal, so the top
+   * contributor wears the color of their kind; slots 2–5 avoid blue (the
+   * language split's leads) and green (the purpose split's Tests), so
+   * switching the split repaints the leading bands. Blues only come back from
+   * slot 6. The first eight, Bots, AI agents and Other stay apart pairwise,
+   * under simulated color-vision deficiency too (category-colors.test.ts).
+   */
+  --contributor-1: var(--kind-human);
+  --contributor-2: #5d2eb8;
+  --contributor-3: #f38c8d;
+  --contributor-4: #716e0a;
+  --contributor-5: #9d5e94;
+  --contributor-6: #6fafeb;
+  --contributor-7: #354e70;
+  --contributor-8: #109fb4;
+  --contributor-9: #844500;
+  --contributor-10: #ad86c5;
+  /*
+   * Built-in file purposes, the same in every repository. Source purposes
+   * take colors that no common language or leading contributor wears, so the
+   * purpose split reads as its own kind of chart; AI instructions take the AI
+   * plum. The non-source purposes (files chart only) are muted tones: a
+   * different register than the vivid source bands, without the hatching
+   * that already marks AI assistance elsewhere on the page. All ten stay
+   * apart pairwise, under simulated color-vision deficiency too
+   * (category-colors.test.ts).
+   */
+  --purpose-production: #8f263a;
+  --purpose-tests: #68a945;
+  --purpose-docs: #b191ea;
+  --purpose-examples: #5ac7d2;
+  --purpose-tooling: #6c6fe8;
+  --purpose-test-data: #9b5a35;
+  --purpose-assets: #a3a98d;
+  --purpose-generated: #5c4468;
+  /*
+   * Files the language table does not know (".json", "No extension", …):
+   * near-greys, so the files chart reads as colorful code next to neutral
+   * data, yet clear of the common languages and Other.
+   */
+  --unknown-type-1: #92ad91;
+  --unknown-type-2: #bda4c2;
+  --unknown-type-3: #4f6d6a;
+  --seq-100: #cde2fb;
+  --seq-200: #9ec5f4;
+  --seq-300: #6da7ec;
+  --seq-400: #3987e5;
+  --seq-500: #256abf;
+  --seq-600: #184f95;
+  --seq-700: #0d366b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --surface-2: #242423;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8b897f;
+    --grid-line: #33332f;
+    --series-1: #3987e5;
+    --series-2: #199e70;
+    --series-3: #c98500;
+    --series-4: #008300;
+    --series-5: #9085e9;
+    --series-6: #e66767;
+    --series-7: #d55181;
+    --series-8: #d95926;
+    --series-9: #8164e3;
+    --series-10: #907f03;
+    --series-11: #b02978;
+    --series-12: #9b5400;
+    --series-13: #03a5ab;
+    --series-14: #47aa2d;
+    --series-15: #cd5fc5;
+    --series-16: #893fb6;
+    --series-17: #607201;
+    --series-18: #0070a6;
+    --series-19: #bc2539;
+    --series-20: #425ad1;
+    --diverge-pos: #3987e5;
+    --diverge-neg: #e66767;
+    --kind-human: #257b74;
+    --kind-bot: #c17f00;
+    --kind-ai: #b02fa8;
+    --contributor-2: #734ad3;
+    --contributor-3: #f48e8e;
+    --contributor-4: #ce4116;
+    --contributor-5: #ef64a9;
+    --contributor-6: #6eaff7;
+    --contributor-7: #3870fa;
+    --contributor-8: #1fa5bb;
+    --contributor-9: #915114;
+    --contributor-10: #ba92d2;
+    --purpose-production: #a3394a;
+    --purpose-tests: #78b955;
+    --purpose-docs: #be9df7;
+    --purpose-examples: #79e4f0;
+    --purpose-tooling: #7578f9;
+    --purpose-test-data: #d2b7a9;
+    --purpose-assets: #747830;
+    --purpose-generated: #704a83;
+    --unknown-type-1: #dbd6b0;
+    --unknown-type-2: #345f56;
+    --unknown-type-3: #9eaf9a;
+  }
+}
+
+html {
+  /* The page grows as sections reveal one per paint, so with classic
+     always-visible scrollbars (Windows, macOS with the accessibility setting)
+     the scrollbar would kick in mid-reveal and reflow the whole page. Keep the
+     track there from the start so the width never changes. */
+  overflow-y: scroll;
+}
+
+body {
+  background: var(--surface-1);
+  color: var(--text-primary);
+}

@@ -1,0 +1,98 @@
+import { UiSchema } from "@effect/ui";
+import { Html } from "@effect/ui/html";
+import { makeSelect } from "@effect/ui-kit";
+import { Schema } from "effect";
+
+import { SelectView } from "../shared/@ui-primitive/select.ts";
+import { HistoryRangeSchema } from "./shared/history-ranges.ts";
+
+/** ui-kit's Select, typed for history ranges: its `Picked` carries one. */
+const Select = makeSelect({ value: HistoryRangeSchema });
+
+export const HistoryRangeSelectMessage = UiSchema.TaggedEnum({
+  RequestedOpenSelect: {},
+  RequestedCloseSelect: {},
+  PickedSelectChoice: { value: HistoryRangeSchema },
+});
+
+/** What the select asks of its section: show this range instead. */
+export const HistoryRangeSelectEvents = UiSchema.TaggedEnum({
+  Picked: { value: HistoryRangeSchema },
+});
+
+/**
+ * A dropdown of history ranges, sized for a section's control row. A
+ * component rather than a view function because ui-kit's Select is
+ * controlled: someone has to own whether the popup is open, and that is
+ * nobody's business but the select's. The range itself stays with the
+ * section, which passes it in as `value` and hears `Picked`.
+ */
+export const HistoryRangeSelect = Html.component({
+  name: "HistoryRangeSelect",
+  props: Schema.Struct({
+    /**
+     * Accessible name, e.g. "Calendar range" — the options ("Last 12 months",
+     * …) make the purpose plain, so it is not rendered.
+     */
+    label: Schema.String,
+    value: HistoryRangeSchema,
+    items: Schema.Array(
+      Schema.Struct({ value: HistoryRangeSchema, label: Schema.String }),
+    ),
+  }),
+  model: Schema.Struct({ open: Schema.Boolean }),
+  message: HistoryRangeSelectMessage,
+  events: HistoryRangeSelectEvents,
+  restore: false,
+}).make({
+  init: () => ({ open: false }),
+  update: {
+    RequestedOpenSelect: ($) => $.evolve({ open: true }),
+    RequestedCloseSelect: ($) => $.evolve({ open: false }),
+    // A pick of the range on show asks for nothing.
+    PickedSelectChoice: ($, { value }) =>
+      value === $.props.value
+        ? $.model
+        : $.emit(HistoryRangeSelectEvents.Picked({ value })),
+  },
+  view: (h, model) =>
+    Select(h, {
+      props: {
+        open: model.open,
+        value: h.props.value,
+        items: h.props.items,
+        side: "bottom",
+        sideOffset: 4,
+        align: "center",
+        alignItemWithTrigger: false,
+      },
+      onEmit: {
+        RequestedOpen: () => HistoryRangeSelectMessage.RequestedOpenSelect(),
+        RequestedClose: () => HistoryRangeSelectMessage.RequestedCloseSelect(),
+        // A range select always has a value: the cleared pick (`null`), which
+        // a single select never sends anyway, asks for nothing.
+        Picked: ({ value }) =>
+          typeof value === "string"
+            ? HistoryRangeSelectMessage.PickedSelectChoice({ value })
+            : undefined,
+        // The record names every event; the popup's transitions ending needs
+        // no answer.
+        // eslint-disable-next-line unicorn/no-useless-undefined -- an event mapped to no message
+        Settled: () => undefined,
+      },
+      view: (select) =>
+        // A fixed-width slot for the trigger, which keeps hugging its own
+        // value: the options differ by ~60px ("2019" against the widest,
+        // "Last 12 months", which needs 128px at this size), and a trigger
+        // claiming a different slice of the row on every change hopped
+        // between rows once the row wraps on a narrow viewport. The slot also
+        // holds the popup and its backdrop: a view returns one node, and both
+        // live in the top layer, outside the slot's layout.
+        h.div.class("w-36").children(
+          SelectView(h, select, {
+            label: h.props.label,
+            items: h.props.items,
+          }),
+        ),
+    }),
+});
