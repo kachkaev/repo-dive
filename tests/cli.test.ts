@@ -23,6 +23,11 @@ const dashboardBuilt = existsSync(
   path.join(rootDirectory, "dist", "dashboard", "index.html"),
 );
 
+// `--ui effect` serves and exports the experimental Effect UI build instead.
+const effectUiDashboardBuilt = existsSync(
+  path.join(rootDirectory, "dist", "dashboard-effect-ui", "index.html"),
+);
+
 // A config importing `repo-dive/config` from a repository without node_modules
 // falls back to this package's own `exports`, which point at the built entry.
 const configEntryBuilt = existsSync(
@@ -703,6 +708,145 @@ test
       rmSync(repoPath, { force: true, recursive: true });
     }
   });
+
+test
+  .skipIf(!effectUiDashboardBuilt)
+  .concurrent(
+    "report --ui effect exports the Effect UI dashboard as one HTML file",
+    async () => {
+      const repoPath = createFixtureRepo();
+
+      try {
+        await runCli(
+          "scan",
+          "--repo",
+          repoPath,
+          "--collectors",
+          "commit-meta,churn",
+        );
+        await runCli("index", "--repo", repoPath);
+        const outPath = path.join(repoPath, "report-effect.html");
+        const result = await runCli(
+          "report",
+          "--repo",
+          repoPath,
+          "--ui",
+          "effect",
+          "--out",
+          outPath,
+        );
+        expect(result.status, result.stderr).toBe(0);
+
+        const reportHtml = readFileSync(outPath, "utf8");
+        const effectUiIndexHtml = readFileSync(
+          path.join(rootDirectory, "dist", "dashboard-effect-ui", "index.html"),
+          "utf8",
+        );
+        const effectUiScript = /src="\.\/(assets\/[^"]+\.js)"/.exec(
+          effectUiIndexHtml,
+        )?.[1];
+        expect(effectUiScript).toBeDefined();
+        // The inlined bundle is the Effect UI build's, not the React one's.
+        expect(reportHtml).toContain(
+          readFileSync(
+            path.join(
+              rootDirectory,
+              "dist",
+              "dashboard-effect-ui",
+              effectUiScript ?? "",
+            ),
+            "utf8",
+          ).slice(0, 200),
+        );
+        expect(reportHtml).toMatch(/window\.__REPO_DIVE_DATA__ = \{/);
+        expect(reportHtml).not.toMatch(/src="\.?\/assets/);
+        expect(reportHtml).not.toMatch(/<link rel="stylesheet"/);
+      } finally {
+        rmSync(repoPath, { force: true, recursive: true });
+      }
+    },
+  );
+
+test
+  .skipIf(!effectUiDashboardBuilt)
+  .concurrent("dashboard --ui effect serves the Effect UI build", async () => {
+    const repoPath = createFixtureRepo();
+    const port = 4990 + Math.floor(Math.random() * 9);
+
+    try {
+      await runCli(
+        "scan",
+        "--repo",
+        repoPath,
+        "--collectors",
+        "commit-meta,churn",
+      );
+      await runCli("index", "--repo", repoPath);
+
+      const server = spawn(
+        process.execPath,
+        [
+          "src/cli.ts",
+          "dashboard",
+          "--repo",
+          repoPath,
+          "--port",
+          String(port),
+          "--ui",
+          "effect",
+        ],
+        { cwd: rootDirectory, stdio: ["ignore", "pipe", "pipe"] },
+      );
+
+      try {
+        let output = "";
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            reject(new Error(`Timed out. Output so far:\n${output}`));
+          }, 30_000);
+          server.stdout.on("data", (chunk: Buffer) => {
+            output += chunk.toString();
+            if (output.includes("Serving on")) {
+              clearTimeout(timer);
+              resolve();
+            }
+          });
+          server.stderr.on("data", (chunk: Buffer) => {
+            output += chunk.toString();
+          });
+          server.on("exit", () => {
+            clearTimeout(timer);
+            reject(new Error(`Dashboard exited early. Output:\n${output}`));
+          });
+        });
+
+        const response = await fetch(`http://localhost:${port}/`);
+        expect(response.ok).toBe(true);
+        expect(await response.text()).toBe(
+          readFileSync(
+            path.join(
+              rootDirectory,
+              "dist",
+              "dashboard-effect-ui",
+              "index.html",
+            ),
+            "utf8",
+          ),
+        );
+      } finally {
+        server.kill();
+      }
+    } finally {
+      rmSync(repoPath, { force: true, recursive: true });
+    }
+  });
+
+test.concurrent("--ui rejects an unknown dashboard", async () => {
+  const result = await runCli("report", "--ui", "vue");
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toMatch(/react/);
+  expect(result.stderr).toMatch(/effect/);
+});
 
 test.concurrent(
   "index splits lint disables by linter and merges their rules",

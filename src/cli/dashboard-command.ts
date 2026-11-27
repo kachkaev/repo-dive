@@ -1,7 +1,7 @@
 import { Command, Flag } from "effect/cli";
 
 import { defaultDashboardPort } from "./shared/config.ts";
-import { runDashboard } from "./shared/dashboard-server.ts";
+import { dashboardUiFlag, runDashboard } from "./shared/dashboard-server.ts";
 
 export const dashboardCommand = Command.make("dashboard", {
   repoPath: Flag.String("repo").pipe(
@@ -18,6 +18,7 @@ export const dashboardCommand = Command.make("dashboard", {
     Flag.withDefault(false),
     Flag.withDescription("Open the dashboard in the default browser"),
   ),
+  ui: dashboardUiFlag,
 }).pipe(
   Command.withDescription(
     "Serve the interactive dashboard for a scanned and indexed repository",
@@ -27,6 +28,7 @@ export const dashboardCommand = Command.make("dashboard", {
       repoPath: config.repoPath,
       port: config.port,
       open: config.open,
+      ui: config.ui,
     }),
   ),
 );

@@ -13,7 +13,10 @@ import { queryCommand } from "./cli/query-command.ts";
 import { reportCommand } from "./cli/report-command.ts";
 import { scanCommand } from "./cli/scan-command.ts";
 import { defaultDashboardPort } from "./cli/shared/config.ts";
-import { runDashboard } from "./cli/shared/dashboard-server.ts";
+import {
+  dashboardUiFlag,
+  runDashboard,
+} from "./cli/shared/dashboard-server.ts";
 import { runIndex } from "./cli/shared/indexing.ts";
 import { runScan } from "./cli/shared/scan.ts";
 import { statusCommand } from "./cli/status-command.ts";
@@ -35,6 +38,7 @@ const cli = Command.make("repo-dive", {
       "Open the dashboard in the default browser (default: --open; pass --no-open to disable)",
     ),
   ),
+  ui: dashboardUiFlag,
 }).pipe(
   Command.withDescription(
     "Derive insights from a git repository's history. " +
@@ -51,6 +55,7 @@ const cli = Command.make("repo-dive", {
         repoPath: config.repoPath,
         port: config.port,
         open: config.open,
+        ui: config.ui,
       });
     }),
   ),

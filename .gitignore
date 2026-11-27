@@ -22,6 +22,7 @@
 
 ## Local dashboard data for `dev:dashboard` (copied from some repo's catalog)
 /dashboard/public/
+/dashboard-effect-ui/public/
 
 ## Catalog (when running the tool against this repository)
 /.repo-dive/

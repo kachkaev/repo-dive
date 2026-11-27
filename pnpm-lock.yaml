@@ -184,6 +184,12 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.5
         version: 4.1.5(effect@4.1.5)(redis@6.3.1)
+      '@effect/ui':
+        specifier: https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f
+        version: https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f(effect@4.1.5)
+      '@effect/ui-kit':
+        specifier: https://pkg.pr.new/Effect-TS/ui/@effect/ui-kit@859a30f
+        version: https://pkg.pr.new/Effect-TS/ui/@effect/ui-kit@859a30f(@effect/ui@https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f(effect@4.1.5))(effect@4.1.5)
       '@effect/vitest':
         specifier: 4.1.5
         version: 4.1.5(effect@4.1.5)(vitest@5.1.1(@types/node@26.6.5)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)))
@@ -802,6 +808,19 @@ packages:
     peerDependencies:
       effect: ^4.1.5
       redis: '>=5.1.0 <7.0.0'
+
+  '@effect/ui-kit@https://pkg.pr.new/Effect-TS/ui/@effect/ui-kit@859a30f':
+    resolution: {integrity: sha512-kzPODHD+4U5ZWFAY+kl8KUktZyzWeF+y1p1VQRQtiZ33AyfdFl2F1LNcKIsFmkDbeLkJQ8gGJWFlSzmcFatFPw==, tarball: https://pkg.pr.new/Effect-TS/ui/@effect/ui-kit@859a30f}
+    version: 0.0.0
+    peerDependencies:
+      '@effect/ui': ^0.0.0
+      effect: ^4.1.4
+
+  '@effect/ui@https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f':
+    resolution: {integrity: sha512-jiCKwNyfV/aKT5cfDL/8rFYwi4KXSuf/qCBtQz6ttwOw1aES81hk74noMKlDslAJ0ndQvd3Yv3EE+xWlkijH8A==, tarball: https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f}
+    version: 0.0.0
+    peerDependencies:
+      effect: ^4.1.4
 
   '@effect/vitest@4.1.5':
     resolution: {integrity: sha512-18u1013wkJtSelk1ZYLc/5aUnluTQyDfi2hAemkJW1GQ9qXw4mtPSiSf0AXZPhesmGCvG1Dk2C4JYD2sz+R72w==}
@@ -4556,6 +4575,15 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@effect/ui-kit@https://pkg.pr.new/Effect-TS/ui/@effect/ui-kit@859a30f(@effect/ui@https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f(effect@4.1.5))(effect@4.1.5)':
+    dependencies:
+      '@effect/ui': https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f(effect@4.1.5)
+      effect: 4.1.5
+
+  '@effect/ui@https://pkg.pr.new/Effect-TS/ui/@effect/ui@859a30f(effect@4.1.5)':
+    dependencies:
+      effect: 4.1.5
 
   '@effect/vitest@4.1.5(effect@4.1.5)(vitest@5.1.1(@types/node@26.6.5)(vite@8.3.8(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)))':
     dependencies:

@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Console, Data, Effect, type PlatformError, type Scope } from "effect";
+import { Flag } from "effect/cli";
 import { ChildProcess, type ChildProcessSpawner } from "effect/process";
 
 import { loadConfig } from "./config.ts";
@@ -39,16 +40,45 @@ const mimeTypes: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
+/**
+ * Which build of the dashboard to serve or export. Both read the same
+ * dashboard.json: `react` is the dashboard itself, `effect` an experimental
+ * port to Effect UI that lives in dashboard-effect-ui/ and is built next to it.
+ */
+export type DashboardUi = "react" | "effect";
+
+/** The `--ui` flag, shared by every command that serves or exports the dashboard. */
+export const dashboardUiFlag = Flag.Literals("ui", ["react", "effect"]).pipe(
+  Flag.withDefault("react"),
+  Flag.withDescription(
+    "Which dashboard to use: react, or effect for the experimental Effect UI port (default: react)",
+  ),
+);
+
+/** The build of each dashboard implementation, as a folder of dist/. */
+const assetsDirNames: Record<DashboardUi, string> = {
+  react: "dashboard",
+  effect: "dashboard-effect-ui",
+};
+
 /** Bundled build: dist/cli.js + dist/dashboard/. Dev: src/cli/shared/… + dist/dashboard/. */
-export const resolveAssetsDir = (): string | undefined => {
+export const resolveAssetsDir = (ui: DashboardUi): string | undefined => {
+  const dirName = assetsDirNames[ui];
   const candidates = [
-    fileURLToPath(new URL("dashboard", import.meta.url)),
-    fileURLToPath(new URL("../../../dist/dashboard", import.meta.url)),
+    fileURLToPath(new URL(dirName, import.meta.url)),
+    fileURLToPath(new URL(`../../../dist/${dirName}`, import.meta.url)),
   ];
   return candidates.find((candidate) =>
     existsSync(path.join(candidate, "index.html")),
   );
 };
+
+export const assetsUnavailableError = (
+  ui: DashboardUi,
+): DashboardUnavailableError =>
+  new DashboardUnavailableError({
+    reason: `Dashboard assets not found — run \`pnpm build\` first (dist/${assetsDirNames[ui]} is missing).`,
+  });
 
 export const openInBrowser = Effect.fn("openInBrowser")(
   function* (
@@ -79,10 +109,12 @@ export const runDashboard = Effect.fn("runDashboard")(function* ({
   repoPath,
   port,
   open,
+  ui,
 }: {
   readonly repoPath: string;
   readonly port: number;
   readonly open: boolean;
+  readonly ui: DashboardUi;
 }): Effect.fn.Return<void, Error, ChildProcessSpawner.ChildProcessSpawner> {
   const repoRoot = yield* resolveRepoRoot(repoPath);
   const config = yield* loadConfig(repoRoot);
@@ -93,12 +125,9 @@ export const runDashboard = Effect.fn("runDashboard")(function* ({
     });
   }
 
-  const assetsDir = resolveAssetsDir();
+  const assetsDir = resolveAssetsDir(ui);
   if (assetsDir === undefined) {
-    return yield* new DashboardUnavailableError({
-      reason:
-        "Dashboard assets not found — run `pnpm build` first (dist/dashboard is missing).",
-    });
+    return yield* assetsUnavailableError(ui);
   }
 
   const server = http.createServer((request, response) => {

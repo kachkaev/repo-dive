@@ -23,7 +23,10 @@ import path from "node:path";
 const baselineFilePath = "node_modules/.cache/package-size/baseline.json";
 
 /** Vite fingerprints these, so their file names differ between any two builds. */
-const assetDirectory = "dist/dashboard/assets/";
+const assetDirectories = [
+  "dist/dashboard/assets/",
+  "dist/dashboard-effect-ui/assets/",
+];
 const assetHashLength = 8;
 
 const byteUnits = ["B", "kB", "MB", "GB"] as const;
@@ -144,7 +147,10 @@ function formatCountDelta(current: number, baseline: number): string {
  * looking for the last hyphen.
  */
 function toComparablePath(filePath: string): string {
-  if (!filePath.startsWith(assetDirectory)) {
+  const assetDirectory = assetDirectories.find((directory) =>
+    filePath.startsWith(directory),
+  );
+  if (assetDirectory === undefined) {
     return filePath;
   }
 

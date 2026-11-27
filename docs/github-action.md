@@ -51,6 +51,7 @@ The `workflow_dispatch` trigger lets you run the first analysis (and any ad-hoc 
 | `version`              | `latest`                | The `repo-dive` npm package version to run — an exact version, a range or a dist-tag.                      |
 | `repo`                 | `.`                     | Path to the repository to analyze, relative to the workspace.                                              |
 | `report-path`          | `repo-dive-report.html` | Where to write the report; the file name doubles as the artifact name.                                     |
+| `ui`                   | `react`                 | Which dashboard the report embeds: `react`, or `effect` for the experimental Effect UI port.               |
 | `scan-timeout-minutes` | `300`                   | Interrupt `scan` gracefully after this many minutes, so that the catalog cache is still saved (see below). |
 | `cache`                | `true`                  | Cache the catalog across runs with `actions/cache`.                                                        |
 | `cache-key-prefix`     | `repo-dive-catalog`     | Prefix of the catalog cache key; override it when one workflow analyzes several repositories.              |

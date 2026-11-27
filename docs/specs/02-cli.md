@@ -5,15 +5,15 @@ _All commands below are implemented._
 ## Commands
 
 ```text
-npx repo-dive            [--repo PATH] [--port N] [--no-open]   # scan + index + dashboard
+npx repo-dive            [--repo PATH] [--port N] [--no-open] [--ui react|effect]   # scan + index + dashboard
 npx repo-dive scan       [--repo PATH] [--collectors a,b] [--sample POLICY] [--max-commits N] [--force]
 npx repo-dive index      [--repo PATH]
-npx repo-dive dashboard  [--repo PATH] [--port N] [--open]
+npx repo-dive dashboard  [--repo PATH] [--port N] [--open] [--ui react|effect]
 npx repo-dive status     [--repo PATH]
 npx repo-dive collectors
 npx repo-dive gc         [--repo PATH] [--unreachable] [--off-mainline] [--stale] [--collectors a,b] [--dry-run] [--yes]
 npx repo-dive ignore     [--repo PATH] [--dry-run]
-npx repo-dive report     [--repo PATH] [--out PATH] [--open]
+npx repo-dive report     [--repo PATH] [--out PATH] [--open] [--ui react|effect]
 npx repo-dive query      [--repo PATH] [--json] "<sql>"
 npx repo-dive mcp        [--repo PATH]
 ```
@@ -35,6 +35,7 @@ npx repo-dive mcp        [--repo PATH]
   `scan`, `index` and `status` warn when an entry is missing and point here; `--dry-run` reports the same plan without writing.
   Only existing ignore files are amended — none is created — and a catalog configured to live outside the repository needs none of this.
 - **`report`** — exports the dashboard as one self-contained HTML file (bundle + data inlined) for sharing and presentations.
+- **`--ui`** — picks the dashboard that `dashboard`, `report` and the bare pipeline serve or export: `react` (the default), or `effect` for an experimental port to [Effect UI](https://github.com/Effect-TS/ui) that lives in `dashboard-effect-ui/` and reads the same `dashboard.json`.
 - **`query`** — escape hatch: run a read-only SQL query against the cube and print rows (table or `--json`).
 - **`mcp`** — serve the cube over the Model Context Protocol (stdio) with `schema` and `query` tools, so AI agents can explore a scanned repository.
 
