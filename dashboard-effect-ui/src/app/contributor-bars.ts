@@ -293,7 +293,7 @@ export const ContributorBars = <M>(
       .class("grid items-end gap-x-3 pl-1 text-[0.65rem] text-muted-foreground")
       .style({ gridTemplateColumns: gridTemplate })
       .children(
-        h.span("authored above, assisted below"),
+        h.span.children("authored above, assisted below"),
         h.span.class("text-right").children("total"),
         kindOrder.map((kind) =>
           h.span
