@@ -1,9 +1,11 @@
 /**
- * The visx grid and axes the React DivergingBars draws (`GridRows`,
- * `AxisLeft`, `AxisBottom`), re-implemented as view functions over the
- * scales' ticks. Each writes the markup visx renders for the props
- * diverging-bars.tsx passes — the same groups, classes, the `<svg>` wrapper
- * visx's `Text` puts around every label, and its `dy` — so the pixels match.
+ * The visx grid and axes the React charts draw (`GridRows`, `AxisLeft`,
+ * `AxisBottom`, as diverging-bars.tsx and time-stack-chart.tsx configure
+ * them), re-implemented as view functions over ticks the chart has already
+ * placed and labelled. Each writes the markup visx renders for those props —
+ * the same groups, classes, the `<svg>` wrapper visx's `Text` puts around
+ * every label, and its `dy` — so the pixels match. A chart builds them through
+ * `h.lazy` from its layout, so a hover reuses them untouched.
  */
 import type { Html } from "@effect/ui/html";
 

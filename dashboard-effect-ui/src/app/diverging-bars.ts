@@ -2,7 +2,6 @@ import { Mount, UiSchema } from "@effect/ui";
 import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
-import { AxisBottom, AxisLeft, GridRows } from "./diverging-bars/axes.ts";
 import {
   type DivergingLayout,
   divergingLayoutOf,
@@ -11,6 +10,7 @@ import {
   margin,
   nearestIndexOf,
 } from "./diverging-bars/diverging-layout.ts";
+import { AxisBottom, AxisLeft, GridRows } from "./shared/axes.ts";
 import { barPath } from "./shared/bar-path.ts";
 import { CrosshairLine } from "./shared/crosshair-line.ts";
 import { formatCount, formatMonth } from "./shared/format.ts";

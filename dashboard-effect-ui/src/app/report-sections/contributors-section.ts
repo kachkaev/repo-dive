@@ -11,6 +11,7 @@ import {
   ContributorBars,
   type ContributorBarsItem,
 } from "../contributor-bars.ts";
+import { cachedBy } from "../shared/cached-by.ts";
 import {
   kindBadge,
   kindColors,
@@ -30,7 +31,6 @@ import {
   type ListedContributor,
 } from "./contributors-in-range.ts";
 import { HistoryRangeSelect } from "./history-range-select.ts";
-import { cachedBy } from "./shared/cached-by.ts";
 import { historyOf, HistoryRangeSchema } from "./shared/history-ranges.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 

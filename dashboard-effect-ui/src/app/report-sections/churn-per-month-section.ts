@@ -4,6 +4,7 @@ import { Schema } from "effect";
 
 import { type DashboardData, DashboardDataSchema } from "../../data.ts";
 import { DivergingBars, type DivergingPoint } from "../diverging-bars.ts";
+import { cachedBy } from "../shared/cached-by.ts";
 import {
   kindColors,
   type KindFilter,
@@ -12,7 +13,6 @@ import {
   kindOrder,
 } from "../shared/contributor-kinds.ts";
 import { Section, type SectionHeading } from "../shared/primitives.ts";
-import { cachedBy } from "./shared/cached-by.ts";
 import { commitKindsOf } from "./shared/commit-kinds.ts";
 import { monthlyRowsOf } from "./shared/monthly-buckets.ts";
 import type { ReportSection } from "./shared/report-section.ts";

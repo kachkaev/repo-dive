@@ -1,5 +1,5 @@
 import type { ContributorKind, DashboardData } from "../../../data.ts";
-import { cachedBy } from "./cached-by.ts";
+import { cachedBy } from "../../shared/cached-by.ts";
 
 /** The commits-per-month series: author kind, with humans split by AI assistance. */
 export const commitKindSeries = {
