@@ -17,6 +17,6 @@ export const linesOfCodeSectionOf = (
           annotation: data.config?.charts?.annotations?.["lines-of-code"],
         },
         view: (h, key) =>
-          LinesTimeline(h, { data, maxContributorsInCharts }).key(key),
+          LinesTimeline(h, { key, data, maxContributorsInCharts }),
       }
     : undefined;

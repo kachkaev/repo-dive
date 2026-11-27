@@ -1,16 +1,21 @@
 import type { Html } from "@effect/ui/html";
 
 import type { DashboardData } from "../data.ts";
-import { ChartPlaceholder } from "./shared/chart-placeholder.ts";
-import { Section } from "./shared/primitives.ts";
+import { cachedBy } from "./shared/cached-by.ts";
+import {
+  filePurposeLabelsOf,
+  survivalColorScalesOf,
+} from "./shared/survival-colors.ts";
+import { SurvivalTimeline } from "./survival-timeline.ts";
 
 /**
  * The section heading, exported so the reveal can paint it before this
  * section has arrived — this chart sits above the scroll cut, so anonymous
  * ghost bars flashing into the real heading would be the first thing a reload
- * shows. The subtitle is constant across every toggle combination: language
- * splits count source files at each commit, while purpose and contributor
- * splits and age shading are attributed via git blame at sampled commits.
+ * shows. The subtitle is constant across every toggle combination (see
+ * `SurvivalTimeline`): language splits count source files at each commit,
+ * while purpose and contributor splits and age shading are attributed via git
+ * blame at sampled commits.
  */
 export const linesTimelineHeading = {
   title: "Lines of code",
@@ -19,24 +24,39 @@ export const linesTimelineHeading = {
 };
 
 /**
+ * What the timeline takes from the data, once per data, so the same arrays
+ * reach its props (and the caches keyed by them) on every render.
+ */
+const linesTimelineInputsOf = cachedBy((data: DashboardData) => ({
+  flatRows: data.languages.map((row) => ({
+    date: row.date,
+    values: row.byLanguage,
+  })),
+  purposeOrder: filePurposeLabelsOf(data),
+  colorScales: survivalColorScalesOf(data),
+}));
+
+/**
  * The lines-of-code timeline: the line grain of `SurvivalTimeline`, drawn from
  * the dense per-commit language rows and the blame-based survival cross-tabs.
- *
- * TEMPORARY: `SurvivalTimeline` (with its controls and "View data" table) is
- * not ported yet, so this draws the section around a placeholder.
  */
 export const LinesTimeline = <M>(
   h: Html.H<M>,
-  { data }: { data: DashboardData; maxContributorsInCharts: number },
+  {
+    key,
+    data,
+    maxContributorsInCharts,
+  }: { key: string; data: DashboardData; maxContributorsInCharts: number },
 ) =>
-  Section(h, {
-    ...linesTimelineHeading,
-    annotation: data.config?.charts?.annotations?.["lines-of-code"],
-    children: [
-      ChartPlaceholder(h, {
-        reactFile: "survival-timeline.tsx",
-        description: "Stacked lines of code over time, split four ways",
-        height: 288,
-      }),
-    ],
+  SurvivalTimeline(h, {
+    key,
+    props: {
+      title: linesTimelineHeading.title,
+      subtitle: linesTimelineHeading.subtitle,
+      annotation: data.config?.charts?.annotations?.["lines-of-code"],
+      unit: "lines",
+      survivalRows: data.survival,
+      maxContributorsInCharts,
+      ...linesTimelineInputsOf(data),
+    },
   });
