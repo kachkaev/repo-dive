@@ -6,7 +6,8 @@ It reads the same `dashboard.json` and aims to replicate the React dashboard's U
 React stays the default.
 The CLI serves or exports this build with `--ui effect` on the bare pipeline, `dashboard` and `report`, and the GitHub Action takes `ui: effect`.
 
-This README is the porting guide for the charts that are still placeholders.
+Every chart and section is ported (see the [checklist](#port-checklist)).
+This README is the guide to how the port is put together and how to carry a change to the React dashboard over to it.
 Read it with the React file you are porting open next to it.
 
 ## Ground rules
@@ -51,27 +52,32 @@ src/
     ├── report-sections.ts          # the list of sections, revealed one per frame
     ├── report-sections/
     │   ├── <name>-section.ts       # one file per section: heading, controls, chart call
-    │   ├── history-range-select.ts # ported (ui-kit Select)
-    │   ├── frame-ticks.ts          # the reveal's clock: animation frames, or a task loop while hidden
+    │   ├── history-range-select.ts # ui-kit Select over the history ranges
+    │   ├── frame-ticks.ts          # the reveal's clock: animation frames, or a task loop while hidden or stalled
     │   ├── contributors-in-range.ts (+ test, copied)
     │   └── shared/                 # what several sections share: ReportSection, ranges, kinds, monthly buckets, decimate
-    ├── bar-list.ts                 # ported — the reference chart
-    ├── lines-timeline.ts           # placeholder around SurvivalTimeline
-    ├── files-timeline.ts           # placeholder around SurvivalTimeline
+    ├── bar-list.ts                 # the simplest chart: a view function
+    ├── contributor-bars.ts         # a view function too
+    ├── activity-calendar.ts (+ activity-calendar/)  # CommitCalendar
+    ├── diverging-bars.ts (+ diverging-bars/)        # DivergingBars (churn)
+    ├── time-stack-chart.ts (+ time-stack-chart/)    # TimeSeriesChart: area, bar and line
+    ├── survival-timeline.ts (+ survival-timeline/)  # SurvivalTimeline on TimeSeriesChart, with its controls
+    ├── lines-timeline.ts, files-timeline.ts         # SurvivalTimeline for lines of code and number of files
     └── shared/
-        ├── @ui-primitive/          # tooltip, select, toggle-group: ui-kit parts with the shadcn classes; shared/top-layer-reset.ts
+        ├── @ui-primitive/          # tooltip, select, toggle-group, scroll-area: ui-kit parts with the shadcn classes; shared/top-layer-reset.ts
         ├── primitives.ts           # Section, SectionSkeleton, StatTile, DataTable
         ├── cached-by.ts            # cachedBy: derived data cached per key object (+ further arguments), one slot per key
         ├── axes.ts                 # visx's GridRows, AxisLeft and AxisBottom as view functions
+        ├── contributor-kinds.ts    # kinds, their colors and labels, KindFilterControl, the kind Schemas
+        ├── history-range-schema.ts # HistoryRangeSchema, for props and Models
         ├── markdown.ts, icons.ts, format.ts, history-range.ts, stacked-series.ts, …
         ├── measure-width.ts        # MeasureWidth mount (the React useMeasuredWidth)
         ├── track-pointer.ts        # TrackPointer mount (the React charts' onMouseMove)
         ├── crosshair-line.ts, bar-path.ts, time-axis.ts, category-colors.ts, survival-colors.ts
-        ├── dashboard-data-fixture.ts # a small dashboard.json for tests
-        └── chart-placeholder.ts    # TEMPORARY, deleted with the last placeholder
+        └── dashboard-data-fixture.ts # a small dashboard.json for tests
 ```
 
-A chart port adds its file where the React one lives (`app/time-stack-chart.ts`, `app/activity-calendar.ts`, …), with any helpers it alone needs in a folder of the same name, and replaces one placeholder in its section file.
+A chart lives where the React one lives (`app/time-stack-chart.ts`, `app/activity-calendar.ts`, …), with any helpers it alone needs in a folder of the same name, and its section file calls it.
 
 ## How the app is put together
 
@@ -81,6 +87,7 @@ A chart port adds its file where the React one lives (`app/time-stack-chart.ts`,
   `DashboardDataSchema` declares the shape rather than validating it, as the React app casts it.
 - `ReportSections` lists every section in reading order (`reportSectionsOf`, built once per data) and reveals one per frame, showing the next section's heading over a spinner meanwhile, like the React `RevealSequentially`.
   The frames come from `frame-ticks.ts`: animation frames while the page is shown, and a `MessageChannel` task loop while it is hidden, which browsers don't throttle the way they throttle timers, so a report opened in a background tab is complete when shown.
+  A shown page whose frames stop coming for 100 ms (an embedded webview out of sight, a covered window) switches to the task loop too, so the reveal always finishes.
 - Each section lives in `report-sections/<name>-section.ts` and exports one `<name>SectionOf(data: DashboardData)` that returns a `ReportSection` (or `undefined` when the repo has nothing for it):
   - `id`: the section's chart annotation id, which also keys its node.
   - `skeleton`: the heading the reveal shows before the section arrives.
@@ -160,8 +167,8 @@ h.svg
   );
 ```
 
-For scales and shapes, use what visx wraps: `d3-scale` and `d3-shape` (curves, stacks), with their `@types/*`, are already devDependencies at the versions visx pins (with a temporary `knip.config.ts` exception until a chart imports them).
-Re-implement visx's axis and grid as plain view functions over the scale's `ticks()`, copying the React chart's tick props (font size, color, anchor) into SVG attributes.
+For scales and shapes, use what visx wraps: `d3-scale` and `d3-shape` (curves, stacks), with their `@types/*`, are devDependencies at the versions visx pins.
+visx's grid and axes are plain view functions over the scale's `ticks()` in `shared/axes.ts`, with the React charts' tick props (font size, color, anchor) as SVG attributes.
 `useId()` (for `<pattern>` and `<clipPath>` ids) becomes `h.id("hatch")`, unique per instance.
 
 ### Measuring width
@@ -233,7 +240,7 @@ Keep the crosshair's `will-change-transform` overlay: the reason it exists (repa
 | `@ui-primitive/tooltip.tsx` (Base UI)      | `@ui-primitive/tooltip.ts` on ui-kit `Tooltip`                                                               |
 | `@ui-primitive/select.tsx` (Base UI)       | `@ui-primitive/select.ts` (markup) on ui-kit `Select`; `report-sections/history-range-select.ts` owns `open` |
 | `@ui-primitive/toggle-group.tsx` (Base UI) | `@ui-primitive/toggle-group.ts` (markup) on ui-kit `ToggleGroup`                                             |
-| `@ui-primitive/scroll-area.tsx` (Base UI)  | not ported: use ui-kit `ScrollArea` with the React classes when the calendar needs it                        |
+| `@ui-primitive/scroll-area.tsx` (Base UI)  | `@ui-primitive/scroll-area.ts` (markup) on ui-kit `ScrollArea`                                               |
 | `segmented-control.tsx`                    | `segmented-control.ts` (`SegmentedControl`, `PercentControl`)                                                |
 | `contributor-kinds.tsx`                    | `contributor-kinds.ts`, in full                                                                              |
 | `primitives.tsx`                           | `primitives.ts`, in full; `Legend` items with toggles are `Tooltip` children keyed by label                  |
@@ -262,14 +269,13 @@ Tests sit next to what they test, as `*.test.ts`, and run with the rest of the r
 - Build test data with `dashboardDataOf()` from `shared/dashboard-data-fixture.ts`, overriding what the section under test needs.
 - Pure helpers get plain `test(...)` from Vitest, as in the React dashboard.
 
-### Replacing a placeholder
+### Carrying a change over from React
 
-1.  Port the chart into its own file under `src/app/`, with its helpers in a folder of the same name, and copy the pure helpers it needs from `../dashboard` verbatim (with their tests).
-1.  In the section file, replace the one `ChartPlaceholder(h, …)` call with the chart, using the comment above it as the checklist of what to pass.
-    Where the section already derives the chart's data (`commitsChartsOf`, `dependenciesChartOf`), pass that; derive the rest the same way, with `cachedBy`, rather than in `view`.
-1.  Leave `knip.config.ts`, this README's checklist and `report-sections.ts` alone, even where the port makes an exception or a line stale: the parallel ports would all edit the same lines.
-    The last PR of the series prunes the knip exceptions and ticks the checklist.
+1.  Make the change in the file of the same name here; a new chart goes into its own file under `src/app/`, with its helpers in a folder of the same name.
+    Copy the pure helpers it needs from `../dashboard` verbatim (with their tests), or apply the same edit to the copies already here.
+1.  Where the section already derives the chart's data (`commitsChartsOf`, `dependenciesChartOf`), pass that; derive the rest the same way, with `cachedBy`, rather than in `view`.
 1.  Compare with the React dashboard side by side on the same `dashboard.json`, at the same viewport, including hover states and keyboard use.
+    Anything that cannot match goes into [Deviations](#deviations-from-the-react-dashboard).
 
 Adding a new section to the report is the same in reverse: write `report-sections/<name>-section.ts` exporting `<name>SectionOf(data)`, and call it from `reportSectionsOf` in `report-sections.ts`, in the React dashboard's order.
 
@@ -280,31 +286,43 @@ Ported:
 - `main.tsx`, `app.tsx` → `main.ts`, `app.ts` (data loading, loading and error states, stat tiles)
 - `data.ts` (types copied; the loader is the `LoadDashboardData` query)
 - `app/report-header.tsx`
-- `app/report-sections.tsx` (page structure, every section with its title, subtitle and annotation; every section's controls and "View data" table except those of "Lines of code" and "Number of files", which come with `SurvivalTimeline`)
+- `app/report-sections.tsx` (page structure, every section with its title, subtitle, annotation, controls and "View data" table)
 - `app/report-sections/history-range-select.tsx`, `app/report-sections/contributors-in-range.ts`
 - `app/bar-list.tsx`
 - `app/shared/primitives.tsx`, `markdown.tsx`, `segmented-control.tsx`, `contributor-kinds.tsx`, `crosshair-line.tsx`, `use-measure.ts`
-- `app/shared/@ui-primitive/tooltip.tsx`, `select.tsx`, `toggle-group.tsx`
+- `app/shared/@ui-primitive/tooltip.tsx`, `select.tsx`, `toggle-group.tsx`, `scroll-area.tsx`
 - `app/shared/format.ts`, `history-range.ts`, `stacked-series.ts`, `bar-path.ts`, `time-axis.ts`, `category-colors.ts` (with its test), `survival-colors.tsx` (copied)
 
-Everything shared between charts is in place, most of it ahead of its first user (see the `knip.config.ts` exceptions), so the follow-up PRs a, b and c touch no file outside their own charts and section files — not `knip.config.ts`, and not this checklist, which the series' last PR updates.
+The charts, one PR each after the scaffold (#394):
 
-Still placeholders, by follow-up PR (a, b and c run in parallel; d follows a):
+- [x] `app/contributor-bars.tsx` — the contributors section (#395)
+- [x] `app/activity-calendar.tsx` and `app/diverging-bars.tsx` — the commit calendar and churn per month sections (#396)
+- [x] `app/time-stack-chart.tsx` — the commits per month, direct dependencies, dependencies and loose ends sections (#397)
+- [x] `app/survival-timeline.tsx`, `app/lines-timeline.tsx` and `app/files-timeline.tsx` — the lines of code and number of files sections, with their controls and "View data" tables (#398)
 
-- [ ] **a:** `app/time-stack-chart.tsx` — the commits per month, direct dependencies, dependencies and loose ends section files
-- [ ] **b:** `app/activity-calendar.tsx` (with ui-kit's `ScrollArea` for `@ui-primitive/scroll-area.tsx`) and `app/diverging-bars.tsx` — the commit calendar and churn per month section files
-- [ ] **c:** `app/contributor-bars.tsx` — the contributors section file
-- [ ] **d:** `app/survival-timeline.tsx` (on a's `time-stack-chart.ts`), then `app/lines-timeline.ts` and `app/files-timeline.ts` (headings ported) — the lines of code and number of files sections, with their controls and "View data" tables
+`stale-overlay.tsx` has no counterpart (see [Synchronous re-renders](#deviations-from-the-react-dashboard)).
 
 ## Deviations from the React dashboard
 
 - **No fragments.**
   A view, and a headless component's view closure, returns one node.
   `ReportSections` wraps the sections in a `<div>` (their margins collapse through it, so the layout is unchanged), and each tooltip wraps its trigger and card in a `<span>`.
+  `TimeSeriesChart` puts its grid and marks in a `<g>` of their own, where React writes a fragment.
 - **The reveal runs on its own clock.**
-  React reveals a section per commit inside a transition; here a Subscription advances a counter on each animation frame, or on each turn of a `MessageChannel` task loop while the tab is hidden.
+  React reveals a section per commit inside a transition; here a Subscription advances a counter on each animation frame, or on each turn of a `MessageChannel` task loop while the tab is hidden or once frames stall on a shown page.
 - **Synchronous re-renders.**
   React defers heavy re-renders (`useDeferredValue`) and dims the stale chart (`StaleOverlay`); Effect UI has no concurrent rendering, so expensive subtrees are memoized with `h.lazy` instead and nothing is ever stale.
+  A chart's root is a plain `<div>` where React writes the overlay's two wrappers, and a control press re-shapes a chart and its "View data" table in the same render.
+  `SurvivalTimeline` shapes each split and shading on first use and keeps it, so switching back reuses its arrays where React re-shapes them on every switch.
+- **`TimeSeriesChart` before its width arrives.**
+  Until `MeasureWidth` reports, the chart draws an empty 260px `<svg>` where React draws the marks against a 10px plot; the layout is the same.
+- **Inline percentages.**
+  Effect UI writes inline styles as a `style` attribute where React sets them through the CSS object model, and Chrome keeps a percentage such as a contributor bar's width at a slightly different precision on the two paths, so bar tips can differ by a few anti-aliased pixels.
+- **Calendar day ids.**
+  ui-kit's Tooltip anchors to an element id where Base UI takes the element, so every day's hover target carries an `id`, `calendar-<hash>-<date>`, the hash a short digest of the calendar's `h.id`.
+- **Scroll area content.**
+  ui-kit's ScrollArea observes a content element inside the viewport, so the calendar's own `mx-auto flex w-max …` div gains `role="presentation"`, ui-kit's data attributes and an inline `min-width: fit-content`.
+  The native scrollbars are hidden by ui-kit's inline `scrollbar-width: none` rather than Base UI's `base-ui-disable-scrollbar` class.
 - **Tooltip triggers.**
   ui-kit's trigger part takes only `<button>` and `<a href>`, so the header's link-less dates are buttons styled like the React `<span tabIndex={0}>`.
 - **Tooltip positioners are `<div>`s.**
@@ -314,6 +332,7 @@ Still placeholders, by follow-up PR (a, b and c run in parallel; d follows a):
   The card fades and scales in through `@starting-style`, but closes at once: ui-kit's Tooltip hides its popover as soon as `open` turns false and has no `holdExit` for an exit transition.
 - **Popover placement.**
   ui-kit writes the tooltip and select positioners next to their triggers in the top layer instead of in a portal on `<body>`; `topLayerReset` undoes what they would inherit there.
+  It also places them at fractional pixels where Base UI rounds them, so a card (the calendar's day card, say) can sit half a pixel off.
 - **Select highlight.**
   The highlighted option follows the pointer from option to option, as Base UI's does, but ui-kit highlights an option only as the pointer enters it.
   With the pointer resting on an option, ArrowDown moves the highlight to the next one and leaves it there while the pointer moves within the first; Base UI keeps the highlight on the option under the pointer.

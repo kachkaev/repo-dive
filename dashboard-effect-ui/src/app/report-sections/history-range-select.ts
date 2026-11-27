@@ -4,7 +4,7 @@ import { makeSelect } from "@effect/ui-kit";
 import { Schema } from "effect";
 
 import { SelectView } from "../shared/@ui-primitive/select.ts";
-import { HistoryRangeSchema } from "./shared/history-ranges.ts";
+import { HistoryRangeSchema } from "../shared/history-range-schema.ts";
 
 /** ui-kit's Select, typed for history ranges: its `Picked` carries one. */
 const Select = makeSelect({ value: HistoryRangeSchema });

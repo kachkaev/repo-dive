@@ -8,14 +8,11 @@ import {
   KindFilterControl,
   KindFilterSchema,
 } from "../shared/contributor-kinds.ts";
+import { HistoryRangeSchema } from "../shared/history-range-schema.ts";
 import { Section, type SectionHeading } from "../shared/primitives.ts";
 import { HistoryRangeSelect } from "./history-range-select.ts";
 import { commitKindsOf } from "./shared/commit-kinds.ts";
-import {
-  defaultCalendarRangeOf,
-  historyOf,
-  HistoryRangeSchema,
-} from "./shared/history-ranges.ts";
+import { defaultCalendarRangeOf, historyOf } from "./shared/history-ranges.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 
 const commitCalendarHeading = (

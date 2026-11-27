@@ -80,6 +80,7 @@ The catalog hides itself from git, but other tools that walk the repository (pre
 
 `index` normalizes raw snapshots into `.repo-dive/index/metrics.sqlite` — a facts-by-categories cube, rebuildable at any time — plus `dashboard.json`.
 `dashboard` then serves a local React app with interactive charts: languages over time, file counts over time, a split of both by file purpose (production, tests, docs, …), a GitHub-style commit calendar, monthly commits with AI-assisted share, churn, lint-suppression trends, dependency counts over time, code survival by cohort and author, and more.
+Pass `--ui effect` to `dashboard`, `report` or the bare pipeline for an experimental port of the same dashboard to [Effect UI](https://github.com/Effect-TS/ui).
 
 ## Configuration
 

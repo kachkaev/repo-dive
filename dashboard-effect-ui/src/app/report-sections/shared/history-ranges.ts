@@ -1,5 +1,3 @@
-import { Schema } from "effect";
-
 import type { DashboardData } from "../../../data.ts";
 import { cachedBy } from "../../shared/cached-by.ts";
 import {
@@ -7,17 +5,6 @@ import {
   historyDaySpanOf,
   type HistoryRange,
 } from "../../shared/history-range.ts";
-
-/**
- * A {@link HistoryRange} as a Schema, so the sections that narrow their chart
- * to a range can keep it in their Model and the range select can carry it in
- * its props and events.
- */
-export const HistoryRangeSchema: Schema.Codec<HistoryRange> = Schema.Union([
-  Schema.Literals(["last-12-months", "this-year", "all-years"]),
-  Schema.TemplateLiteral(["last-", Schema.Number, "-years"]),
-  Schema.TemplateLiteral(["year-", Schema.Number]),
-]);
 
 /**
  * The calendar's multi-year unit, in calendar years (one strip each). Every

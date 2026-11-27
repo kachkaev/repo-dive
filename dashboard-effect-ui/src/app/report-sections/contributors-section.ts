@@ -21,6 +21,7 @@ import {
 } from "../shared/contributor-kinds.ts";
 import { formatCount } from "../shared/format.ts";
 import { type HistoryRange, monthSpanOf } from "../shared/history-range.ts";
+import { HistoryRangeSchema } from "../shared/history-range-schema.ts";
 import {
   DataTable,
   Section,
@@ -31,7 +32,7 @@ import {
   type ListedContributor,
 } from "./contributors-in-range.ts";
 import { HistoryRangeSelect } from "./history-range-select.ts";
-import { historyOf, HistoryRangeSchema } from "./shared/history-ranges.ts";
+import { historyOf } from "./shared/history-ranges.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 
 /**
