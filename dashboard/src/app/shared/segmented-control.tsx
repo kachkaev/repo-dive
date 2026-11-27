@@ -53,7 +53,7 @@ export function SegmentedControl<Value extends string>({
           // hover) so the pressed one's fill is the sole "selected" signal;
           // disabled options stay hoverable so their explanatory tooltip
           // shows, but keep their resting style (hover is enabled-only).
-          className="not-data-pressed:enabled:hover:bg-transparent not-data-pressed:enabled:hover:text-(--text-secondary) not-data-pressed:text-(--text-muted) disabled:pointer-events-auto"
+          className="not-data-pressed:text-(--text-muted) not-data-pressed:enabled:hover:bg-transparent not-data-pressed:enabled:hover:text-(--text-secondary) disabled:pointer-events-auto"
         >
           {option.label}
         </ToggleGroupItem>

@@ -16,13 +16,13 @@ import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group
 import { cva, type VariantProps } from "class-variance-authority";
 import { createContext, useContext } from "react";
 
-import { cn, type PropsWithPlainClassName } from "./shared/cn.ts";
+import { cn, type PropsWithPlainClassName } from "../cn.ts";
 
 const toggleVariants = cva(
   // Hover styles are enabled-only: a disabled item may stay hoverable for its
   // explanatory tooltip (pointer-events restored by the caller) and must not
   // light up then.
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none enabled:hover:bg-muted enabled:hover:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-pressed:bg-accent data-pressed:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-muted enabled:hover:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 data-pressed:bg-accent data-pressed:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

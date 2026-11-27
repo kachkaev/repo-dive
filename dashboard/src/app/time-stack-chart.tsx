@@ -7,6 +7,7 @@ import { AreaStack, BarStack, LinePath } from "@visx/shape";
 import { useDeferredValue, useId, useState } from "react";
 
 import { barPath } from "./shared/bar-path.ts";
+import { cn } from "./shared/cn.ts";
 import { CrosshairLine } from "./shared/crosshair-line.tsx";
 import { formatCount, formatMonth, formatPercent } from "./shared/format.ts";
 import { DateStamp, Legend, Swatch } from "./shared/primitives.tsx";
@@ -357,8 +358,8 @@ function HoverTooltip({
       <div
         className={
           hovered
-            ? "mb-1 font-medium tabular-nums text-(--text-secondary)"
-            : "font-medium tabular-nums text-(--text-secondary)"
+            ? "mb-1 font-medium text-(--text-secondary) tabular-nums"
+            : "font-medium text-(--text-secondary) tabular-nums"
         }
       >
         {pointUnit === "month" ? (
@@ -403,17 +404,19 @@ function HoverTooltip({
                   {entry.key}
                 </span>
                 <span
-                  className={`ml-auto pl-3 tabular-nums ${
-                    showPercent ? "text-(--text-muted)" : "font-medium"
-                  }`}
+                  className={cn(
+                    "ml-auto pl-3 tabular-nums",
+                    showPercent ? "text-(--text-muted)" : "font-medium",
+                  )}
                 >
                   {formatValue(entry.value)}
                 </span>
                 {supportsPercent && (
                   <span
-                    className={`min-w-9 pl-2 text-right tabular-nums ${
-                      showPercent ? "font-medium" : "text-(--text-muted)"
-                    }`}
+                    className={cn(
+                      "min-w-9 pl-2 text-right tabular-nums",
+                      showPercent ? "font-medium" : "text-(--text-muted)",
+                    )}
                   >
                     {hoveredTotal === 0
                       ? "—"
@@ -432,16 +435,18 @@ function HoverTooltip({
                   <span className="inline-block size-2" />
                   <span className="text-(--text-secondary)">{row.label}</span>
                   <span
-                    className={`ml-auto pl-3 tabular-nums ${
-                      showPercent ? "text-(--text-muted)" : "font-medium"
-                    }`}
+                    className={cn(
+                      "ml-auto pl-3 tabular-nums",
+                      showPercent ? "text-(--text-muted)" : "font-medium",
+                    )}
                   >
                     {formatValue(row.value)}
                   </span>
                   <span
-                    className={`min-w-9 pl-2 text-right tabular-nums ${
-                      showPercent ? "font-medium" : "text-(--text-muted)"
-                    }`}
+                    className={cn(
+                      "min-w-9 pl-2 text-right tabular-nums",
+                      showPercent ? "font-medium" : "text-(--text-muted)",
+                    )}
                   >
                     {row.share}
                   </span>

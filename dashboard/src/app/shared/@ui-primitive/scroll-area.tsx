@@ -11,7 +11,7 @@
  */
 import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
 
-import { cn, type PropsWithPlainClassName } from "./shared/cn.ts";
+import { cn, type PropsWithPlainClassName } from "../cn.ts";
 
 function ScrollBar({
   className,

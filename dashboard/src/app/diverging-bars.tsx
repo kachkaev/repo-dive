@@ -153,7 +153,7 @@ function HoverCard({
           : { left: Math.min(crosshairX + 10, Math.max(0, width - cardWidth)) }
       }
     >
-      <div className="mb-1 font-medium tabular-nums text-(--text-secondary)">
+      <div className="mb-1 font-medium text-(--text-secondary) tabular-nums">
         {formatMonth(point.month)}
       </div>
       {rows.map((row) => (
