@@ -1,7 +1,8 @@
 # Examples
 
 Each subdirectory here defines one public example dashboard, deployed to `https://kachkaev.github.io/repo-dive/examples/<name>/`.
-The [examples workflow](../.github/workflows/examples.yaml) rebuilds them weekly (and on any change to this directory): it clones every listed repository, runs `repo-dive` against it and publishes the resulting self-contained report to GitHub Pages.
+The [examples workflow](../.github/workflows/examples.yaml) rebuilds them weekly (and on any change to this directory): it clones every listed repository, runs `repo-dive` against it and publishes the resulting self-contained reports to GitHub Pages.
+It also exports each one with the experimental Effect UI dashboard (`repo-dive report --ui effect`), deployed to `https://kachkaev.github.io/repo-dive/examples/<name>/effect-ui/`.
 
 ## Anatomy of an example
 

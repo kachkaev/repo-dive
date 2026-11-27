@@ -2,8 +2,14 @@ name: Examples
 
 # Rebuilds the public example dashboards (https://kachkaev.github.io/repo-dive/examples/…):
 # every example in examples/*/example.json is cloned, analyzed with the CLI built
-# from the current commit and exported as one self-contained HTML report, then
+# from the current commit and exported as a self-contained HTML report, then
 # everything is deployed to GitHub Pages in a single pass.
+#
+# Each example is also exported with the experimental Effect UI dashboard, to
+# examples/<name>/effect-ui/. The variant lives in a subfolder of its example
+# so that a later swap of the default stays local: examples/<name>/ switches to
+# Effect UI, React moves to a react-ui/ sibling, and effect-ui/ becomes a
+# redirect stub to ../ until it is removed.
 
 on:
   push:
@@ -151,37 +157,60 @@ jobs:
         run: node dist/cli.js index --repo analyzed
 
       - name: Run repo-dive report
-        # The file name doubles as the artifact name (see the upload step), so
-        # it carries the example-- prefix the deploy job filters on
         run: |
           mkdir -p report
           node dist/cli.js report --repo analyzed \
             --out "report/example--${{ matrix.example.name }}.html"
 
-      - name: Add report size to the job summary
+      # archive: false keeps each report non-zipped, so the run page can
+      # render it in the browser without a download. It also makes the file
+      # name the artifact name (a `name` input would be ignored), hence the
+      # example-- prefix the deploy job filters on, and the --effect-ui suffix
+      # it maps to the effect-ui/ subfolder. It takes a single file, hence one
+      # upload per dashboard.
+      #
+      # Retention is longer than a day, as reports expire one by one: a re-run
+      # would otherwise deploy only the survivors and take the others offline.
+      # A week covers the gap until the next scheduled run
+      - name: Upload the report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: report/example--${{ matrix.example.name }}.html
+          archive: false
+          retention-days: 7
+
+      # The experimental Effect UI export comes after the React upload, so
+      # that when it breaks, the job goes red but the stable React dashboard
+      # still gets deployed. Both read the same catalog, so the second export
+      # only costs the second or so it takes to write the file
+      - name: Run repo-dive report with Effect UI
         run: |
-          report="report/example--${{ matrix.example.name }}.html"
-          raw=$(du -h "$report" | cut -f1)
-          gzipped=$(gzip -c "$report" | wc -c)
+          node dist/cli.js report --repo analyzed --ui effect \
+            --out "report/example--${{ matrix.example.name }}--effect-ui.html"
+
+      - name: Upload the Effect UI report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: report/example--${{ matrix.example.name }}--effect-ui.html
+          archive: false
+          retention-days: 7
+
+      - name: Add report sizes to the job summary
+        if: ${{ !cancelled() }}
+        run: |
+          # Nothing to report when the scan or index step failed
+          [ -d report ] || exit 0
           {
             echo "### ${{ matrix.example.name }}"
             echo ""
-            echo "Report: $raw raw, $((gzipped / 1024)) kB gzipped."
+            for variant in ":React" "--effect-ui:Effect UI"; do
+              report="report/example--${{ matrix.example.name }}${variant%%:*}.html"
+              [ -f "$report" ] || continue
+              raw=$(du -h "$report" | cut -f1)
+              gzipped=$(gzip -c "$report" | wc -c)
+              echo "- ${variant#*:}: $raw raw, $((gzipped / 1024)) kB gzipped."
+            done
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload the report
-        # archive: false keeps the report non-zipped, so the run page can
-        # render it in the browser without a download. It also makes the file
-        # name the artifact name (a `name` input would be ignored), hence the
-        # example-- prefix on the report file itself
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          path: report/
-          archive: false
-          # Longer than a day, as reports expire one by one: a re-run would
-          # otherwise deploy only the survivors and take the others offline.
-          # A week covers the gap until the next scheduled run
-          retention-days: 7
 
   deploy:
     name: Deploy to GitHub Pages
@@ -205,10 +234,11 @@ jobs:
 
       - name: Assemble the site
         # Each non-zipped report downloads into a directory named after its
-        # artifact, i.e. _site/examples/example--<name>.html/<raw file>.
-        # Rearrange that into examples/<name>/index.html and add redirect
-        # stubs: the site root and /examples/ are not destinations, they point
-        # back at the repository
+        # artifact, i.e. _site/examples/example--<name>[--effect-ui].html/<raw
+        # file>. Rearrange that into examples/<name>/index.html and
+        # examples/<name>/effect-ui/index.html, and add redirect stubs: the
+        # site root and /examples/ are not destinations, they point back at
+        # the repository
         run: |
           if ! ls -d _site/examples/example--* > /dev/null 2>&1; then
             echo "No example reports were produced — leaving the previous deployment in place."
@@ -217,8 +247,12 @@ jobs:
           for dir in _site/examples/example--*; do
             name=$(basename "$dir" .html)
             name=${name#example--}
-            mkdir "_site/examples/$name"
-            mv "$dir"/* "_site/examples/$name/index.html"
+            case "$name" in
+              *--effect-ui) target="_site/examples/${name%--effect-ui}/effect-ui" ;;
+              *) target="_site/examples/$name" ;;
+            esac
+            mkdir -p "$target"
+            mv "$dir"/* "$target/index.html"
             rmdir "$dir"
           done
 
