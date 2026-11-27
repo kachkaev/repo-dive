@@ -121,6 +121,7 @@ export const directDependenciesSectionOf = (
         skeleton: directDependenciesHeading(
           data.config?.charts?.annotations?.["direct-dependencies"],
         ),
-        view: (h) => DirectDependenciesSection(h, { props: { data } }),
+        view: (h, key) =>
+          DirectDependenciesSection(h, { key, props: { data } }),
       }
     : undefined;

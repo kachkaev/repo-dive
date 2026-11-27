@@ -10,7 +10,10 @@ import type { SectionHeading } from "../../shared/primitives.ts";
  * for it to show — so a chart port touches its section's file only.
  */
 export type ReportSection = {
-  /** The section's chart annotation id where it has one, e.g. `commit-calendar`. */
+  /**
+   * Unique among the sections, and the key of the section's node: the
+   * section's chart annotation id, e.g. `commit-calendar`.
+   */
   readonly id: string;
   /**
    * What the reveal tail shows while the section waits for its turn: its
@@ -21,9 +24,10 @@ export type ReportSection = {
    */
   readonly skeleton: SectionHeading | undefined;
   /**
-   * Draws the section. Stateful sections return their own component here, so
-   * their controls' state survives the parent's renders; stateless ones
-   * return a `Section` view directly.
+   * Draws the section, keyed with `key` (the `id`): `.key(key)` on a view's
+   * root element, or `key` on a component call. Stateful sections return
+   * their own component, so their controls' state survives the parent's
+   * renders; stateless ones return a `Section` view directly.
    */
-  readonly view: <M>(h: Html.H<M>) => View.Content<M>;
+  readonly view: <M>(h: Html.H<M>, key: string) => View.Content<M>;
 };

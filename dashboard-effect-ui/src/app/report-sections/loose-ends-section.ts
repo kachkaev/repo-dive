@@ -100,7 +100,7 @@ export const looseEndsSectionOf = (
   return {
     id: "loose-ends",
     skeleton: heading,
-    view: (h) =>
+    view: (h, key) =>
       Section(h, {
         ...heading,
         children: [
@@ -113,6 +113,6 @@ export const looseEndsSectionOf = (
             height: 288,
           }),
         ],
-      }),
+      }).key(key),
   };
 };

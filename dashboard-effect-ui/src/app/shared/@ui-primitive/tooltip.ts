@@ -19,9 +19,8 @@
  *   trigger part accepts only those two. The React dashboard draws an inert
  *   trigger as a focusable `<span>`; the button is reset to look the same.
  * - The card is written next to its trigger instead of portaled to the
- *   body, so the popup resets inherited text styles (alignment, weight,
- *   numeral style) that would otherwise leak in from the trigger's
- *   surroundings.
+ *   body, so its positioner takes `topLayerReset` against the styles it
+ *   would otherwise inherit from the trigger's surroundings.
  * - The card fades and scales in through `@starting-style` but closes at
  *   once: ui-kit hides the positioner (a manual popover) as soon as `open`
  *   turns false, so there is no exit transition to run.
@@ -30,6 +29,8 @@ import { UiSchema, type View } from "@effect/ui";
 import { Html } from "@effect/ui/html";
 import { Tooltip as TooltipPrimitive } from "@effect/ui-kit";
 import { Schema } from "effect";
+
+import { topLayerReset } from "./shared/top-layer-reset.ts";
 
 /** The parts of a ui-kit Tooltip that {@link TooltipContent} draws. */
 type TooltipParts = Parameters<
@@ -52,12 +53,9 @@ const TooltipContent = <M>(
 ) =>
   tooltip
     .positioner(
-      // A manual popover in the top layer: reset what the browser gives
-      // every popover, and let the popup carry the look. Unlike a portal it
-      // stays where the view writes it, so it inherits that spot's text
-      // styles; the popup resets the ones the dashboard sets on prose
-      // (`tabular-nums` in the header, say) to the body's.
-      h.div.class("isolate z-50 overflow-visible border-0 bg-transparent p-0"),
+      // A manual popover in the top layer, written where the view writes it:
+      // see `topLayerReset`. The popup carries the look.
+      h.div.class(`isolate z-50 ${topLayerReset}`),
     )
     .children(
       tooltip
@@ -65,7 +63,7 @@ const TooltipContent = <M>(
           h.div
             .attr("data-slot", "tooltip-content")
             .class(
-              "w-fit max-w-xs origin-(--transform-origin) text-left font-normal normal-nums rounded-md border border-border bg-muted px-2.5 py-1.5 text-xs text-balance text-foreground shadow-sm transition-[opacity,transform] duration-100 starting:scale-95 starting:opacity-0",
+              "w-fit max-w-xs origin-(--transform-origin) rounded-md border border-border bg-muted px-2.5 py-1.5 text-xs text-balance text-foreground shadow-sm transition-[opacity,transform] duration-100 starting:scale-95 starting:opacity-0",
             ),
         )
         .children(

@@ -106,6 +106,6 @@ export const dependenciesSectionOf = (
         skeleton: dependenciesHeading(
           data.config?.charts?.annotations?.dependencies,
         ),
-        view: (h) => DependenciesSection(h, { props: { data } }),
+        view: (h, key) => DependenciesSection(h, { key, props: { data } }),
       }
     : undefined;

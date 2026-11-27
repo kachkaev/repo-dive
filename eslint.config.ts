@@ -45,8 +45,15 @@ export default defineConfig([
         {
           ...ruleArgsForIdLength[1],
           // The one-letter names Effect UI fixes: `h` for view builders, `$`
-          // in update handlers and `p` in headless components' parts.
-          exceptions: [...ruleArgsForIdLength[1].exceptions, "h", "$", "p"],
+          // in update handlers, `p` in headless components' parts and `s` for
+          // a Story or Scene.
+          exceptions: [
+            ...ruleArgsForIdLength[1].exceptions,
+            "h",
+            "$",
+            "p",
+            "s",
+          ],
         },
       ],
       "import/no-default-export": "off", // Vite config files must default-export.

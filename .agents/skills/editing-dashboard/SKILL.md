@@ -9,6 +9,9 @@ The dashboard's interactive controls are canonical [shadcn](https://ui.shadcn.co
 Reuse them (and the layout primitives) before hand-rolling anything; extend the set by porting more shadcn components the same way (see below).
 React-compiler rules live in [editing-react](../editing-react/SKILL.md); file placement in [fractal-tree-file-structure](../fractal-tree-file-structure/SKILL.md).
 
+The semantic color tokens and the interaction conventions below apply to the experimental Effect UI port in [`dashboard-effect-ui/`](../../../dashboard-effect-ui) too, which copies `styles.css` verbatim and renders the same classes.
+Its primitives are `@effect/ui-kit` components rather than Base UI ones: see [its README](../../../dashboard-effect-ui/README.md) for how they map.
+
 ## What already exists
 
 - `@ui-primitive/`: `select` (Select/SelectTrigger/SelectValue/SelectContent/SelectItem), `checkbox`, `label`, `toggle-group` (ToggleGroup/ToggleGroupItem, with `toggleVariants` folded in), `scroll-area` (both scrollbars built in — never use raw `overflow-*-auto` for scrollable dashboard content), `tooltip` (Tooltip/TooltipTrigger/TooltipContent, no provider — each trigger sets its own `delay`), and `shared/cn.ts` (`cn`, `PropsWithPlainClassName`).

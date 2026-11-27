@@ -63,7 +63,7 @@ const contributorsHeading = (data: DashboardData): SectionHeading => ({
   annotation: data.config?.charts?.annotations?.contributors,
 });
 
-const listedContributorsOf = (
+const tallyContributors = (
   data: DashboardData,
   range: HistoryRange,
   maxContributorsInCharts: number,
@@ -91,27 +91,48 @@ const listedContributorsOf = (
   );
 };
 
+const listedContributorsCache = new WeakMap<
+  DashboardData,
+  Map<string, ListedContributor[]>
+>();
+
 /**
- * The table under the chart, tallied from every commit. Built through
- * `h.lazy` on the data and the range, so a kind filter click reuses it, and
- * only a new range tallies again.
+ * The contributors list over a range, tallied from every commit once per data,
+ * range and cap. The same array comes back for the same three, so the table
+ * (and, once ported, the chart) can be built in `h.lazy` from it and skip
+ * every render that changes neither — a kind filter click, say.
  */
-const ContributorsTable = <M>(
-  h: Html.H<M>,
+const listedContributorsOf = (
   data: DashboardData,
   range: HistoryRange,
   maxContributorsInCharts: number,
-) => {
-  const listedContributors = listedContributorsOf(
-    data,
-    range,
-    maxContributorsInCharts,
-  );
-  return DataTable(h, {
+): ListedContributor[] => {
+  const byRange =
+    listedContributorsCache.get(data) ?? new Map<string, ListedContributor[]>();
+  listedContributorsCache.set(data, byRange);
+  const key = `${range}|${maxContributorsInCharts}`;
+  const cached = byRange.get(key);
+  if (cached) {
+    return cached;
+  }
+  const tallied = tallyContributors(data, range, maxContributorsInCharts);
+  byRange.set(key, tallied);
+  return tallied;
+};
+
+/**
+ * The table under the chart, built through `h.lazy` with the list as the
+ * first argument.
+ */
+const ContributorsTable = <M>(
+  h: Html.H<M>,
+  listedContributors: readonly ListedContributor[],
+) =>
+  DataTable(h, {
     caption: `All ${listedContributors.length} listed contributors`,
     header: ["contributor", "commits", "added", "deleted"],
     rows: listedContributors.map((contributor) => [
-      h.span(
+      [
         contributor.kind && contributor.kind !== "human"
           ? h.span
               .attr("title", kindBadge[contributor.kind].title)
@@ -135,13 +156,12 @@ const ContributorsTable = <M>(
           : contributor.name,
         " ",
         h.span.class("text-(--text-muted)").children(`<${contributor.email}>`),
-      ),
+      ],
       contributor.commits,
       formatCount(contributor.added),
       formatCount(contributor.deleted),
     ]),
   });
-};
 
 const ContributorsSectionMessage = UiSchema.TaggedEnum({
   ToggledKindFilter: { kindFilter: KindFilterSchema },
@@ -152,7 +172,7 @@ const ContributorsSectionMessage = UiSchema.TaggedEnum({
  * Who built the repo, narrowed by kind and range. The list is re-tallied from
  * every commit on a range change; the React dashboard defers that render and
  * dims the stale chart meanwhile, while Effect UI re-renders synchronously, so
- * the tally runs inside `h.lazy` and only when the range changes.
+ * the tally is memoized per range (see `listedContributorsOf`).
  */
 const ContributorsSection = Html.component({
   name: "ContributorsSection",
@@ -175,6 +195,11 @@ const ContributorsSection = Html.component({
   },
   view: (h, model) => {
     const { data, maxContributorsInCharts } = h.props;
+    const listedContributors = listedContributorsOf(
+      data,
+      model.range,
+      maxContributorsInCharts,
+    );
     const historyDays = historyDaySpanOf(
       data.commits,
       data.repo.firstCommitDate,
@@ -185,7 +210,6 @@ const ContributorsSection = Html.component({
     const contributorKinds = new Set<ContributorKind>(
       data.contributors.map((contributor) => contributor.kind ?? "human"),
     );
-    const isHistoryRange = Schema.is(HistoryRangeSchema);
     return Section(h, {
       ...contributorsHeading(data),
       controls: [
@@ -206,20 +230,19 @@ const ContributorsSection = Html.component({
             },
             onEmit: {
               Picked: ({ value }) =>
-                isHistoryRange(value)
-                  ? ContributorsSectionMessage.PickedRange({ range: value })
-                  : undefined,
+                ContributorsSectionMessage.PickedRange({ range: value }),
             },
           }),
       ],
-      footer: [
-        h.lazy(ContributorsTable, data, model.range, maxContributorsInCharts),
-      ],
+      footer: [h.lazy(ContributorsTable, listedContributors)],
       children: [
         // TEMPORARY until contributor-bars.tsx is ported: ContributorBars over
-        // `listedContributorsOf(data, model.range, maxContributorsInCharts)`,
-        // narrowed to `model.kindFilter`, at most `maxContributorsInCharts * 2`
-        // rows — built inside `h.lazy` too, so a kind filter click skips the tally.
+        // `listedContributors`, narrowed to `model.kindFilter`, at most
+        // `maxContributorsInCharts * 2` rows. If its bars go in `h.lazy`, give
+        // that call a first argument of its own, such as
+        // `h.lazy(Bars, "bars", listedContributors, model.kindFilter)`: lazy
+        // calls in one instance are told apart by their first argument, and
+        // the table's is `listedContributors`.
         ChartPlaceholder(h, {
           reactFile: "contributor-bars.tsx",
           description: "Commits authored and co-authored per contributor",
@@ -236,6 +259,9 @@ export const contributorsSectionOf = (
 ): ReportSection => ({
   id: "contributors",
   skeleton: contributorsHeading(data),
-  view: (h) =>
-    ContributorsSection(h, { props: { data, maxContributorsInCharts } }),
+  view: (h, key) =>
+    ContributorsSection(h, {
+      key,
+      props: { data, maxContributorsInCharts },
+    }),
 });

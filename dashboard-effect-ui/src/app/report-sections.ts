@@ -1,6 +1,6 @@
-import { UiSchema } from "@effect/ui";
-import { Html, HtmlSubscription } from "@effect/ui/html";
-import { Schema } from "effect";
+import { Subscription, UiSchema } from "@effect/ui";
+import { Html } from "@effect/ui/html";
+import { Schema, Stream } from "effect";
 
 import { type DashboardData, DashboardDataSchema } from "../data.ts";
 import { FilesTimeline } from "./files-timeline.ts";
@@ -11,6 +11,7 @@ import { commitsPerMonthSectionOf } from "./report-sections/commits-per-month-se
 import { contributorsSectionOf } from "./report-sections/contributors-section.ts";
 import { dependenciesSectionOf } from "./report-sections/dependencies-section.ts";
 import { directDependenciesSectionOf } from "./report-sections/direct-dependencies-section.ts";
+import { frameTicks } from "./report-sections/frame-ticks.ts";
 import { looseEndsSectionOf } from "./report-sections/loose-ends-section.ts";
 import { mostSuppressedLintRulesSectionOf } from "./report-sections/most-suppressed-lint-rules-section.ts";
 import type { ReportSection } from "./report-sections/shared/report-section.ts";
@@ -25,7 +26,7 @@ import {
  * lives in its own file and is listed here by one call: porting a chart edits
  * that file, not this list.
  */
-const reportSectionsOf = (
+const listReportSections = (
   data: DashboardData,
   maxContributorsInCharts: number,
 ): ReportSection[] => {
@@ -40,7 +41,7 @@ const reportSectionsOf = (
             ...linesTimelineHeading,
             annotation: data.config?.charts?.annotations?.["lines-of-code"],
           },
-          view: (h) => LinesTimeline(h, data),
+          view: (h, key) => LinesTimeline(h, data).key(key),
         }
       : undefined,
     // The same timeline at the file grain, directly under its line-grain
@@ -52,7 +53,7 @@ const reportSectionsOf = (
       ? {
           id: "number-of-files",
           skeleton: undefined,
-          view: (h) => FilesTimeline(h, data),
+          view: (h, key) => FilesTimeline(h, data).key(key),
         }
       : undefined,
     commitCalendarSectionOf(data),
@@ -67,8 +68,34 @@ const reportSectionsOf = (
   return sections.filter((section) => section !== undefined);
 };
 
-const ReportSectionsMessage = UiSchema.TaggedEnum({
-  PaintedFrame: {},
+const reportSectionsCache = new WeakMap<
+  DashboardData,
+  Map<number, ReportSection[]>
+>();
+
+/**
+ * {@link listReportSections}, built once per data: the view and the
+ * subscriptions both ask on every reveal step, and the headings scan every
+ * commit.
+ */
+export const reportSectionsOf = (
+  data: DashboardData,
+  maxContributorsInCharts: number,
+): ReportSection[] => {
+  const byMax =
+    reportSectionsCache.get(data) ?? new Map<number, ReportSection[]>();
+  reportSectionsCache.set(data, byMax);
+  const cached = byMax.get(maxContributorsInCharts);
+  if (cached) {
+    return cached;
+  }
+  const sections = listReportSections(data, maxContributorsInCharts);
+  byMax.set(maxContributorsInCharts, sections);
+  return sections;
+};
+
+export const ReportSectionsMessage = UiSchema.TaggedEnum({
+  TickedFrame: {},
 });
 
 /**
@@ -82,10 +109,11 @@ const ReportSectionsMessage = UiSchema.TaggedEnum({
  * The React dashboard gets there with a deferred render and a recursive
  * component that reveals inside a transition, so a click on a visible section
  * can jump the queue. Effect UI renders synchronously and has no transitions,
- * so the reveal is a counter in the Model, advanced by an animation-frame
- * Subscription that runs only while sections are still hidden. A frame is
- * short and each section's render is small, so the page stays interactive
- * between steps all the same.
+ * so the reveal is a counter in the Model, advanced by a Subscription that
+ * ticks once per frame (see `frame-ticks.ts`, which keeps ticking in a hidden
+ * tab) and runs only while sections are still hidden. A frame is short and
+ * each section's render is small, so the page stays interactive between steps
+ * all the same.
  */
 export const ReportSections = Html.component({
   name: "ReportSections",
@@ -98,13 +126,14 @@ export const ReportSections = Html.component({
 }).make({
   init: () => ({ revealed: 0 }),
   update: {
-    PaintedFrame: ($) => $.evolve({ revealed: (revealed) => revealed + 1 }),
+    TickedFrame: ($) => $.evolve({ revealed: (revealed) => revealed + 1 }),
   },
   subscriptions: ({ model, props }) => [
     model.revealed <
       reportSectionsOf(props.data, props.maxContributorsInCharts).length &&
-      HtmlSubscription.onAnimationFrame(() =>
-        ReportSectionsMessage.PaintedFrame(),
+      Subscription.make(
+        "frameTicks",
+        frameTicks.pipe(Stream.map(() => ReportSectionsMessage.TickedFrame())),
       ),
   ],
   view: (h, model) => {
@@ -119,12 +148,15 @@ export const ReportSections = Html.component({
     // Effect UI tells apart by component (and key), not by position, so one
     // keeps its Model as the sections before it come and go.
     return h.div(
-      sections.slice(0, model.revealed).map((section) => section.view(h)),
+      sections
+        .slice(0, model.revealed)
+        .map((section) => section.view(h, section.id)),
       next === undefined
         ? undefined
-        : next.skeleton
-          ? SectionHeadingSkeleton(h, next.skeleton)
-          : SectionSkeleton(h),
+        : (next.skeleton
+            ? SectionHeadingSkeleton(h, next.skeleton)
+            : SectionSkeleton(h)
+          ).key(`skeleton-${next.id}`),
     );
   },
 });

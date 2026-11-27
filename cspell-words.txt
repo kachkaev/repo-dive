@@ -140,6 +140,7 @@ undashed
 unittests
 unparseable
 unscanned
+unstub
 utf
 VCS
 VCSs

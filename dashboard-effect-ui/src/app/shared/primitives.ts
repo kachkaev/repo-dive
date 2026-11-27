@@ -151,15 +151,19 @@ export const StatTile = <M>(
         : undefined,
     );
 
-/** One table cell: plain text, a number, or markup such as a linked name. */
-type DataTableCell<M> = string | number | View.Content<M>;
+/**
+ * One table cell: plain text, a number, or markup such as a linked name —
+ * one node, or several placed side by side in the cell.
+ */
+type DataTableCell<M> =
+  string | number | View.Content<M> | View.Children<M, never>;
 
 /**
  * A "View data" table behind a closed `<details>`. The body can hold
  * thousands of rows (one per commit), so build it inside `h.lazy` at the call
- * site, keyed on the rows' source array: the section's own re-renders (a
- * control flipping the chart) then reuse the table's nodes untouched instead
- * of diffing every row. The React dashboard defers the rows with
+ * site, with the rows' source as the first argument: the section's own
+ * re-renders (a control flipping the chart) then reuse the table's nodes
+ * untouched instead of diffing every row. The React dashboard defers the rows with
  * `useDeferredValue` for the same reason; Effect UI renders synchronously, so
  * memoizing them is what keeps a click cheap.
  */

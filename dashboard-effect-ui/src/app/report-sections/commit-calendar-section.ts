@@ -2,7 +2,11 @@ import { UiSchema } from "@effect/ui";
 import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
-import { type ContributorKind, DashboardDataSchema } from "../../data.ts";
+import {
+  type ContributorKind,
+  type DashboardData,
+  DashboardDataSchema,
+} from "../../data.ts";
 import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import {
   KindFilterControl,
@@ -80,7 +84,6 @@ const CommitCalendarSection = Html.component({
     const commitKinds = new Set<ContributorKind>(
       data.commits.map((commit) => commit.kind ?? "human"),
     );
-    const isHistoryRange = Schema.is(HistoryRangeSchema);
     return Section(h, {
       ...commitCalendarHeading(
         data.config?.charts?.annotations?.["commit-calendar"],
@@ -102,9 +105,7 @@ const CommitCalendarSection = Html.component({
           },
           onEmit: {
             Picked: ({ value }) =>
-              isHistoryRange(value)
-                ? CommitCalendarSectionMessage.PickedRange({ range: value })
-                : undefined,
+              CommitCalendarSectionMessage.PickedRange({ range: value }),
           },
         }),
       ],
@@ -123,7 +124,7 @@ const CommitCalendarSection = Html.component({
 });
 
 export const commitCalendarSectionOf = (
-  data: typeof DashboardDataSchema.Type,
+  data: DashboardData,
 ): ReportSection | undefined =>
   data.repo.firstCommitDate !== undefined && data.commits.length > 0
     ? {
@@ -131,6 +132,6 @@ export const commitCalendarSectionOf = (
         skeleton: commitCalendarHeading(
           data.config?.charts?.annotations?.["commit-calendar"],
         ),
-        view: (h) => CommitCalendarSection(h, { props: { data } }),
+        view: (h, key) => CommitCalendarSection(h, { key, props: { data } }),
       }
     : undefined;

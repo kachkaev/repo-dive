@@ -767,59 +767,70 @@ test
     },
   );
 
-test
-  .skipIf(!effectUiDashboardBuilt)
-  .concurrent("dashboard --ui effect serves the Effect UI build", async () => {
+/**
+ * Starts a CLI invocation that ends up serving a dashboard and resolves once
+ * it says where. The caller kills the child.
+ */
+async function spawnServing(args: readonly string[]) {
+  const server = spawn(process.execPath, ["src/cli.ts", ...args], {
+    cwd: rootDirectory,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Timed out. Output so far:\n${output}`));
+    }, 30_000);
+    server.stdout.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+      if (output.includes("Serving on")) {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+    server.stderr.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+    server.on("exit", () => {
+      clearTimeout(timer);
+      reject(new Error(`Exited before serving. Output:\n${output}`));
+    });
+  });
+  return server;
+}
+
+test.skipIf(!effectUiDashboardBuilt).concurrent.each([
+  { command: "dashboard", indexFirst: true, firstPort: 4990 },
+  { command: "the bare pipeline", indexFirst: false, firstPort: 4995 },
+])(
+  "$command with --ui effect serves the Effect UI build",
+  async ({ indexFirst, firstPort }) => {
     const repoPath = createFixtureRepo();
-    const port = 4990 + Math.floor(Math.random() * 9);
+    const port = firstPort + Math.floor(Math.random() * 5);
 
     try {
-      await runCli(
-        "scan",
-        "--repo",
-        repoPath,
-        "--collectors",
-        "commit-meta,churn",
-      );
-      await runCli("index", "--repo", repoPath);
-
-      const server = spawn(
-        process.execPath,
-        [
-          "src/cli.ts",
-          "dashboard",
+      if (indexFirst) {
+        await runCli(
+          "scan",
           "--repo",
           repoPath,
-          "--port",
-          String(port),
-          "--ui",
-          "effect",
-        ],
-        { cwd: rootDirectory, stdio: ["ignore", "pipe", "pipe"] },
-      );
+          "--collectors",
+          "commit-meta,churn",
+        );
+        await runCli("index", "--repo", repoPath);
+      }
 
+      const server = await spawnServing([
+        ...(indexFirst ? ["dashboard"] : []),
+        "--repo",
+        repoPath,
+        "--port",
+        String(port),
+        "--no-open",
+        "--ui",
+        "effect",
+      ]);
       try {
-        let output = "";
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => {
-            reject(new Error(`Timed out. Output so far:\n${output}`));
-          }, 30_000);
-          server.stdout.on("data", (chunk: Buffer) => {
-            output += chunk.toString();
-            if (output.includes("Serving on")) {
-              clearTimeout(timer);
-              resolve();
-            }
-          });
-          server.stderr.on("data", (chunk: Buffer) => {
-            output += chunk.toString();
-          });
-          server.on("exit", () => {
-            clearTimeout(timer);
-            reject(new Error(`Dashboard exited early. Output:\n${output}`));
-          });
-        });
-
         const response = await fetch(`http://localhost:${port}/`);
         expect(response.ok).toBe(true);
         expect(await response.text()).toBe(
@@ -839,7 +850,8 @@ test
     } finally {
       rmSync(repoPath, { force: true, recursive: true });
     }
-  });
+  },
+);
 
 test.concurrent("--ui rejects an unknown dashboard", async () => {
   const result = await runCli("report", "--ui", "vue");

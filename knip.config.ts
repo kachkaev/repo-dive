@@ -5,6 +5,16 @@ export default {
   // Example configs are copied into the analyzed clone by the examples
   // workflow rather than imported from anywhere in this repo.
   ignore: ["examples/*/repo-dive.config.ts"],
+  // TEMPORARY: what the Effect UI dashboard's chart ports draw with in place
+  // of visx (at the versions visx already pins), added ahead of them so the
+  // parallel ports don't each touch the lockfile. Drop once a chart imports
+  // them.
+  ignoreDependencies: [
+    "@types/d3-scale",
+    "@types/d3-shape",
+    "d3-scale",
+    "d3-shape",
+  ],
   ignoreIssues: {
     // Verbatim copies of the React dashboard's pure helpers: the Effect UI
     // port keeps them whole so the remaining chart ports can use the rest of

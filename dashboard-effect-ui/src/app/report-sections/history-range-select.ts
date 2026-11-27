@@ -4,16 +4,17 @@ import { Select } from "@effect/ui-kit";
 import { Schema } from "effect";
 
 import { SelectView } from "../shared/@ui-primitive/select.ts";
+import { HistoryRangeSchema } from "./shared/history-ranges.ts";
 
-const HistoryRangeSelectMessage = UiSchema.TaggedEnum({
+export const HistoryRangeSelectMessage = UiSchema.TaggedEnum({
   RequestedOpenSelect: {},
   RequestedCloseSelect: {},
   PickedSelectChoice: { value: Schema.String },
 });
 
 /** What the select asks of its section: show this range instead. */
-const HistoryRangeSelectEvents = UiSchema.TaggedEnum({
-  Picked: { value: Schema.String },
+export const HistoryRangeSelectEvents = UiSchema.TaggedEnum({
+  Picked: { value: HistoryRangeSchema },
 });
 
 /**
@@ -31,9 +32,9 @@ export const HistoryRangeSelect = Html.component({
      * …) make the purpose plain, so it is not rendered.
      */
     label: Schema.String,
-    value: Schema.String,
+    value: HistoryRangeSchema,
     items: Schema.Array(
-      Schema.Struct({ value: Schema.String, label: Schema.String }),
+      Schema.Struct({ value: HistoryRangeSchema, label: Schema.String }),
     ),
   }),
   model: Schema.Struct({ open: Schema.Boolean }),
@@ -45,12 +46,16 @@ export const HistoryRangeSelect = Html.component({
   update: {
     RequestedOpenSelect: ($) => $.evolve({ open: true }),
     RequestedCloseSelect: ($) => $.evolve({ open: false }),
-    // A range select always has a value: an empty pick (the cleared state)
-    // is ignored.
-    PickedSelectChoice: ($, { value }) =>
-      value === "" || value === $.props.value
+    // A range select always has a value: an empty pick (the cleared state),
+    // and a pick of the range on show, ask for nothing. The value comes back
+    // from ui-kit as a plain string, so it is looked up among the items,
+    // which also types it.
+    PickedSelectChoice: ($, { value }) => {
+      const item = $.props.items.find((candidate) => candidate.value === value);
+      return item === undefined || item.value === $.props.value
         ? $.model
-        : $.emit(HistoryRangeSelectEvents.Picked({ value })),
+        : $.emit(HistoryRangeSelectEvents.Picked({ value: item.value }));
+    },
   },
   view: (h, model) =>
     // A fixed-width slot for the trigger, which keeps hugging its own value:
@@ -68,18 +73,18 @@ export const HistoryRangeSelect = Html.component({
         align: "center",
         alignItemWithTrigger: false,
       },
-      // Each event the select asks for maps to a fact of this component's own;
-      // `Settled` (the popup's transitions ended) needs no answer.
-      onEmit: (event) =>
-        event._tag === "RequestedOpen"
-          ? HistoryRangeSelectMessage.RequestedOpenSelect()
-          : event._tag === "RequestedClose"
-            ? HistoryRangeSelectMessage.RequestedCloseSelect()
-            : event._tag === "Picked" && typeof event.value === "string"
-              ? HistoryRangeSelectMessage.PickedSelectChoice({
-                  value: event.value,
-                })
-              : undefined,
+      onEmit: {
+        RequestedOpen: () => HistoryRangeSelectMessage.RequestedOpenSelect(),
+        RequestedClose: () => HistoryRangeSelectMessage.RequestedCloseSelect(),
+        Picked: ({ value }) =>
+          typeof value === "string"
+            ? HistoryRangeSelectMessage.PickedSelectChoice({ value })
+            : undefined,
+        // The record names every event; the popup's transitions ending needs
+        // no answer.
+        // eslint-disable-next-line unicorn/no-useless-undefined -- an event mapped to no message
+        Settled: () => undefined,
+      },
       // The slot also holds the popup and its backdrop: a view returns one
       // node, and both live in the top layer, outside the slot's layout.
       view: (select) =>

@@ -2,7 +2,11 @@ import { UiSchema } from "@effect/ui";
 import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
-import { type ContributorKind, DashboardDataSchema } from "../../data.ts";
+import {
+  type ContributorKind,
+  type DashboardData,
+  DashboardDataSchema,
+} from "../../data.ts";
 import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import {
   type KindFilter,
@@ -44,12 +48,12 @@ const commitKindsOfFilter: Record<
   bot: ["bot"],
 };
 
-const CommitsPerMonthSectionMessage = UiSchema.TaggedEnum({
+export const CommitsPerMonthSectionMessage = UiSchema.TaggedEnum({
   ToggledKindFilter: { kindFilter: KindFilterSchema },
   ToggledPercent: { percent: Schema.Boolean },
 });
 
-const CommitsPerMonthSection = Html.component({
+export const CommitsPerMonthSection = Html.component({
   name: "CommitsPerMonthSection",
   props: Schema.Struct({ data: DashboardDataSchema }),
   model: Schema.Struct({
@@ -120,11 +124,11 @@ const CommitsPerMonthSection = Html.component({
 });
 
 export const commitsPerMonthSectionOf = (
-  data: typeof DashboardDataSchema.Type,
+  data: DashboardData,
 ): ReportSection => ({
   id: "commits-per-month",
   skeleton: commitsPerMonthHeading(
     data.config?.charts?.annotations?.["commits-per-month"],
   ),
-  view: (h) => CommitsPerMonthSection(h, { props: { data } }),
+  view: (h, key) => CommitsPerMonthSection(h, { key, props: { data } }),
 });

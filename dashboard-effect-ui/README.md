@@ -51,17 +51,19 @@ src/
     ├── report-sections/
     │   ├── <name>-section.ts       # one file per section: heading, controls, chart call
     │   ├── history-range-select.ts # ported (ui-kit Select)
+    │   ├── frame-ticks.ts          # the reveal's clock: animation frames, or a task loop while hidden
     │   ├── contributors-in-range.ts (+ test, copied)
     │   └── shared/                 # what several sections share: ReportSection, ranges, monthly buckets, decimate
     ├── bar-list.ts                 # ported — the reference chart
     ├── lines-timeline.ts           # placeholder around SurvivalTimeline
     ├── files-timeline.ts           # placeholder around SurvivalTimeline
     └── shared/
-        ├── @ui-primitive/          # tooltip, select, toggle-group: ui-kit parts with the shadcn classes
+        ├── @ui-primitive/          # tooltip, select, toggle-group: ui-kit parts with the shadcn classes; shared/top-layer-reset.ts
         ├── primitives.ts           # Section, SectionSkeleton, StatTile, DataTable
         ├── markdown.ts, icons.ts, format.ts, history-range.ts, stacked-series.ts, …
         ├── measure-width.ts        # MeasureWidth mount (the React useMeasuredWidth)
         ├── track-pointer.ts        # TrackPointer mount (the React charts' onMouseMove)
+        ├── dashboard-data-fixture.ts # a small dashboard.json for tests
         └── chart-placeholder.ts    # TEMPORARY, deleted with the last placeholder
 ```
 
@@ -73,10 +75,12 @@ A chart port adds its file where the React one lives (`app/time-stack-chart.ts`,
 - `App` declares the `LoadDashboardData` query (in `data.ts`) and renders `AsyncResult.match` over it: nothing while it loads, the error page on failure, the report on success.
   The query reads the inlined `window.__REPO_DIVE_DATA__` of a `repo-dive report` export, or fetches `./dashboard.json`.
   `DashboardDataSchema` declares the shape rather than validating it, as the React app casts it.
-- `ReportSections` lists every section in reading order (`reportSectionsOf`) and reveals one per animation frame, showing the next section's heading over a spinner meanwhile, like the React `RevealSequentially`.
-- Each section lives in `report-sections/<name>-section.ts` and exports one `<name>SectionOf(data)` that returns a `ReportSection` (or `undefined` when the repo has nothing for it):
+- `ReportSections` lists every section in reading order (`reportSectionsOf`, built once per data) and reveals one per frame, showing the next section's heading over a spinner meanwhile, like the React `RevealSequentially`.
+  The frames come from `frame-ticks.ts`: animation frames while the page is shown, and a `MessageChannel` task loop while it is hidden, which browsers don't throttle the way they throttle timers, so a report opened in a background tab is complete when shown.
+- Each section lives in `report-sections/<name>-section.ts` and exports one `<name>SectionOf(data: DashboardData)` that returns a `ReportSection` (or `undefined` when the repo has nothing for it):
+  - `id`: the section's chart annotation id, which also keys its node.
   - `skeleton`: the heading the reveal shows before the section arrives.
-  - `view`: draws the section — a `Section(h, …)` view for stateless sections, or the section's own component when it has controls.
+  - `view(h, key)`: draws the section — a `Section(h, …).key(key)` view for stateless sections, or the section's own component (`Name(h, { key, props })`) when it has controls.
 - A section with controls is a component whose Model holds the controls' values (kind filter, percent mode, range).
   In React that state lives in `ReportSections`; here each section owns it, so a chart port touches only its own section file.
 
@@ -120,6 +124,10 @@ export const DivergingBars = Html.component({
 - Derive everything else in `view` from props and Model, as the React component derives it on every render.
   Effect UI has no `useMemo`: wrap expensive, rarely changing subtrees (the marks of a dense series, a "View data" table) in `h.lazy(fn, firstArg, ...args)`, which rebuilds only when an argument changes by `===`.
   Keep hover-dependent drawing (crosshair, hover card) outside those lazy subtrees.
+- **Give every `h.lazy` call in one component instance its own first argument.**
+  The runtime keeps one cached node per first argument, so two calls that share it (the same `listedContributors` for a table and a chart, say) evict each other and rebuild on every render.
+  When two subtrees are built from the same data, lead one with a constant such as `h.lazy(Bars, "bars", rows, filter)`.
+  Make sure each argument keeps its identity across renders: compute derived arrays once per input (a module-level `WeakMap` keyed by `data`, as `listedContributorsOf` in `contributors-section.ts` and `reportSectionsOf` do), never fresh in `view`.
 - Props equality is shallow with a reference check first, so pass the same arrays on every render where possible (from `data`, or from a lazy builder) and keep large derived arrays out of props.
 - Data that is the same everywhere, such as `data`, travels as a prop typed with `DashboardDataSchema`.
 - The section calls the chart with its props and maps its events, if it has any, to its own messages:
@@ -146,7 +154,7 @@ h.svg
   );
 ```
 
-For scales and shapes, use what visx wraps — `d3-scale`, `d3-shape` (curves, stacks) — added as devDependencies by the first chart port that needs them; it is already in the lockfile through visx, at the same versions.
+For scales and shapes, use what visx wraps: `d3-scale` and `d3-shape` (curves, stacks), with their `@types/*`, are already devDependencies at the versions visx pins (with a temporary `knip.config.ts` exception until a chart imports them).
 Re-implement visx's axis and grid as plain view functions over the scale's `ticks()`, copying the React chart's tick props (font size, color, anchor) into SVG attributes.
 `useId()` (for `<pattern>` and `<clipPath>` ids) becomes `h.id("hatch")`, unique per instance.
 
@@ -192,6 +200,10 @@ h.rect
 Keep only what the view needs in the Model — the hovered index, not the raw position.
 Elements whose own hover is all CSS (`hover:` classes) need nothing at all, as in `bar-list.ts`.
 
+Each pointer move is a message and a render of the chart's view.
+That is cheap when the marks are in `h.lazy` and only the crosshair and the hover card change, and when `update` returns the Model unchanged for a move that keeps the same hovered index.
+If a chart still lags, coalesce the moves: keep the last position in the mount and report it at most once per animation frame (a `requestAnimationFrame` in `TrackPointer`'s listener, or a variant of it), as browsers deliver `mousemove` far more often than they paint.
+
 The crosshair (`shared/crosshair-line.tsx`) and the hover card are plain elements next to the `<svg>`, positioned with inline styles from the Model, exactly as in React; port them as view functions.
 Keep the crosshair's `will-change-transform` overlay: the reason it exists (repainting the marks under it) holds in any framework.
 
@@ -203,7 +215,8 @@ Keep the crosshair's `will-change-transform` overlay: the reason it exists (repa
   See `report-header.ts`.
 - **A tooltip that follows the hovered mark** (the calendar's day cells) is controlled by the chart: keep `open` and the hovered item in the chart's Model, give the hovered element an `id`, and call `@effect/ui-kit`'s `Tooltip` directly with `props: { open, anchor: thatId, … }` and its `RequestedOpen` / `RequestedClose` events mapped to the chart's messages.
   Draw its positioner and popup with the same markup as `TooltipContent` in `tooltip.ts`; export that function when the first chart needs it.
-- `@effect/ui-kit` places popups in the top layer as manual popovers, not in a portal: a popup inherits text styles from where it is written, so reset any that the React portal would not carry (see `TooltipContent`).
+- `@effect/ui-kit` places popups in the top layer as manual popovers, not in a portal: a popup inherits text styles from where it is written.
+  Give every positioner and backdrop `topLayerReset` from `shared/@ui-primitive/shared/top-layer-reset.ts`, which undoes the browser's popover box and the inherited styles a portal on `<body>` would not carry.
 - The native `title` attribute stays a native `title`, as in React (`bar-list.ts`, disabled segmented options).
 
 ### Controls and other primitives
@@ -226,6 +239,19 @@ Draw each part with the classes and `data-slot` attributes the React primitive r
 A component that owns nothing but an open state the caller never needs (a select's popup, a tooltip) wraps the ui-kit component once, as `HistoryRangeSelect` and `Tooltip` do.
 Several headless children in one component need distinct `key`s.
 
+### Testing
+
+Tests sit next to what they test, as `*.test.ts`, and run with the rest of the repo's in `pnpm test` (Vitest, with `it.effect` from `@effect/vitest`).
+
+- **Logic** goes in a `Story` from `@effect/ui/testing`: `Story.make(Component, props)` runs `init`, `s.send(message)` runs `update`, and `s.model`, `s.subscriptions` (by key) and `s.emitted(event)` say what happened.
+  Nothing runs: no host, no Subscriptions, no Commands, and no DOM is needed.
+  The test fails at the end if an event was emitted that it didn't acknowledge with `s.emitted`, so a story that sends messages and acknowledges nothing proves that none emitted.
+  See `history-range-select.test.ts`, `report-sections.test.ts` and `commits-per-month-section.test.ts`.
+- **What the user sees and does** goes in an `HtmlScene` from `@effect/ui/html/testing` (clicks, typing, locators, `expectMount`), and **mounts and other DOM code** in a real `BrowserHost.mountEffect` under `// @vitest-environment happy-dom` with `it.live` (see `measure-width.test.ts`, `track-pointer.test.ts` and `frame-ticks.test.ts`).
+  happy-dom lays nothing out: stub what the browser would measure.
+- Build test data with `dashboardDataOf()` from `shared/dashboard-data-fixture.ts`, overriding what the section under test needs.
+- Pure helpers get plain `test(...)` from Vitest, as in the React dashboard.
+
 ### Replacing a placeholder
 
 1.  Port the chart into its own file under `src/app/`, with its helpers in a folder of the same name, and copy the pure helpers it needs from `../dashboard` verbatim (with their tests).
@@ -242,7 +268,7 @@ Ported:
 - `main.tsx`, `app.tsx` → `main.ts`, `app.ts` (data loading, loading and error states, stat tiles)
 - `data.ts` (types copied; the loader is the `LoadDashboardData` query)
 - `app/report-header.tsx`
-- `app/report-sections.tsx` (page structure, every section with its title, subtitle, annotation, controls and "View data" table)
+- `app/report-sections.tsx` (page structure, every section with its title, subtitle and annotation; every section's controls and "View data" table except those of "Lines of code" and "Number of files", which come with `SurvivalTimeline`)
 - `app/report-sections/history-range-select.tsx`, `app/report-sections/contributors-in-range.ts`
 - `app/bar-list.tsx`
 - `app/shared/primitives.tsx` (`Section`, `SectionSkeleton`, `StatTile`, `DataTable`), `markdown.tsx`, `segmented-control.tsx`, `use-measure.ts`
@@ -250,22 +276,20 @@ Ported:
 - `app/shared/@ui-primitive/tooltip.tsx`, `select.tsx`, `toggle-group.tsx`
 - `app/shared/format.ts`, `history-range.ts`, `stacked-series.ts` (copied)
 
-Still placeholders, in the order of the follow-up PRs:
+Still placeholders, by follow-up PR (a, b and c run in parallel; d follows a):
 
-- [ ] `app/time-stack-chart.tsx` — commits per month, direct dependencies, dependencies, loose ends (with `shared/crosshair-line.tsx`, `shared/time-axis.ts`, `shared/bar-path.ts`, `Legend` and `Swatch` from `primitives.tsx`, `DateStamp`)
-- [ ] `app/lines-timeline.tsx`, `app/files-timeline.tsx` — headings ported, the chart is `SurvivalTimeline`
-- [ ] `app/activity-calendar.tsx` — commit calendar (with `@ui-primitive/scroll-area.tsx`)
-- [ ] `app/diverging-bars.tsx` — churn per month
-- [ ] `app/survival-timeline.tsx` — lines of code, number of files (with `shared/survival-colors.tsx`, `shared/category-colors.ts`)
-- [ ] `app/contributor-bars.tsx` — contributors (with the rest of `shared/contributor-kinds.tsx`)
+- [ ] **a:** `app/time-stack-chart.tsx` with `shared/crosshair-line.tsx`, `shared/time-axis.ts`, `shared/bar-path.ts`, and `Legend`, `Swatch` and `DateStamp` from `primitives.tsx` — the commits per month, direct dependencies, dependencies and loose ends sections
+- [ ] **b:** `app/activity-calendar.tsx` (with `@ui-primitive/scroll-area.tsx`) and `app/diverging-bars.tsx` — the commit calendar and churn per month sections
+- [ ] **c:** `app/contributor-bars.tsx` with the rest of `shared/contributor-kinds.tsx` — the contributors section
+- [ ] **d:** `app/survival-timeline.tsx` with `shared/survival-colors.tsx` and `shared/category-colors.ts`, then `app/lines-timeline.tsx` and `app/files-timeline.tsx` (headings ported) — the lines of code and number of files sections, with their controls and "View data" tables
 
 ## Deviations from the React dashboard
 
 - **No fragments.**
   A view, and a headless component's view closure, returns one node.
   `ReportSections` wraps the sections in a `<div>` (their margins collapse through it, so the layout is unchanged), and each tooltip wraps its trigger and card in a `<span>`.
-- **The reveal runs on animation frames.**
-  React reveals a section per commit inside a transition; here a Subscription advances a counter on each animation frame, so a tab opened in the background reveals the rest when it is shown.
+- **The reveal runs on its own clock.**
+  React reveals a section per commit inside a transition; here a Subscription advances a counter on each animation frame, or on each turn of a `MessageChannel` task loop while the tab is hidden.
 - **Synchronous re-renders.**
   React defers heavy re-renders (`useDeferredValue`) and dims the stale chart (`StaleOverlay`); Effect UI has no concurrent rendering, so expensive subtrees are memoized with `h.lazy` instead and nothing is ever stale.
 - **Tooltip triggers.**
@@ -273,4 +297,7 @@ Still placeholders, in the order of the follow-up PRs:
 - **Tooltip exit.**
   The card fades and scales in through `@starting-style`, but closes at once: ui-kit's Tooltip hides its popover as soon as `open` turns false and has no `holdExit` for an exit transition.
 - **Popover placement.**
-  ui-kit writes the tooltip and select positioners next to their triggers in the top layer instead of in a portal on `<body>`; the popups reset inherited text styles to match.
+  ui-kit writes the tooltip and select positioners next to their triggers in the top layer instead of in a portal on `<body>`; `topLayerReset` undoes what they would inherit there.
+- **Select highlight.**
+  The highlighted option follows the pointer from option to option, as Base UI's does, but ui-kit highlights an option only as the pointer enters it.
+  With the pointer resting on an option, ArrowDown moves the highlight to the next one and leaves it there while the pointer moves within the first; Base UI keeps the highlight on the option under the pointer.

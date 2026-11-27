@@ -11,21 +11,19 @@
  * Deviations from the React primitive: only the `xs` trigger size exists
  * (the only one the dashboard draws), the popup always sits below the trigger
  * (`alignItemWithTrigger: false`, as the React primitive defaults to), and
- * the positioner and backdrop reset the styles a browser gives every popover,
- * since ui-kit places them in the top layer instead of a portal.
+ * the positioner and backdrop take `topLayerReset`, since ui-kit places them
+ * in the top layer where the view writes them instead of in a portal.
  */
 import type { Html } from "@effect/ui/html";
 import type { Select } from "@effect/ui-kit";
 
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "../icons.ts";
+import { topLayerReset } from "./shared/top-layer-reset.ts";
 
 /** The parts of a ui-kit Select. */
 type SelectParts = Parameters<
   NonNullable<Parameters<typeof Select>[1]["view"]>
 >[0];
-
-/** Resets what a browser gives every popover; ui-kit places the box itself. */
-const popoverReset = "overflow-visible border-0 bg-transparent p-0";
 
 const scrollArrowClass =
   "absolute z-10 flex w-full cursor-default items-center justify-center bg-popover py-1";
@@ -60,8 +58,8 @@ export const SelectView = <M>(
       ),
       select.icon(h.span).children(ChevronDownIcon(h)),
     ),
-  select.backdrop(h.div.class(popoverReset)),
-  select.positioner(h.div.class(`isolate z-50 ${popoverReset}`)).children(
+  select.backdrop(h.div.class(topLayerReset)),
+  select.positioner(h.div.class(`isolate z-50 ${topLayerReset}`)).children(
     select
       .popup(
         h.div

@@ -41,14 +41,17 @@ const mimeTypes: Record<string, string> = {
 };
 
 /**
- * Which build of the dashboard to serve or export. Both read the same
- * dashboard.json: `react` is the dashboard itself, `effect` an experimental
- * port to Effect UI that lives in dashboard-effect-ui/ and is built next to it.
+ * The builds of the dashboard there are to serve or export. Both read the
+ * same dashboard.json: `react` is the dashboard itself, `effect` an
+ * experimental port to Effect UI that lives in dashboard-effect-ui/ and is
+ * built next to it.
  */
-export type DashboardUi = "react" | "effect";
+const dashboardUiOptions = ["react", "effect"] as const;
+
+export type DashboardUi = (typeof dashboardUiOptions)[number];
 
 /** The `--ui` flag, shared by every command that serves or exports the dashboard. */
-export const dashboardUiFlag = Flag.Literals("ui", ["react", "effect"]).pipe(
+export const dashboardUiFlag = Flag.Literals("ui", dashboardUiOptions).pipe(
   Flag.withDefault("react"),
   Flag.withDescription(
     "Which dashboard to use: react, or effect for the experimental Effect UI port (default: react)",
@@ -61,7 +64,11 @@ const assetsDirNames: Record<DashboardUi, string> = {
   effect: "dashboard-effect-ui",
 };
 
-/** Bundled build: dist/cli.js + dist/dashboard/. Dev: src/cli/shared/… + dist/dashboard/. */
+/**
+ * Where the build of `ui` lives: next to the bundled CLI (dist/cli.js +
+ * dist/dashboard/ or dist/dashboard-effect-ui/), or, when the CLI runs from
+ * source (src/cli/shared/…), in the repo's dist/. Undefined until built.
+ */
 export const resolveAssetsDir = (ui: DashboardUi): string | undefined => {
   const dirName = assetsDirNames[ui];
   const candidates = [

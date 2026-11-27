@@ -2,7 +2,11 @@ import { UiSchema } from "@effect/ui";
 import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
-import { type ContributorKind, DashboardDataSchema } from "../../data.ts";
+import {
+  type ContributorKind,
+  type DashboardData,
+  DashboardDataSchema,
+} from "../../data.ts";
 import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import {
   KindFilterControl,
@@ -72,12 +76,10 @@ const ChurnPerMonthSection = Html.component({
   },
 });
 
-export const churnPerMonthSectionOf = (
-  data: typeof DashboardDataSchema.Type,
-): ReportSection => ({
+export const churnPerMonthSectionOf = (data: DashboardData): ReportSection => ({
   id: "churn-per-month",
   skeleton: churnPerMonthHeading(
     data.config?.charts?.annotations?.["churn-per-month"],
   ),
-  view: (h) => ChurnPerMonthSection(h, { props: { data } }),
+  view: (h, key) => ChurnPerMonthSection(h, { key, props: { data } }),
 });

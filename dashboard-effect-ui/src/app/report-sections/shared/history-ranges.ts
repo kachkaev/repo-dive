@@ -3,18 +3,15 @@ import { Schema } from "effect";
 import type { DaySpan, HistoryRange } from "../../shared/history-range.ts";
 
 /**
- * A {@link HistoryRange} as a Model field: the sections that narrow their
- * chart to a range keep it in their Model, which Effect UI describes with a
- * Schema.
+ * A {@link HistoryRange} as a Schema, so the sections that narrow their chart
+ * to a range can keep it in their Model and the range select can carry it in
+ * its props and events.
  */
-export const HistoryRangeSchema = Schema.declare<HistoryRange>(
-  (input): input is HistoryRange =>
-    typeof input === "string" &&
-    /^(?:last-12-months|this-year|all-years|last-\d+-years|year-\d+)$/.test(
-      input,
-    ),
-  { title: "HistoryRange" },
-);
+export const HistoryRangeSchema: Schema.Codec<HistoryRange> = Schema.Union([
+  Schema.Literals(["last-12-months", "this-year", "all-years"]),
+  Schema.TemplateLiteral(["last-", Schema.Number, "-years"]),
+  Schema.TemplateLiteral(["year-", Schema.Number]),
+]);
 
 /**
  * The calendar's multi-year unit, in calendar years (one strip each). Every

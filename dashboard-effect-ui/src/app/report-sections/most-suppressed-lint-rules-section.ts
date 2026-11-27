@@ -20,7 +20,7 @@ export const mostSuppressedLintRulesSectionOf = (
   return {
     id: "most-suppressed-lint-rules",
     skeleton: heading,
-    view: (h) =>
+    view: (h, key) =>
       Section(h, {
         ...heading,
         children: [
@@ -33,6 +33,6 @@ export const mostSuppressedLintRulesSectionOf = (
             color: "var(--series-6)",
           }),
         ],
-      }),
+      }).key(key),
   };
 };
