@@ -6,6 +6,7 @@ import {
   ToggleGroupItemButton,
   ToggleGroupRoot,
 } from "./@ui-primitive/toggle-group.ts";
+import { cn } from "./cn.ts";
 
 export type SegmentedControlOption<Value extends string, M> = {
   value: Value;
@@ -57,7 +58,10 @@ export const SegmentedControl = <M, Value extends string>(
     view: (toggleGroup) =>
       toggleGroup
         .root(
-          ToggleGroupRoot(h, { label: options.label, className: "shrink-0" }),
+          ToggleGroupRoot(h, {
+            label: options.label,
+            class: cn("shrink-0"),
+          }),
         )
         .children(
           options.options.map((option) =>
@@ -69,8 +73,9 @@ export const SegmentedControl = <M, Value extends string>(
                   // "selected" signal; disabled options stay hoverable so
                   // their explanatory tooltip shows, but keep their resting
                   // style (hover is enabled-only).
-                  className:
-                    "not-data-pressed:enabled:hover:bg-transparent not-data-pressed:enabled:hover:text-(--text-secondary) not-data-pressed:text-(--text-muted) disabled:pointer-events-auto",
+                  class: cn(
+                    "not-data-pressed:text-(--text-muted) not-data-pressed:enabled:hover:bg-transparent not-data-pressed:enabled:hover:text-(--text-secondary) disabled:pointer-events-auto",
+                  ),
                 }).attr("title", option.title),
                 value: option.value,
               })

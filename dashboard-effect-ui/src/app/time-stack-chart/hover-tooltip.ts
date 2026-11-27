@@ -1,5 +1,6 @@
 import type { Html } from "@effect/ui/html";
 
+import { cn } from "../shared/cn.ts";
 import { formatMonth, formatPercent } from "../shared/format.ts";
 import { DateStamp, Swatch } from "../shared/primitives.ts";
 import type { PointUnit } from "../shared/time-axis.ts";
@@ -109,12 +110,14 @@ export const HoverTooltip = <M>(
   const cardWidth = supportsPercent ? 220 : 180;
   const { crosshairX, width } = options;
   const fitsLeftOfLine = crosshairX >= 10 + cardWidth;
-  const valueClass = `ml-auto pl-3 tabular-nums ${
-    showPercent ? "text-(--text-muted)" : "font-medium"
-  }`;
-  const shareClass = `min-w-9 pl-2 text-right tabular-nums ${
-    showPercent ? "font-medium" : "text-(--text-muted)"
-  }`;
+  const valueClass = cn(
+    "ml-auto pl-3 tabular-nums",
+    showPercent ? "text-(--text-muted)" : "font-medium",
+  );
+  const shareClass = cn(
+    "min-w-9 pl-2 text-right tabular-nums",
+    showPercent ? "font-medium" : "text-(--text-muted)",
+  );
   const body = () => {
     if (hovered === undefined) {
       // Nothing was collected at this instant — a genuine gap.
@@ -140,9 +143,10 @@ export const HoverTooltip = <M>(
               Swatch(h, {
                 color: entry.color,
                 hatch: entry.hatch,
-                className: hiddenLabels.has(entry.key)
-                  ? "inline-block size-2 rounded-xs opacity-35"
-                  : "inline-block size-2 rounded-xs",
+                class: cn(
+                  "inline-block size-2 rounded-xs",
+                  hiddenLabels.has(entry.key) && "opacity-35",
+                ),
               }),
               h.span
                 .class(
@@ -198,8 +202,8 @@ export const HoverTooltip = <M>(
       h.div
         .class(
           hovered
-            ? "mb-1 font-medium tabular-nums text-(--text-secondary)"
-            : "font-medium tabular-nums text-(--text-secondary)",
+            ? "mb-1 font-medium text-(--text-secondary) tabular-nums"
+            : "font-medium text-(--text-secondary) tabular-nums",
         )
         .children(
           options.pointUnit === "month"

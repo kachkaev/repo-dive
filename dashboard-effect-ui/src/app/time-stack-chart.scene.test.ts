@@ -6,6 +6,7 @@ import { it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import { Tooltip, TooltipEvents } from "./shared/@ui-primitive/tooltip.ts";
+import { cn } from "./shared/cn.ts";
 import { MeasureWidth } from "./shared/measure-width.ts";
 import { TrackPointer } from "./shared/track-pointer.ts";
 import { type SeriesGroup, TimeSeriesChart } from "./time-stack-chart.ts";
@@ -69,11 +70,13 @@ it.effect("crosses a hidden series out and sums what is still shown", () =>
         Locator.inside(
           Locator.attr(
             "class",
-            "pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm will-change-transform",
+            cn(
+              "pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm will-change-transform",
+            ),
           ),
           Locator.attr(
             "class",
-            "text-(--text-secondary) line-through opacity-60",
+            cn("text-(--text-secondary) line-through opacity-60"),
           ),
         ),
       )
@@ -135,7 +138,7 @@ it.effect("sums each group's sub-series and divides only between groups", () =>
     s.expectMount(MeasureWidth())
       .mounted(MeasureWidth, 600)
       .expectMount(TrackPointer())
-      .expect(Locator.attr("class", "visx-linepath"))
+      .expect(Locator.attr("class", cn("visx-linepath")))
       .toHaveCount(2)
       .mounted(TrackPointer, { x: plotX(10), y: 50 })
       // TypeScript 1 + 2, Markdown 3 + 4, CSS 5, of 15.
@@ -181,7 +184,7 @@ it.effect("sets a second legend apart below the first", () =>
         Locator.inside(
           Locator.attr(
             "class",
-            "mt-3 text-center text-xs text-balance text-(--text-secondary)",
+            cn("mt-3 text-center text-xs text-balance text-(--text-secondary)"),
           ),
           Locator.text("2026", { exact: true }),
         ),
@@ -191,7 +194,7 @@ it.effect("sets a second legend apart below the first", () =>
         Locator.inside(
           Locator.attr(
             "class",
-            "mt-2 text-center text-xs text-balance text-(--text-secondary)",
+            cn("mt-2 text-center text-xs text-balance text-(--text-secondary)"),
           ),
           Locator.text("b", { exact: true }),
         ),

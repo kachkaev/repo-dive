@@ -18,8 +18,9 @@ Read it with the React file you are changing open next to it.
   Copy a helper verbatim when a chart needs it; don't refactor it while porting.
 - **Same markup, same classes.**
   `src/styles.css` is a verbatim copy of the React one, and every element carries the classes and `data-*` attributes its React counterpart renders, so the pixels match.
-  When the React code computes a class with `cn(...)`, inspect the rendered DOM and paste the merged class string.
+  When the React code computes a class with `cn(...)`, inspect the rendered DOM and paste the merged class string; `pnpm fix:eslint` then sorts it.
   The semantic tokens and interaction conventions in the [editing-dashboard skill](../.agents/skills/editing-dashboard/SKILL.md) apply here as they do there.
+  Every class string is linted, and options that carry classes are named `class` or `…Class` after `.class(…)`: see "Class strings are linted" in that skill.
 - **Replicate first, improve later.**
   When Effect UI cannot reproduce a React behavior exactly, say so in a comment next to the code and add it to [Deviations](#deviations-from-the-react-dashboard).
 - `@effect/ui` and `@effect/ui-kit` are not on npm yet: both are installed from pkg.pr.new snapshots pinned to one Effect-TS/ui commit (see `package.json`), tracked in [#393](https://github.com/kachkaev/repo-dive/issues/393).
@@ -64,8 +65,9 @@ src/
     ├── survival-timeline.ts (+ survival-timeline/)  # SurvivalTimeline on TimeSeriesChart, with its controls
     ├── lines-timeline.ts, files-timeline.ts         # SurvivalTimeline for lines of code and number of files
     └── shared/
-        ├── @ui-primitive/          # tooltip, select, toggle-group, scroll-area: ui-kit parts with the shadcn classes; shared/top-layer-reset.ts
+        ├── @ui-primitive/          # tooltip, select, toggle-group, scroll-area: ui-kit parts with the shadcn classes; shared/top-layer-reset-class.ts
         ├── primitives.ts           # Section, SectionSkeleton, StatTile, DataTable
+        ├── cn.ts                   # cn: joins class strings (no tailwind-merge) so the linter sees them
         ├── cached-by.ts            # cachedBy: derived data cached per key object (+ further arguments), one slot per key
         ├── axes.ts                 # visx's GridRows, AxisLeft and AxisBottom as view functions
         ├── contributor-kinds.ts    # kinds, their colors and labels, KindFilterControl, the kind Schemas
@@ -230,7 +232,7 @@ Keep the crosshair's `will-change-transform` overlay: the reason it exists (repa
 - **A tooltip that follows the hovered mark** (the calendar's day cells) is controlled by the chart: keep `open` and the hovered item in the chart's Model, give the hovered element an `id`, and call `@effect/ui-kit`'s `Tooltip` directly with `props: { open, anchor: thatId, … }` and its `RequestedOpen` / `RequestedClose` events mapped to the chart's messages.
   Draw its positioner and popup with `TooltipContent(h, tooltip, content, { arrow: false })` from `tooltip.ts`, the counterpart of the React `TooltipContent` (`activity-calendar.tsx` passes `arrow={false}`); React's `anchor` is the ui-kit Tooltip's own `anchor` prop here.
 - `@effect/ui-kit` places popups in the top layer as manual popovers, not in a portal: a popup inherits text styles from where it is written.
-  Give every positioner and backdrop `topLayerReset` from `shared/@ui-primitive/shared/top-layer-reset.ts`, which undoes the browser's popover box and the inherited styles a portal on `<body>` would not carry.
+  Give every positioner and backdrop `topLayerResetClass` from `shared/@ui-primitive/shared/top-layer-reset-class.ts`, which undoes the browser's popover box and the inherited styles a portal on `<body>` would not carry.
 - The native `title` attribute stays a native `title`, as in React (`bar-list.ts`, disabled segmented options).
 
 ### Controls and other primitives
@@ -332,7 +334,7 @@ The charts, one PR each after the scaffold (#394):
 - **Tooltip exit.**
   The card fades and scales in through `@starting-style`, but closes at once: ui-kit's Tooltip hides its popover as soon as `open` turns false and has no `holdExit` for an exit transition.
 - **Popover placement.**
-  ui-kit writes the tooltip and select positioners next to their triggers in the top layer instead of in a portal on `<body>`; `topLayerReset` undoes what they would inherit there.
+  ui-kit writes the tooltip and select positioners next to their triggers in the top layer instead of in a portal on `<body>`; `topLayerResetClass` undoes what they would inherit there.
   It also places them at fractional pixels where Base UI rounds them, so a card (the calendar's day card, say) can sit half a pixel off.
 - **Select internals.**
   Base UI writes a hidden `<input>` after the trigger for forms, a redundant `tabindex="0"` on the trigger button, `data-base-ui-focusable` on the popup and its `base-ui-disable-scrollbar` class on the list (which does nothing there: the popup is what scrolls); ui-kit writes none of these, and marks the value span and each option's text with `data-select-value` and `data-select-item-text` instead.

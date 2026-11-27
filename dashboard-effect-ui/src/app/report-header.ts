@@ -3,6 +3,7 @@ import type { Html } from "@effect/ui/html";
 
 import type { DashboardData } from "../data.ts";
 import { Tooltip } from "./shared/@ui-primitive/tooltip.ts";
+import { cn } from "./shared/cn.ts";
 import { formatDate } from "./shared/format.ts";
 
 const repoDiveUrl = "https://github.com/kachkaev/repo-dive";
@@ -135,8 +136,9 @@ const RepoHeading = <M>(
 };
 
 /** The dotted underline that marks "this tooltip trigger is also a link". */
-const tooltipUnderline =
-  "underline decoration-dotted decoration-(--text-muted) underline-offset-4";
+const tooltipUnderlineClass = cn(
+  "underline decoration-(--text-muted) decoration-dotted underline-offset-4",
+);
 
 /**
  * A date whose exact meaning lives in a tooltip, optionally linking out. When
@@ -160,11 +162,14 @@ const AnnotatedDate = <M>(
     key: options.key,
     props:
       options.href === undefined
-        ? { delay: 200, triggerClass: "cursor-help whitespace-nowrap" }
+        ? { delay: 200, triggerClass: cn("cursor-help whitespace-nowrap") }
         : {
             delay: 200,
             href: options.href,
-            triggerClass: `${tooltipUnderline} cursor-pointer whitespace-nowrap hover:text-(--series-1)`,
+            triggerClass: cn(
+              tooltipUnderlineClass,
+              "cursor-pointer whitespace-nowrap hover:text-(--series-1)",
+            ),
           },
     slots: {
       trigger: formatDate(options.isoDate),
@@ -226,14 +231,17 @@ export const ReportHeader = <M>(
     // `tabular-nums` for the dates: the coverage pair sits side by side, and
     // two dates of the same shape should measure the same. The tooltips sit
     // in the top layer and keep the prose figures their sentences want.
-    h.p.class("mt-1.5 text-sm tabular-nums text-(--text-secondary)").children(
+    h.p.class("mt-1.5 text-sm text-(--text-secondary) tabular-nums").children(
       "Analyzed by ",
       Tooltip(h, {
         key: "repo-dive",
         props: {
           delay: 200,
           href: repoDiveUrl,
-          triggerClass: `${tooltipUnderline} cursor-pointer hover:text-(--series-1)`,
+          triggerClass: cn(
+            tooltipUnderlineClass,
+            "cursor-pointer hover:text-(--series-1)",
+          ),
         },
         slots: {
           trigger: "repo-dive",

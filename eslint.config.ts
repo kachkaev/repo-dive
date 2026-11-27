@@ -56,7 +56,7 @@ const messageForWrappingInCn =
   'Wrap the class string in `cn("…")`, so better-tailwindcss lints it.';
 
 const messageForTemplateLiteral =
-  'Replace the template literal with `cn(…)`, e.g. `cn(someClassName, "…")`, so better-tailwindcss lints it and tailwind-merge resolves conflicts.';
+  'Replace the template literal with `cn(…)` arguments, e.g. `cn(someClassName, "…")`, so better-tailwindcss lints them and tailwind-merge resolves conflicts.';
 
 /**
  * Keeps the React dashboard's class strings where the selectors above see
@@ -64,15 +64,16 @@ const messageForTemplateLiteral =
  */
 const ruleArgsForNoRestrictedClassNameSyntax = [
   {
-    selector: `${classNameHolder} > Literal[value=type(string)]`,
+    selector: `${classNameHolder} > Literal[value=type(string)]:not([value=""])`,
     message: messageForWrappingInCn,
   },
   {
-    selector: `${classNameHolder} > :matches(ConditionalExpression, LogicalExpression) > Literal[value=type(string)]`,
+    selector: `${classNameHolder} > :matches(ConditionalExpression, LogicalExpression) > Literal[value=type(string)]:not([value=""])`,
     message: messageForWrappingInCn,
   },
   {
-    selector: `${classNameHolder} > TemplateLiteral[expressions.length>0]`,
+    // A `cn(…)` in a class attribute is left to the attribute rule below.
+    selector: `:matches(${classNameHolder}, CallExpression[callee.name="cn"]:not(JSXAttribute[name.name=${classNamePattern}] CallExpression)) > TemplateLiteral[expressions.length>0]`,
     message: messageForTemplateLiteral,
   },
   {
@@ -83,6 +84,62 @@ const ruleArgsForNoRestrictedClassNameSyntax = [
     selector: `JSXAttribute[name.name=${classNamePattern}] > JSXExpressionContainer > CallExpression[callee.name=cn][arguments.length=1][arguments.0.type=Literal]`,
     message:
       'Replace `className={cn("…")}` with `className="…"`: `cn` only earns its place when it merges several values, and the attribute is linted on its own.',
+  },
+];
+
+/**
+ * The Effect UI dashboard's `.class(…)` builder calls (`h.div.class("…")`):
+ * a lone string argument, and every string inside an argument's expression
+ * (a ternary branch, the right of `&&` or `??`). The plugin's default
+ * selectors already cover `cn(…)`.
+ */
+const selectorsForClassCalls = [
+  { kind: SelectorKind.Callee, name: "^class$" },
+  {
+    kind: SelectorKind.Callee,
+    name: "^class$",
+    match: [{ type: MatcherType.String }],
+  },
+] satisfies Selectors;
+
+const classPattern = "/^(.+C|c)lass$/";
+
+/** A `class` / `…Class` variable, object key or destructuring default. */
+const classHolder = `:matches(VariableDeclarator[id.name=${classPattern}], Property[key.name=${classPattern}][computed=false], AssignmentPattern[left.name=${classPattern}])`;
+
+/** A `.class(…)` builder call. */
+const classCall =
+  'CallExpression[callee.type="MemberExpression"][callee.property.name="class"]';
+
+/**
+ * Keeps the Effect UI dashboard's class strings where the selectors above see
+ * them, so none escapes the better-tailwindcss rules.
+ */
+const ruleArgsForNoRestrictedClassSyntax = [
+  {
+    selector: `${classHolder} > Literal[value=type(string)]:not([value=""])`,
+    message: messageForWrappingInCn,
+  },
+  {
+    selector: `${classHolder} > :matches(ConditionalExpression, LogicalExpression) > Literal[value=type(string)]:not([value=""])`,
+    message: messageForWrappingInCn,
+  },
+  {
+    // A `cn(…)` in `.class(…)` arguments is left to the rules below.
+    selector: `:matches(${classHolder}, CallExpression[callee.name="cn"]:not(${classCall} > CallExpression.arguments, ${classCall} > .arguments CallExpression)) > TemplateLiteral[expressions.length>0]`,
+    message:
+      'Replace the template literal with `cn(…)` arguments, e.g. `cn(someClass, "…")`, so better-tailwindcss lints them.',
+  },
+  {
+    // Only in the arguments: a `.key(…)` earlier in the chain is the callee.
+    selector: `TemplateLiteral[expressions.length>0]:matches(${classCall} > .arguments, ${classCall} > .arguments *):not(MemberExpression[computed=true] > TemplateLiteral)`,
+    message:
+      'Replace the template literal with separate arguments, e.g. `.class(someClass, "…")`, so better-tailwindcss lints them.',
+  },
+  {
+    selector: `${classCall} > CallExpression[callee.name="cn"]`,
+    message:
+      "Pass the classes to `.class(…)` directly: it joins its arguments as `cn` does, and its strings are linted on their own.",
   },
 ];
 
@@ -133,6 +190,39 @@ export default defineConfig([
       "no-restricted-syntax": [
         ...ruleArgsForNoRestrictedSyntax,
         ...ruleArgsForNoRestrictedClassNameSyntax,
+      ],
+    },
+  },
+
+  {
+    // Every Tailwind class value in the Effect UI dashboard is linted: the
+    // arguments of `.class(…)` builder calls, and any other class string
+    // once it is wrapped in `cn("…")`. The `lucide` and `visx-*` classes are
+    // the markers the React dashboard's icons and visx marks render, copied
+    // for the same DOM; no stylesheet defines them.
+    files: ["dashboard-effect-ui/src/**/*.ts"],
+    plugins: { "better-tailwindcss": eslintPluginBetterTailwindcss },
+    settings: {
+      "better-tailwindcss": {
+        entryPoint: `${import.meta.dirname}/dashboard-effect-ui/src/styles.css`,
+        selectors: { extends: selectorsForClassCalls },
+      },
+    },
+    rules: {
+      ...ruleArgsForBetterTailwindcss,
+      "better-tailwindcss/no-unknown-classes": [
+        "error",
+        {
+          ignore: [
+            "^lucide$",
+            // cspell:ignore linepath -- the class visx gives its LinePath
+            "^visx-(group|rows|line|linepath|axis|axis-(tick|left|bottom|line))$",
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        ...ruleArgsForNoRestrictedSyntax,
+        ...ruleArgsForNoRestrictedClassSyntax,
       ],
     },
   },

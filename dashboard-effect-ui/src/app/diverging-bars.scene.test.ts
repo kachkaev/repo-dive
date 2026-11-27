@@ -5,6 +5,7 @@ import { it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import { DivergingBars } from "./diverging-bars.ts";
+import { cn } from "./shared/cn.ts";
 import { MeasureWidth } from "./shared/measure-width.ts";
 import { TrackPointer } from "./shared/track-pointer.ts";
 
@@ -26,7 +27,9 @@ const props = {
 
 const card = Locator.attr(
   "class",
-  "pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm will-change-transform",
+  cn(
+    "pointer-events-none absolute top-2 z-10 rounded-md border border-(--grid-line) bg-(--surface-2) px-2.5 py-1.5 text-xs shadow-sm will-change-transform",
+  ),
 );
 const crosshair = Locator.attr("stroke-dasharray", "3,3");
 

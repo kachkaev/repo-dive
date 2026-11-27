@@ -4,6 +4,7 @@ import { Schema } from "effect";
 
 import { AxisBottom, AxisLeft } from "./shared/axes.ts";
 import { cachedBy } from "./shared/cached-by.ts";
+import { cn } from "./shared/cn.ts";
 import { CrosshairLine } from "./shared/crosshair-line.ts";
 import { formatCount } from "./shared/format.ts";
 import { MeasureWidth } from "./shared/measure-width.ts";
@@ -315,7 +316,7 @@ const PrimaryLegend = <M>(
 const SecondaryLegend = <M>(
   h: Html.H<M>,
   secondaryLegendItems: readonly LegendItem[],
-) => Legend(h, { items: secondaryLegendItems, marginClassName: "mt-3" });
+) => Legend(h, { items: secondaryLegendItems, marginClass: cn("mt-3") });
 
 /**
  * Stacked series over time — areas for dense series, bars for monthly

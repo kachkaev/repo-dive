@@ -9,6 +9,8 @@
  */
 import type { Html } from "@effect/ui/html";
 
+import { cn } from "./cn.ts";
+
 /** The stroke the React chart gives its grid and axis lines. */
 const lineStroke = "var(--grid-line)";
 
@@ -16,14 +18,14 @@ const lineStroke = "var(--grid-line)";
 const VisxLine = <M>(
   h: Html.H<M>,
   options: {
-    readonly className: string;
+    readonly class: string;
     readonly x1: number;
     readonly y1: number;
     readonly x2: number;
     readonly y2: number;
   },
 ) =>
-  h.line.class(options.className).attrs({
+  h.line.class(options.class).attrs({
     x1: String(options.x1),
     y1: String(options.y1),
     x2: String(options.x2),
@@ -86,7 +88,7 @@ export const GridRows = <M>(
     .children(
       options.ticksY.map((y) =>
         VisxLine(h, {
-          className: "visx-line",
+          class: cn("visx-line"),
           x1: 0,
           y1: y,
           x2: options.width,
@@ -125,7 +127,7 @@ export const AxisLeft = <M>(
         }),
       ),
       VisxLine(h, {
-        className: "visx-line visx-axis-line",
+        class: cn("visx-line visx-axis-line"),
         x1: 0,
         y1: options.range[0] + 0.5,
         x2: 0,
@@ -166,7 +168,7 @@ export const AxisBottom = <M>(
         }),
       ),
       VisxLine(h, {
-        className: "visx-line visx-axis-line",
+        class: cn("visx-line visx-axis-line"),
         x1: options.range[0] + 0.5 - options.rangePadding,
         y1: 0,
         x2: options.range[1] + 0.5 + options.rangePadding,

@@ -2,6 +2,7 @@ import type { View } from "@effect/ui";
 import type { Html } from "@effect/ui/html";
 
 import { Tooltip } from "./@ui-primitive/tooltip.ts";
+import { cn } from "./cn.ts";
 import { formatDate, formatDayOfWeek } from "./format.ts";
 import { InfoIcon, LoaderCircleIcon } from "./icons.ts";
 import { Markdown } from "./markdown.ts";
@@ -30,10 +31,9 @@ const SpinnerRow = <M>(h: Html.H<M>) =>
     .attr("aria-hidden", "true")
     .class("mt-2 flex h-7 items-center")
     .children(
-      LoaderCircleIcon(
-        h,
-        "size-4 text-muted-foreground motion-safe:animate-spin",
-      ),
+      LoaderCircleIcon(h, {
+        class: cn("size-4 text-muted-foreground motion-safe:animate-spin"),
+      }),
     );
 
 const SectionHeader = <M>(h: Html.H<M>, heading: SectionHeading) => [
@@ -49,7 +49,9 @@ const SectionHeader = <M>(h: Html.H<M>, heading: SectionHeading) => [
           "mt-2 flex max-w-prose gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm text-(--text-secondary)",
         )
         .children(
-          InfoIcon(h, "mt-0.5 size-4 shrink-0 text-muted-foreground"),
+          InfoIcon(h, {
+            class: cn("mt-0.5 size-4 shrink-0 text-muted-foreground"),
+          }),
           h.div(Markdown(h, heading.annotation)),
         )
     : undefined,
@@ -148,7 +150,7 @@ export const StatTile = <M>(
         .children(options.value),
       options.hint
         ? h.div
-            .class("mt-0.5 text-xs tabular-nums text-(--text-secondary)")
+            .class("mt-0.5 text-xs text-(--text-secondary) tabular-nums")
             .children(options.hint)
         : undefined,
     );
@@ -267,10 +269,10 @@ export const Swatch = <M>(
   options: {
     readonly color: string;
     readonly hatch?: string | undefined;
-    readonly className?: string | undefined;
+    readonly class?: string | undefined;
   },
 ) =>
-  h.span.class(options.className ?? "inline-block size-2.5 rounded-xs").style({
+  h.span.class(options.class ?? "inline-block size-2.5 rounded-xs").style({
     backgroundColor: options.color,
     backgroundImage: options.hatch
       ? `repeating-linear-gradient(135deg, transparent 0 4px, ${options.hatch} 4px 6px)`
@@ -322,7 +324,7 @@ export const Legend = <M>(
   options: {
     readonly items: readonly LegendEntry[];
     /** Replaces the default `mt-2` — e.g. a second legend standing further off. */
-    readonly marginClassName?: string | undefined;
+    readonly marginClass?: string | undefined;
     readonly toggles?: LegendToggles<M> | undefined;
   },
 ) => {
@@ -330,7 +332,8 @@ export const Legend = <M>(
   const hiddenLabels = toggles?.hiddenLabels;
   return h.div
     .class(
-      `${options.marginClassName ?? "mt-2"} text-center text-xs text-balance text-(--text-secondary)`,
+      options.marginClass ?? "mt-2",
+      "text-center text-xs text-balance text-(--text-secondary)",
     )
     .children(
       items.map((item) => {
@@ -338,9 +341,7 @@ export const Legend = <M>(
         const swatch = Swatch(h, {
           color: item.color,
           hatch: item.hatch,
-          className: hidden
-            ? "inline-block size-2.5 rounded-xs opacity-35"
-            : "inline-block size-2.5 rounded-xs",
+          class: cn("inline-block size-2.5 rounded-xs", hidden && "opacity-35"),
         });
         if (toggles === undefined) {
           return h.span
@@ -364,8 +365,9 @@ export const Legend = <M>(
             // label as a word. `group` lets the label preview the click on
             // hover; besides that and the text shift the ring is the only
             // feedback — no fill, so the row stays a caption.
-            triggerClass:
+            triggerClass: cn(
               "group mx-2 my-0.5 inline-flex items-center gap-1.5 rounded-xs outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            ),
           },
           slots: {
             trigger: [
