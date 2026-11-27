@@ -1,6 +1,8 @@
 import type { DashboardData } from "../../data.ts";
-import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import { Section, type SectionHeading } from "../shared/primitives.ts";
+import { TimeSeriesChart } from "../time-stack-chart.ts";
+import { cachedBy } from "./shared/cached-by.ts";
+import { decimate } from "./shared/decimate.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 
 /** "a", "a and b", "a, b and c" — the subtitles' own style, no Oxford comma. */
@@ -70,15 +72,39 @@ const looseEndsSeries: Array<{
   },
 ];
 
-const looseEndsHeadingOf = (data: DashboardData): SectionHeading => {
-  // Tested against every row rather than decimated ones: a single commit
-  // somewhere in the history is enough to make the series real, and
-  // decimation could well be what drops it.
-  const drawnLooseEnds = looseEndsSeries.filter(
+/**
+ * The series this repo draws. Tested against every row rather than decimated
+ * ones: a single commit somewhere in the history is enough to make the series
+ * real, and decimation could well be what drops it.
+ */
+const drawnLooseEndsOf = cachedBy((data: DashboardData) =>
+  looseEndsSeries.filter(
     (series) =>
       !series.ecosystemSpecific ||
       data.directives.some((row) => series.valueOf(row) > 0),
-  );
+  ),
+);
+
+/**
+ * The drawn series over time, in the shape `TimeSeriesChart` takes, once per
+ * data.
+ */
+const looseEndsChartOf = cachedBy((data: DashboardData) => {
+  const drawnLooseEnds = drawnLooseEndsOf(data);
+  return {
+    points: decimate(data.directives, 400).map((row) => ({
+      dateMs: new Date(row.date).getTime(),
+      values: Object.fromEntries(
+        drawnLooseEnds.map((series) => [series.key, series.valueOf(row)]),
+      ),
+    })),
+    seriesKeys: drawnLooseEnds.map((series) => series.key),
+    colors: drawnLooseEnds.map((series) => series.color),
+  };
+});
+
+const looseEndsHeadingOf = (data: DashboardData): SectionHeading => {
+  const drawnLooseEnds = drawnLooseEndsOf(data);
   return {
     title: "Loose ends",
     subtitle: [
@@ -104,13 +130,16 @@ export const looseEndsSectionOf = (
       Section(h, {
         ...heading,
         children: [
-          // TEMPORARY until time-stack-chart.tsx is ported: a line-mode
-          // TimeSeriesChart with legend toggles over `decimate(directives,
-          // 400)`, one line per drawn series of `looseEndsSeries`.
-          ChartPlaceholder(h, {
-            reactFile: "time-stack-chart.tsx",
-            description: "Lines of suppressions and TODOs over time",
-            height: 288,
+          // A child of the component that draws this stateless section, so
+          // it takes the section's key to stay apart from any other chart
+          // that component draws.
+          TimeSeriesChart(h, {
+            key,
+            props: {
+              mode: "line",
+              legendToggles: true,
+              ...looseEndsChartOf(data),
+            },
           }),
         ],
       }).key(key),

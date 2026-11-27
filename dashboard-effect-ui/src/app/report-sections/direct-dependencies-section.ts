@@ -3,7 +3,6 @@ import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
 import { type DashboardData, DashboardDataSchema } from "../../data.ts";
-import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import { formatDate } from "../shared/format.ts";
 import {
   DataTable,
@@ -11,7 +10,28 @@ import {
   type SectionHeading,
 } from "../shared/primitives.ts";
 import { PercentControl } from "../shared/segmented-control.ts";
+import { TimeSeriesChart } from "../time-stack-chart.ts";
+import { cachedBy } from "./shared/cached-by.ts";
+import { decimate } from "./shared/decimate.ts";
+import { repoStartMsOf } from "./shared/repo-start-ms.ts";
 import type { ReportSection } from "./shared/report-section.ts";
+
+/**
+ * The declared dependencies per kind, in the shape `TimeSeriesChart` takes,
+ * once per data.
+ */
+const directDependenciesChartOf = cachedBy((data: DashboardData) => ({
+  points: decimate(data.dependencies, 400).map((row) => ({
+    dateMs: new Date(row.date).getTime(),
+    values: {
+      dependencies: row.directProd,
+      devDependencies: row.directDev,
+      optionalDependencies: row.directOptional,
+    },
+  })),
+  seriesKeys: ["dependencies", "devDependencies", "optionalDependencies"],
+  colors: ["var(--series-1)", "var(--series-3)", "var(--series-6)"],
+}));
 
 const directDependenciesHeading = (
   annotation: string | undefined,
@@ -94,13 +114,15 @@ const DirectDependenciesSection = Html.component({
         h.lazy(DirectDependenciesTable, dependencies, hasManifestCounts),
       ],
       children: [
-        // TEMPORARY until time-stack-chart.tsx is ported: an area-mode
-        // TimeSeriesChart with legend toggles, `decimate(dependencies, 400)`,
-        // anchored to the first commit, "No package.json" where it is zero.
-        ChartPlaceholder(h, {
-          reactFile: "time-stack-chart.tsx",
-          description: "Stacked areas of declared dependencies by kind",
-          height: 288,
+        TimeSeriesChart(h, {
+          props: {
+            mode: "area",
+            percentMode: model.percent,
+            ...directDependenciesChartOf(h.props.data),
+            legendToggles: true,
+            domainStartMs: repoStartMsOf(h.props.data),
+            zeroLabel: "No package.json",
+          },
         }),
       ],
     });

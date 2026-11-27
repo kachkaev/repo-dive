@@ -3,7 +3,6 @@ import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
 import { type DashboardData, DashboardDataSchema } from "../../data.ts";
-import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import { formatDate } from "../shared/format.ts";
 import {
   DataTable,
@@ -12,8 +11,10 @@ import {
 } from "../shared/primitives.ts";
 import { PercentControl } from "../shared/segmented-control.ts";
 import { shapeStacked } from "../shared/stacked-series.ts";
+import { TimeSeriesChart } from "../time-stack-chart.ts";
 import { cachedBy } from "./shared/cached-by.ts";
 import { decimate } from "./shared/decimate.ts";
+import { repoStartMsOf } from "./shared/repo-start-ms.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 
 const dependenciesHeading = (
@@ -88,14 +89,15 @@ const DependenciesSection = Html.component({
           : undefined,
       footer: [h.lazy(DependenciesTable, dependencies)],
       children: [
-        // TEMPORARY until time-stack-chart.tsx is ported: an area-mode
-        // TimeSeriesChart of `dependenciesChart` (from `dependenciesChartOf`)
-        // with legend toggles, anchored to the first commit, "No lockfile"
-        // where it is zero.
-        ChartPlaceholder(h, {
-          reactFile: "time-stack-chart.tsx",
-          description: "Stacked areas of resolved packages by package manager",
-          height: 288,
+        TimeSeriesChart(h, {
+          props: {
+            mode: "area",
+            percentMode: model.percent,
+            ...dependenciesChart,
+            legendToggles: true,
+            domainStartMs: repoStartMsOf(h.props.data),
+            zeroLabel: "No lockfile",
+          },
         }),
       ],
     });

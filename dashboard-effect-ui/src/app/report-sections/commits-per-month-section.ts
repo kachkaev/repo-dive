@@ -3,20 +3,20 @@ import { Html } from "@effect/ui/html";
 import { Schema } from "effect";
 
 import { type DashboardData, DashboardDataSchema } from "../../data.ts";
-import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import {
   kindColors,
   type KindFilter,
   KindFilterControl,
   KindFilterSchema,
 } from "../shared/contributor-kinds.ts";
-import {
-  type LegendEntry,
-  Section,
-  type SectionHeading,
-} from "../shared/primitives.ts";
+import { Section, type SectionHeading } from "../shared/primitives.ts";
 import { PercentControl } from "../shared/segmented-control.ts";
 import { monthBucketMs } from "../shared/time-axis.ts";
+import {
+  type LegendItem,
+  type TimePoint,
+  TimeSeriesChart,
+} from "../time-stack-chart.ts";
 import { cachedBy } from "./shared/cached-by.ts";
 import { commitKindsOf } from "./shared/commit-kinds.ts";
 import { commitKindSeries, monthlyRowsOf } from "./shared/monthly-buckets.ts";
@@ -67,11 +67,11 @@ const presentCommitKindKeysOf = cachedBy((data: DashboardData) => {
  * they are.
  */
 type CommitsChart = {
-  points: Array<{ dateMs: number; values: Record<string, number> }>;
+  points: TimePoint[];
   seriesKeys: string[];
   colors: string[];
   seriesHatch: Record<string, string>;
-  legendItems: LegendEntry[];
+  legendItems: LegendItem[];
 };
 
 const commitsChartsOf = cachedBy(
@@ -167,14 +167,16 @@ export const CommitsPerMonthSection = Html.component({
           }),
       ],
       children: [
-        // TEMPORARY until time-stack-chart.tsx is ported: a bar-mode
-        // TimeSeriesChart of `commitsChart` (from `commitsChartsOf`, with
-        // `pointUnit: "month"`), in percent mode while
-        // `model.percent && commitsSupportPercent`.
-        ChartPlaceholder(h, {
-          reactFile: "time-stack-chart.tsx",
-          description: "Stacked bars of commits per month by author kind",
-          height: 288,
+        TimeSeriesChart(h, {
+          props: {
+            mode: "bar",
+            pointUnit: "month",
+            // The remembered preference is ignored, not applied invisibly,
+            // while the filter leaves one series — the control reads
+            // "absolute counts" there, and the bars must agree with it.
+            percentMode: model.percent && commitsSupportPercent,
+            ...commitsChart,
+          },
         }),
       ],
     });
