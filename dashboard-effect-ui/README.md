@@ -54,13 +54,15 @@ src/
     │   ├── history-range-select.ts # ported (ui-kit Select)
     │   ├── frame-ticks.ts          # the reveal's clock: animation frames, or a task loop while hidden
     │   ├── contributors-in-range.ts (+ test, copied)
-    │   └── shared/                 # what several sections share: ReportSection, cachedBy, ranges, kinds, monthly buckets, decimate
+    │   └── shared/                 # what several sections share: ReportSection, ranges, kinds, monthly buckets, decimate
     ├── bar-list.ts                 # ported — the reference chart
     ├── lines-timeline.ts           # placeholder around SurvivalTimeline
     ├── files-timeline.ts           # placeholder around SurvivalTimeline
     └── shared/
         ├── @ui-primitive/          # tooltip, select, toggle-group: ui-kit parts with the shadcn classes; shared/top-layer-reset.ts
         ├── primitives.ts           # Section, SectionSkeleton, StatTile, DataTable
+        ├── cached-by.ts            # cachedBy: derived data cached per key object (+ further arguments), one slot per key
+        ├── axes.ts                 # visx's GridRows, AxisLeft and AxisBottom as view functions
         ├── markdown.ts, icons.ts, format.ts, history-range.ts, stacked-series.ts, …
         ├── measure-width.ts        # MeasureWidth mount (the React useMeasuredWidth)
         ├── track-pointer.ts        # TrackPointer mount (the React charts' onMouseMove)
@@ -130,7 +132,8 @@ export const DivergingBars = Html.component({
   The runtime caches one node per first argument and gives it to the first call that uses that argument in a render; a later call in the same render with the same first argument (the same `listedContributors` for a table and a chart, say) is built afresh on every render.
   When two subtrees are built from the same data, lead one with a constant such as `h.lazy(Bars, "bars", rows, filter)`.
   Make sure each argument keeps its identity across renders: compute derived arrays once per input, never fresh in `view`.
-  `cachedBy` in `report-sections/shared/cached-by.ts` caches a function of `data` in a module-level `WeakMap`, as `historyOf`, `monthlyRowsOf` and `commitKindsOf` do.
+  `cachedBy` in `shared/cached-by.ts` caches a function of a key object (`data`, or a chart's prop array) in a module-level `WeakMap`, as `historyOf`, `monthlyRowsOf` and `commitKindsOf` do.
+  It takes further arguments too, compared by `===`, and keeps one slot per key: the last arguments and their result, so a key shared by two callers that pass different arguments recomputes on every call.
 - Props equality is shallow with a reference check first, so pass the same arrays on every render where possible (from `data`, or from a lazy builder) and keep large derived arrays out of props.
 - Data that is the same everywhere, such as `data`, travels as a prop typed with `DashboardDataSchema`.
 - The section calls the chart with its props and maps its events, if it has any, to its own messages:
@@ -201,10 +204,11 @@ h.rect
 ```
 
 Keep only what the view needs in the Model — the hovered index, not the raw position.
+A chart whose crosshair follows the cursor through gaps in its data needs the instant under the cursor instead, and keeps the latest one on every move, as `TimeSeriesChart` does: the view snaps it to the nearest point, so a re-layout under a resting pointer snaps it afresh.
 Elements whose own hover is all CSS (`hover:` classes) need nothing at all, as in `bar-list.ts`.
 
 Each pointer move is a message and a render of the chart's view.
-That is cheap when the marks are in `h.lazy` and only the crosshair and the hover card change, and when `update` returns the Model unchanged for a move that keeps the same hovered index.
+That is cheap when the marks are in `h.lazy` and only the crosshair and the hover card change, and when `update` returns the Model unchanged for a move that keeps the same hovered index (a chart that keeps the raw instant renders on every move, which its lazy marks keep cheap).
 If a chart still lags, coalesce the moves: keep the last position in the mount and report it at most once per animation frame (a `requestAnimationFrame` in `TrackPointer`'s listener, or a variant of it), as browsers deliver `mousemove` far more often than they paint.
 
 The crosshair (`shared/crosshair-line.ts`, ported) and the hover card are plain elements next to the `<svg>`, positioned with inline styles from the Model, exactly as in React; port the chart's hover card as a view function too.

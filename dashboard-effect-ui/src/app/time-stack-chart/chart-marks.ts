@@ -32,8 +32,6 @@ export type ChartMarksInput = {
   /** Series key → hatch color, and the distinct colors' pattern order. */
   readonly seriesHatch: Readonly<Record<string, string>>;
   readonly hatchColors: readonly string[];
-  /** What the hatch `<pattern>` ids start with. */
-  readonly hatchIdBase: string;
 };
 
 const dateOf = (row: ChartRow): number => row["dateMs"] ?? 0;
@@ -118,7 +116,12 @@ export const stackedBarsOf = (
  * A `<g>` holds what the React component returns as a fragment: a view
  * returns one node. It carries no attributes, so nothing moves.
  */
-export const ChartMarks = <M>(h: Html.H<M>, input: ChartMarksInput) => {
+export const ChartMarks = <M>(
+  h: Html.H<M>,
+  input: ChartMarksInput,
+  /** What this chart instance's hatch `<pattern>` ids start with. */
+  hatchIdBase: string,
+) => {
   const { mode, layout, displayRows, rows, drawnKeys, seriesKeys, colors } =
     input;
   const { xScale, yScale } = layout;
@@ -127,7 +130,7 @@ export const ChartMarks = <M>(h: Html.H<M>, input: ChartMarksInput) => {
     const hatchColor = input.seriesHatch[key];
     return hatchColor === undefined
       ? undefined
-      : `url(#${input.hatchIdBase}-${input.hatchColors.indexOf(hatchColor)})`;
+      : `url(#${hatchIdBase}-${input.hatchColors.indexOf(hatchColor)})`;
   };
   // visx's AreaStack and BarStack: d3's stack with its default order and
   // offset, over the drawn keys.

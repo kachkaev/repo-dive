@@ -208,7 +208,6 @@ const marksInputOf = cachedBy(
     groupBoundaryKeys: ReadonlySet<string>,
     seriesHatch: Readonly<Record<string, string>>,
     hatchColors: readonly string[],
-    hatchIdBase: string,
   ): ChartMarksInput => ({
     mode: layout.mode,
     layout,
@@ -221,7 +220,6 @@ const marksInputOf = cachedBy(
     groupBoundaryKeys,
     seriesHatch,
     hatchColors,
-    hatchIdBase,
   }),
 );
 
@@ -336,8 +334,11 @@ const SecondaryLegend = <M>(
  *
  * Everything else is derived from the props and the width through `cachedBy`
  * helpers keyed by the prop arrays, so pass the same arrays on every render
- * (from `cachedBy` in the section). The marks, axes and legends are lazy
- * nodes; a pointer move redraws only the crosshair and the card.
+ * (from `cachedBy` in the section), and give each chart arrays of its own:
+ * those caches keep one slot per key, so two charts drawn from one `points`
+ * array with different options would recompute each other's rows and scales
+ * on every render. The marks, axes and legends are lazy nodes; a pointer move
+ * redraws only the crosshair and the card.
  *
  * Deviations from the React chart:
  *
@@ -469,8 +470,10 @@ export const TimeSeriesChart = Html.component({
                 : noGroups,
               seriesHatch,
               hatchColors,
-              hatchIdBase,
             ),
+            // The instance's own id stays out of the cached input, so it
+            // never invalidates a slot another chart's arrays could share.
+            hatchIdBase,
           ),
           h.lazy(ChartAxisLeft, "axis-left", layout),
           h.lazy(ChartAxisBottom, "axis-bottom", layout),
