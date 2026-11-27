@@ -9,9 +9,10 @@ import {
   ContributorBars,
   type ContributorBarsItem,
 } from "./contributor-bars.ts";
-import { KindFilterSchema } from "./shared/contributor-kinds.ts";
-
-const ContributorKindSchema = Schema.Literals(["human", "ai", "bot"]);
+import {
+  ContributorKindSchema,
+  KindFilterSchema,
+} from "./shared/contributor-kinds.ts";
 
 const CrossKindCountsSchema = Schema.Struct({
   human: Schema.optionalKey(Schema.Number),

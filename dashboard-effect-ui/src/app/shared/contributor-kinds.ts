@@ -40,6 +40,12 @@ export const kindNouns: Record<ContributorKind, string> = {
 };
 
 /**
+ * A {@link ContributorKind} as a Schema, so a chart can take one in its props.
+ */
+export const ContributorKindSchema: Schema.Codec<ContributorKind> =
+  Schema.Literals(["human", "ai", "bot"]);
+
+/**
  * Which contributor kind a view is narrowed to; "all" shows every kind. A
  * Schema, so a section can keep it in its Model.
  */

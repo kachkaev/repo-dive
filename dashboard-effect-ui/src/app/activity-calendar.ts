@@ -12,26 +12,20 @@ import {
 import { CalendarStrip } from "./activity-calendar/calendar-strip.ts";
 import { ScrollArea } from "./shared/@ui-primitive/scroll-area.ts";
 import { TooltipContent } from "./shared/@ui-primitive/tooltip.ts";
-import { kindColors, KindFilterSchema } from "./shared/contributor-kinds.ts";
+import {
+  ContributorKindSchema,
+  kindColors,
+  KindFilterSchema,
+} from "./shared/contributor-kinds.ts";
 import { formatDateWithDayOfWeek } from "./shared/format.ts";
-import type { HistoryRange } from "./shared/history-range.ts";
+import { HistoryRangeSchema } from "./shared/history-range-schema.ts";
 import { DateStamp } from "./shared/primitives.ts";
 
 const CalendarCommitSchema = Schema.Struct({
   date: Schema.String,
-  kind: Schema.optional(Schema.Literals(["human", "ai", "bot"])),
+  kind: Schema.optional(ContributorKindSchema),
   ai: Schema.Boolean,
 });
-
-/**
- * A {@link HistoryRange}, declared rather than spelled out: the calendar only
- * reads the range its section picked, and the section's Schema for it lives
- * with the sections.
- */
-const HistoryRangePropSchema = Schema.declare<HistoryRange>(
-  (input): input is HistoryRange => typeof input === "string",
-  { title: "HistoryRange" },
-);
 
 export const CommitCalendarMessage = UiSchema.TaggedEnum({
   HoveredDay: { isoDate: Schema.String },
@@ -74,7 +68,7 @@ export const CommitCalendar = Html.component({
      */
     historyDays: Schema.Struct({ first: Schema.String, last: Schema.String }),
     weekStartsOn: Schema.Literals(["monday", "sunday"]),
-    range: HistoryRangePropSchema,
+    range: HistoryRangeSchema,
     kindFilter: KindFilterSchema,
   }),
   model: Schema.Struct({

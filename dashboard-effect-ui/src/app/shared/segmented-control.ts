@@ -74,6 +74,9 @@ export const SegmentedControl = <M, Value extends string>(
                 }).attr("title", option.title),
                 value: option.value,
               })
+              // Base UI writes `aria-disabled` on every toggle in a group,
+              // "false" included; ui-kit's item part never sets it.
+              .attr("aria-disabled", String(option.disabled ?? false))
               .children(option.label),
           ),
         ),
