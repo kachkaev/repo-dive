@@ -322,7 +322,7 @@ The charts, one PR each after the scaffold (#394):
   ui-kit's Tooltip anchors to an element id where Base UI takes the element, so every day's hover target carries an `id`, `calendar-<hash>-<date>`, the hash a short digest of the calendar's `h.id`.
 - **Scroll area content.**
   ui-kit's ScrollArea observes a content element inside the viewport, so the calendar's own `mx-auto flex w-max …` div gains `role="presentation"`, ui-kit's data attributes and an inline `min-width: fit-content`.
-  The native scrollbars are hidden by ui-kit's inline `scrollbar-width: none` rather than Base UI's `base-ui-disable-scrollbar` class.
+  The native scrollbars are hidden by ui-kit's inline `scrollbar-width: none` rather than Base UI's `base-ui-disable-scrollbar` class, and the scrollbar's inline `inset-inline-end` falls back to `0px` where Base UI's has no fallback.
 - **Tooltip triggers.**
   ui-kit's trigger part takes only `<button>` and `<a href>`, so the header's link-less dates are buttons styled like the React `<span tabIndex={0}>`.
 - **Tooltip positioners are `<div>`s.**
