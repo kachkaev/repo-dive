@@ -13,7 +13,7 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 
-import { cn, type PropsWithPlainClassName } from "./shared/cn.ts";
+import { cn, type PropsWithPlainClassName } from "../cn.ts";
 
 export const Select = SelectPrimitive.Root;
 

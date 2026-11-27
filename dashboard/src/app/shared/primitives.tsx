@@ -6,6 +6,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "./@ui-primitive/tooltip.tsx";
+import { cn } from "./cn.ts";
 import { formatDate, formatDayOfWeek } from "./format.ts";
 import { Markdown } from "./markdown.tsx";
 
@@ -156,7 +157,7 @@ export function StatTile({
       </div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
       {hint ? (
-        <div className="mt-0.5 text-xs tabular-nums text-(--text-secondary)">
+        <div className="mt-0.5 text-xs text-(--text-secondary) tabular-nums">
           {hint}
         </div>
       ) : undefined}
@@ -236,7 +237,10 @@ export function Legend({
   const hiddenLabels = toggles?.hiddenLabels;
   return (
     <div
-      className={`${marginClassName ?? "mt-2"} text-center text-xs text-balance text-(--text-secondary)`}
+      className={cn(
+        marginClassName ?? "mt-2",
+        "text-center text-xs text-balance text-(--text-secondary)",
+      )}
     >
       {items.map((item) => {
         const hidden = hiddenLabels?.has(item.label) ?? false;
