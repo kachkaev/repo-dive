@@ -78,9 +78,12 @@ export const SelectView = <M, V extends string>(
               .class(`${scrollArrowClass} top-0`),
           })
           ?.children(ChevronUpIcon(h, "size-4")),
-        // The listbox inside the popup, as Base UI's `Select.List` draws it
-        // (with an empty class), which turns the popup into a presentation.
-        select.list(h.div.attr("class", "")).children(
+        // The listbox inside the popup, where Base UI's `Select.List` draws it,
+        // which turns the popup into a presentation. Base UI also gives it
+        // its `base-ui-disable-scrollbar` class, which does nothing on an
+        // element that doesn't scroll, so it is left out (see the README's
+        // deviations).
+        select.list(h.div).children(
           options.items.map((item) =>
             select
               .item({

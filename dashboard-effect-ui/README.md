@@ -8,7 +8,7 @@ The CLI serves or exports this build with `--ui effect` on the bare pipeline, `d
 
 Every chart and section is ported (see the [checklist](#port-checklist)).
 This README is the guide to how the port is put together and how to carry a change to the React dashboard over to it.
-Read it with the React file you are porting open next to it.
+Read it with the React file you are changing open next to it.
 
 ## Ground rules
 
@@ -87,13 +87,13 @@ A chart lives where the React one lives (`app/time-stack-chart.ts`, `app/activit
   `DashboardDataSchema` declares the shape rather than validating it, as the React app casts it.
 - `ReportSections` lists every section in reading order (`reportSectionsOf`, built once per data) and reveals one per frame, showing the next section's heading over a spinner meanwhile, like the React `RevealSequentially`.
   The frames come from `frame-ticks.ts`: animation frames while the page is shown, and a `MessageChannel` task loop while it is hidden, which browsers don't throttle the way they throttle timers, so a report opened in a background tab is complete when shown.
-  A shown page whose frames stop coming for 100 ms (an embedded webview out of sight, a covered window) switches to the task loop too, so the reveal always finishes.
+  On a shown page, a frame that doesn't come within 100 ms (in an embedded webview out of sight, a covered window, or after a long task) hands the ticks to the task loop until that frame arrives, so the reveal always finishes and goes back to frames once they come.
 - Each section lives in `report-sections/<name>-section.ts` and exports one `<name>SectionOf(data: DashboardData)` that returns a `ReportSection` (or `undefined` when the repo has nothing for it):
   - `id`: the section's chart annotation id, which also keys its node.
   - `skeleton`: the heading the reveal shows before the section arrives.
   - `view(h, key)`: draws the section — a `Section(h, …).key(key)` view for stateless sections, or the section's own component (`Name(h, { key, props })`) when it has controls.
 - A section with controls is a component whose Model holds the controls' values (kind filter, percent mode, range).
-  In React that state lives in `ReportSections`; here each section owns it, so a chart port touches only its own section file.
+  In React that state lives in `ReportSections`; here each section owns it, so a change to one chart touches only its section file.
 
 ## Porting a chart
 
@@ -264,7 +264,8 @@ Tests sit next to what they test, as `*.test.ts`, and run with the rest of the r
   See `history-range-select.test.ts`, `report-sections.test.ts` and `commits-per-month-section.test.ts`.
 - **What the view shows** for a message goes in a `Scene`: `commits-per-month-section.scene.test.ts` checks that the kind filter presses the option picked.
   A scene runs only the component under test, so a click on a ui-kit child (a toggle group's button) does nothing there: stand in for the child with `s.childEmit(ToggleGroup, key, event)`, or use an `HtmlPlay` to run the whole tree.
-- **What the user sees and does** goes in an `HtmlScene` from `@effect/ui/html/testing` (clicks, typing, locators, `expectMount`), and **mounts and other DOM code** in a real `BrowserHost.mountEffect` under `// @vitest-environment happy-dom` with `it.live` (see `measure-width.test.ts`, `track-pointer.test.ts` and `frame-ticks.test.ts`).
+- **What the user sees and does** goes in an `HtmlScene` from `@effect/ui/html/testing` (clicks, typing, locators, `expectMount`), and **mounts and other DOM code** in a real `BrowserHost.mountEffect` under `// @vitest-environment happy-dom` with `it.live` (see `measure-width.test.ts` and `track-pointer.test.ts`).
+  A stream that calls browser APIs directly runs on its own with those APIs stubbed through `vi.stubGlobal`, as in `frame-ticks.test.ts`.
   happy-dom lays nothing out: stub what the browser would measure.
 - Build test data with `dashboardDataOf()` from `shared/dashboard-data-fixture.ts`, overriding what the section under test needs.
 - Pure helpers get plain `test(...)` from Vitest, as in the React dashboard.
@@ -309,7 +310,7 @@ The charts, one PR each after the scaffold (#394):
   `ReportSections` wraps the sections in a `<div>` (their margins collapse through it, so the layout is unchanged), and each tooltip wraps its trigger and card in a `<span>`.
   `TimeSeriesChart` puts its grid and marks in a `<g>` of their own, where React writes a fragment.
 - **The reveal runs on its own clock.**
-  React reveals a section per commit inside a transition; here a Subscription advances a counter on each animation frame, or on each turn of a `MessageChannel` task loop while the tab is hidden or once frames stall on a shown page.
+  React reveals a section per commit inside a transition; here a Subscription advances a counter on each animation frame, or on each turn of a `MessageChannel` task loop while the tab is hidden or a frame is overdue on a shown page.
 - **Synchronous re-renders.**
   React defers heavy re-renders (`useDeferredValue`) and dims the stale chart (`StaleOverlay`); Effect UI has no concurrent rendering, so expensive subtrees are memoized with `h.lazy` instead and nothing is ever stale.
   A chart's root is a plain `<div>` where React writes the overlay's two wrappers, and a control press re-shapes a chart and its "View data" table in the same render.
@@ -334,7 +335,7 @@ The charts, one PR each after the scaffold (#394):
   ui-kit writes the tooltip and select positioners next to their triggers in the top layer instead of in a portal on `<body>`; `topLayerReset` undoes what they would inherit there.
   It also places them at fractional pixels where Base UI rounds them, so a card (the calendar's day card, say) can sit half a pixel off.
 - **Select internals.**
-  Base UI writes a hidden `<input>` after the trigger for forms and a redundant `tabindex="0"` on the trigger button; ui-kit writes neither, and marks the value span and each option's text with `data-select-value` and `data-select-item-text` instead.
+  Base UI writes a hidden `<input>` after the trigger for forms, a redundant `tabindex="0"` on the trigger button, `data-base-ui-focusable` on the popup and its `base-ui-disable-scrollbar` class on the list (which does nothing there: the popup is what scrolls); ui-kit writes none of these, and marks the value span and each option's text with `data-select-value` and `data-select-item-text` instead.
 - **Select highlight.**
   The highlighted option follows the pointer from option to option, as Base UI's does, but ui-kit highlights an option only as the pointer enters it.
   With the pointer resting on an option, ArrowDown moves the highlight to the next one and leaves it there while the pointer moves within the first; Base UI keeps the highlight on the option under the pointer.
