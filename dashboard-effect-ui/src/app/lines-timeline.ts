@@ -25,7 +25,10 @@ export const linesTimelineHeading = {
  * TEMPORARY: `SurvivalTimeline` (with its controls and "View data" table) is
  * not ported yet, so this draws the section around a placeholder.
  */
-export const LinesTimeline = <M>(h: Html.H<M>, data: DashboardData) =>
+export const LinesTimeline = <M>(
+  h: Html.H<M>,
+  { data }: { data: DashboardData; maxContributorsInCharts: number },
+) =>
   Section(h, {
     ...linesTimelineHeading,
     annotation: data.config?.charts?.annotations?.["lines-of-code"],

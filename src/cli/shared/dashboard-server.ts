@@ -60,7 +60,9 @@ export const resolveAssetsDir = (ui: DashboardUi): string | undefined => {
   const candidates = [
     path.join(path.dirname(fileURLToPath(import.meta.url)), dirName),
     path.join(
-      fileURLToPath(new URL("../../../dist", import.meta.url)),
+      fileURLToPath(
+        new URL(/* @vite-ignore */ "../../../dist", import.meta.url),
+      ),
       dirName,
     ),
   ];

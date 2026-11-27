@@ -262,7 +262,9 @@ Tests sit next to what they test, as `*.test.ts`, and run with the rest of the r
 
 1.  Port the chart into its own file under `src/app/`, with its helpers in a folder of the same name, and copy the pure helpers it needs from `../dashboard` verbatim (with their tests).
 1.  In the section file, replace the one `ChartPlaceholder(h, …)` call with the chart, using the comment above it as the checklist of what to pass.
-1.  Delete the chart's line from [the checklist](#port-checklist) below, and drop the `knip.config.ts` exceptions that the port makes unnecessary.
+    Where the section already derives the chart's data (`commitsChartsOf`, `dependenciesChartOf`), pass that; derive the rest the same way, with `cachedBy`, rather than in `view`.
+1.  Leave `knip.config.ts`, this README's checklist and `report-sections.ts` alone, even where the port makes an exception or a line stale: the parallel ports would all edit the same lines.
+    The last PR of the series prunes the knip exceptions and ticks the checklist.
 1.  Compare with the React dashboard side by side on the same `dashboard.json`, at the same viewport, including hover states and keyboard use.
 
 Adding a new section to the report is the same in reverse: write `report-sections/<name>-section.ts` exporting `<name>SectionOf(data)`, and call it from `reportSectionsOf` in `report-sections.ts`, in the React dashboard's order.
@@ -281,7 +283,7 @@ Ported:
 - `app/shared/@ui-primitive/tooltip.tsx`, `select.tsx`, `toggle-group.tsx`
 - `app/shared/format.ts`, `history-range.ts`, `stacked-series.ts`, `bar-path.ts`, `time-axis.ts`, `category-colors.ts` (with its test), `survival-colors.tsx` (copied)
 
-Everything shared between charts is in place, most of it ahead of its first user (see the `knip.config.ts` exceptions), so the follow-up PRs a, b and c touch no file outside their own charts and section files.
+Everything shared between charts is in place, most of it ahead of its first user (see the `knip.config.ts` exceptions), so the follow-up PRs a, b and c touch no file outside their own charts and section files — not `knip.config.ts`, and not this checklist, which the series' last PR updates.
 
 Still placeholders, by follow-up PR (a, b and c run in parallel; d follows a):
 

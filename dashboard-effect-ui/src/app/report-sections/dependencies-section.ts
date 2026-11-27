@@ -12,6 +12,7 @@ import {
 } from "../shared/primitives.ts";
 import { PercentControl } from "../shared/segmented-control.ts";
 import { shapeStacked } from "../shared/stacked-series.ts";
+import { cachedBy } from "./shared/cached-by.ts";
 import { decimate } from "./shared/decimate.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 
@@ -35,6 +36,23 @@ const DependenciesTable = <M>(
     rows: dependencies.map((row) => [formatDate(row.date), row.resolved]),
   });
 
+/**
+ * The resolved packages per package manager, in the shape `TimeSeriesChart`
+ * takes, once per data.
+ */
+const dependenciesChartOf = cachedBy((data: DashboardData) =>
+  shapeStacked(
+    decimate(data.dependencies, 400).map((row) => ({
+      date: row.date,
+      values: row.byPackageManager,
+    })),
+    5,
+    // A repo can switch managers over its life (npm/yarn → pnpm), so rank by
+    // peak to keep each one named rather than folding the retired ones away.
+    "peak",
+  ),
+);
+
 const DependenciesSectionMessage = UiSchema.TaggedEnum({
   ToggledPercent: { percent: Schema.Boolean },
 });
@@ -51,17 +69,7 @@ const DependenciesSection = Html.component({
   },
   view: (h, model) => {
     const { dependencies } = h.props.data;
-    const dependenciesChart = shapeStacked(
-      decimate(dependencies, 400).map((row) => ({
-        date: row.date,
-        values: row.byPackageManager,
-      })),
-      5,
-      // A repo can switch managers over its life (npm/yarn → pnpm), so rank
-      // by peak to keep each one named rather than folding the retired ones
-      // away.
-      "peak",
-    );
+    const dependenciesChart = dependenciesChartOf(h.props.data);
     return Section(h, {
       ...dependenciesHeading(
         h.props.data.config?.charts?.annotations?.dependencies,
@@ -81,8 +89,9 @@ const DependenciesSection = Html.component({
       footer: [h.lazy(DependenciesTable, dependencies)],
       children: [
         // TEMPORARY until time-stack-chart.tsx is ported: an area-mode
-        // TimeSeriesChart of `dependenciesChart` with legend toggles, anchored
-        // to the first commit, "No lockfile" where it is zero.
+        // TimeSeriesChart of `dependenciesChart` (from `dependenciesChartOf`)
+        // with legend toggles, anchored to the first commit, "No lockfile"
+        // where it is zero.
         ChartPlaceholder(h, {
           reactFile: "time-stack-chart.tsx",
           description: "Stacked areas of resolved packages by package manager",

@@ -5,6 +5,7 @@ import { expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import { afterEach, vi } from "vitest";
 
+import { eventually } from "./eventually.ts";
 import { MeasureWidth } from "./measure-width.ts";
 
 const ProbeMessage = UiSchema.TaggedEnum({
@@ -70,17 +71,21 @@ it.live("reports the width on every resize and stops with the element", () =>
     yield* Effect.scoped(
       Effect.gen(function* () {
         const root = yield* BrowserHost.mountEffect(Probe, {}, container);
-        yield* Effect.sleep("20 millis");
+        // The mount starts once the element is in the document.
+        yield* eventually(() => {
+          expect(FakeResizeObserver.instances).toHaveLength(1);
+        });
         const [observer] = FakeResizeObserver.instances;
-        expect(observer).toBeDefined();
 
         observer?.report(320);
-        yield* Effect.sleep("20 millis");
-        expect(root.model()?.width).toBe(320);
+        yield* eventually(() => {
+          expect(root.model()?.width).toBe(320);
+        });
 
         observer?.report(480);
-        yield* Effect.sleep("20 millis");
-        expect(root.model()?.width).toBe(480);
+        yield* eventually(() => {
+          expect(root.model()?.width).toBe(480);
+        });
       }),
     );
     expect(FakeResizeObserver.instances[0]?.disconnected).toBe(true);

@@ -3,8 +3,6 @@ import { Html } from "@effect/ui/html";
 import { Schema, Stream } from "effect";
 
 import { type DashboardData, DashboardDataSchema } from "../data.ts";
-import { FilesTimeline } from "./files-timeline.ts";
-import { LinesTimeline, linesTimelineHeading } from "./lines-timeline.ts";
 import { churnPerMonthSectionOf } from "./report-sections/churn-per-month-section.ts";
 import { commitCalendarSectionOf } from "./report-sections/commit-calendar-section.ts";
 import { commitsPerMonthSectionOf } from "./report-sections/commits-per-month-section.ts";
@@ -12,8 +10,10 @@ import { contributorsSectionOf } from "./report-sections/contributors-section.ts
 import { dependenciesSectionOf } from "./report-sections/dependencies-section.ts";
 import { directDependenciesSectionOf } from "./report-sections/direct-dependencies-section.ts";
 import { frameTicks } from "./report-sections/frame-ticks.ts";
+import { linesOfCodeSectionOf } from "./report-sections/lines-of-code-section.ts";
 import { looseEndsSectionOf } from "./report-sections/loose-ends-section.ts";
 import { mostSuppressedLintRulesSectionOf } from "./report-sections/most-suppressed-lint-rules-section.ts";
+import { numberOfFilesSectionOf } from "./report-sections/number-of-files-section.ts";
 import type { ReportSection } from "./report-sections/shared/report-section.ts";
 import {
   SectionHeadingSkeleton,
@@ -31,31 +31,8 @@ const listReportSections = (
   maxContributorsInCharts: number,
 ): ReportSection[] => {
   const sections: Array<ReportSection | undefined> = [
-    data.languages.length > 0 || data.survival.length > 0
-      ? {
-          id: "lines-of-code",
-          // This chart sits above the scroll cut, so its heading is the first
-          // thing a reload shows: the placeholder carries that real heading
-          // from the very first paint, where ghost bars would flash into text.
-          skeleton: {
-            ...linesTimelineHeading,
-            annotation: data.config?.charts?.annotations?.["lines-of-code"],
-          },
-          view: (h, key) => LinesTimeline(h, data).key(key),
-        }
-      : undefined,
-    // The same timeline at the file grain, directly under its line-grain
-    // sibling. Gated on data the file chart can actually draw: per-language
-    // counts of every file (absent in dashboard.json written before the chart
-    // covered every file) or file-survival samples.
-    data.fileTypes.some((row) => row.byLanguage !== undefined) ||
-    (data.fileSurvival ?? []).length > 0
-      ? {
-          id: "number-of-files",
-          skeleton: undefined,
-          view: (h, key) => FilesTimeline(h, data).key(key),
-        }
-      : undefined,
+    linesOfCodeSectionOf(data, maxContributorsInCharts),
+    numberOfFilesSectionOf(data, maxContributorsInCharts),
     commitCalendarSectionOf(data),
     commitsPerMonthSectionOf(data),
     churnPerMonthSectionOf(data),

@@ -30,7 +30,7 @@ export default {
     "dashboard-effect-ui/src/app/shared/primitives.ts": ["exports", "types"],
     "dashboard-effect-ui/src/app/shared/stacked-series.ts": ["exports"],
     "dashboard-effect-ui/src/app/shared/survival-colors.ts": ["files"],
-    "dashboard-effect-ui/src/app/shared/time-axis.ts": ["files"],
+    "dashboard-effect-ui/src/app/shared/time-axis.ts": ["exports", "types"],
     "dashboard-effect-ui/src/app/shared/track-pointer.ts": ["files"],
   },
 } satisfies KnipConfig;

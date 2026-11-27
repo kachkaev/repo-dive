@@ -791,13 +791,14 @@ test
   );
 
 test.skipIf(!effectUiDashboardBuilt).concurrent.each([
-  { command: "dashboard", indexFirst: true, firstPort: 4990 },
-  { command: "the bare pipeline", indexFirst: false, firstPort: 4995 },
+  { command: "dashboard", indexFirst: true, firstPort: 20_000 },
+  { command: "the bare pipeline", indexFirst: false, firstPort: 25_000 },
 ])(
   "$command with --ui effect serves the Effect UI build",
   async ({ indexFirst, firstPort }) => {
     const repoPath = createFixtureRepo();
-    const port = firstPort + Math.floor(Math.random() * 5);
+    // Ranges of their own, wide enough that concurrent runs rarely meet.
+    const port = firstPort + Math.floor(Math.random() * 5000);
 
     try {
       if (indexFirst) {

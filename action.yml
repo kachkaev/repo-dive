@@ -203,7 +203,7 @@ runs:
       # still runs
       run: |
         mkdir -p "$(dirname "$REPORT_PATH")"
-        if [ "$UI" = "react" ]; then
+        if [ -z "$UI" ] || [ "$UI" = "react" ]; then
           "$BIN" report --repo "$REPO" --out "$REPORT_PATH"
         else
           "$BIN" report --repo "$REPO" --out "$REPORT_PATH" --ui "$UI"

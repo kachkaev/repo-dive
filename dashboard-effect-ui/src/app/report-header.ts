@@ -272,7 +272,7 @@ export const ReportHeader = <M>(
               }),
             ),
           ]
-        : " · no history",
+        : " · no history",
     ),
   );
 };

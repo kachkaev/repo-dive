@@ -9,7 +9,7 @@ import type { Html } from "@effect/ui/html";
  */
 const LucideIcon = <M>(
   h: Html.H<M>,
-  name: string,
+  names: readonly [name: string, ...aliases: string[]],
   className: string | undefined,
   paths: readonly string[],
 ) =>
@@ -26,24 +26,27 @@ const LucideIcon = <M>(
       "stroke-linejoin": "round",
       "aria-hidden": "true",
     })
-    .class("lucide", `lucide-${name}`, className)
+    // lucide-react names the icon and each of its aliases in a class.
+    .class("lucide", ...names.map((name) => `lucide-${name}`), className)
     .children(paths.map((d) => h.path.attr("d", d)));
 
 export const InfoIcon = <M>(h: Html.H<M>, className?: string) =>
-  LucideIcon(h, "info", className, []).children(
+  LucideIcon(h, ["info"], className, []).children(
     h.circle.attrs({ cx: "12", cy: "12", r: "10" }),
     h.path.attr("d", "M12 16v-4"),
     h.path.attr("d", "M12 8h.01"),
   );
 
 export const LoaderCircleIcon = <M>(h: Html.H<M>, className?: string) =>
-  LucideIcon(h, "loader-circle", className, ["M21 12a9 9 0 1 1-6.219-8.56"]);
+  LucideIcon(h, ["loader-circle", "loader-2"], className, [
+    "M21 12a9 9 0 1 1-6.219-8.56",
+  ]);
 
 export const ChevronDownIcon = <M>(h: Html.H<M>, className?: string) =>
-  LucideIcon(h, "chevron-down", className, ["m6 9 6 6 6-6"]);
+  LucideIcon(h, ["chevron-down"], className, ["m6 9 6 6 6-6"]);
 
 export const ChevronUpIcon = <M>(h: Html.H<M>, className?: string) =>
-  LucideIcon(h, "chevron-up", className, ["m18 15-6-6-6 6"]);
+  LucideIcon(h, ["chevron-up"], className, ["m18 15-6-6-6 6"]);
 
 export const CheckIcon = <M>(h: Html.H<M>, className?: string) =>
-  LucideIcon(h, "check", className, ["M20 6 9 17l-5-5"]);
+  LucideIcon(h, ["check"], className, ["M20 6 9 17l-5-5"]);

@@ -56,11 +56,6 @@ export const HistoryRangeSelect = Html.component({
         : $.emit(HistoryRangeSelectEvents.Picked({ value })),
   },
   view: (h, model) =>
-    // A fixed-width slot for the trigger, which keeps hugging its own value:
-    // the options differ by ~60px ("2019" against the widest, "Last 12
-    // months", which needs 128px at this size), and a trigger claiming a
-    // different slice of the row on every change hopped between rows once the
-    // row wraps on a narrow viewport.
     Select(h, {
       props: {
         open: model.open,
@@ -85,9 +80,14 @@ export const HistoryRangeSelect = Html.component({
         // eslint-disable-next-line unicorn/no-useless-undefined -- an event mapped to no message
         Settled: () => undefined,
       },
-      // The slot also holds the popup and its backdrop: a view returns one
-      // node, and both live in the top layer, outside the slot's layout.
       view: (select) =>
+        // A fixed-width slot for the trigger, which keeps hugging its own
+        // value: the options differ by ~60px ("2019" against the widest,
+        // "Last 12 months", which needs 128px at this size), and a trigger
+        // claiming a different slice of the row on every change hopped
+        // between rows once the row wraps on a narrow viewport. The slot also
+        // holds the popup and its backdrop: a view returns one node, and both
+        // live in the top layer, outside the slot's layout.
         h.div.class("w-36").children(
           SelectView(h, select, {
             label: h.props.label,

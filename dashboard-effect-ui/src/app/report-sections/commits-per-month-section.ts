@@ -5,17 +5,21 @@ import { Schema } from "effect";
 import { type DashboardData, DashboardDataSchema } from "../../data.ts";
 import { ChartPlaceholder } from "../shared/chart-placeholder.ts";
 import {
+  kindColors,
   type KindFilter,
   KindFilterControl,
   KindFilterSchema,
 } from "../shared/contributor-kinds.ts";
-import { Section, type SectionHeading } from "../shared/primitives.ts";
-import { PercentControl } from "../shared/segmented-control.ts";
-import { commitKindsOf } from "./shared/commit-kinds.ts";
 import {
-  type commitKindSeries,
-  monthlyRowsOf,
-} from "./shared/monthly-buckets.ts";
+  type LegendEntry,
+  Section,
+  type SectionHeading,
+} from "../shared/primitives.ts";
+import { PercentControl } from "../shared/segmented-control.ts";
+import { monthBucketMs } from "../shared/time-axis.ts";
+import { cachedBy } from "./shared/cached-by.ts";
+import { commitKindsOf } from "./shared/commit-kinds.ts";
+import { commitKindSeries, monthlyRowsOf } from "./shared/monthly-buckets.ts";
 import type { ReportSection } from "./shared/report-section.ts";
 
 const commitsPerMonthHeading = (
@@ -45,6 +49,72 @@ const commitKindsOfFilter: Record<
   bot: ["bot"],
 };
 
+const commitKindColorOf = (kind: keyof typeof commitKindSeries): string =>
+  kind === "humanAi" ? kindColors.human : kindColors[kind];
+
+/** Kinds that ever occur, so a bot-free repo gets no empty series. */
+const presentCommitKindKeysOf = cachedBy((data: DashboardData) => {
+  const monthlyRows = monthlyRowsOf(data.commits);
+  return commitKindOrder.filter((kind) =>
+    monthlyRows.some(([, bucket]) => bucket[kind] > 0),
+  );
+});
+
+/**
+ * What the chart draws for one kind filter: the series of every month, in
+ * the shape `TimeSeriesChart` takes. Built once per data and filter, so the
+ * same arrays come back on every render and can go to `h.lazy` and props as
+ * they are.
+ */
+type CommitsChart = {
+  points: Array<{ dateMs: number; values: Record<string, number> }>;
+  seriesKeys: string[];
+  colors: string[];
+  seriesHatch: Record<string, string>;
+  legendItems: LegendEntry[];
+};
+
+const commitsChartsOf = cachedBy(
+  (data: DashboardData): Record<KindFilter, CommitsChart> => {
+    const monthlyRows = monthlyRowsOf(data.commits);
+    const chartOf = (kindFilter: KindFilter): CommitsChart => {
+      const commitKindKeys = presentCommitKindKeysOf(data).filter((kind) =>
+        commitKindsOfFilter[kindFilter].includes(kind),
+      );
+      return {
+        points: monthlyRows.map(([month, bucket]) => ({
+          dateMs: monthBucketMs(month),
+          values: Object.fromEntries(
+            commitKindKeys.map((kind) => [
+              commitKindSeries[kind],
+              bucket[kind],
+            ]),
+          ),
+        })),
+        // Bars stack bottom-up, so reverse the reading order: humans end up
+        // on top of each bar, bots at the baseline — same as a calendar cell.
+        seriesKeys: commitKindKeys
+          .toReversed()
+          .map((kind) => commitKindSeries[kind]),
+        colors: commitKindKeys.toReversed().map(commitKindColorOf),
+        seriesHatch: { [commitKindSeries.humanAi]: kindColors.ai },
+        // The legend and tooltip keep the reading order, humans first.
+        legendItems: commitKindKeys.map((kind) => ({
+          label: commitKindSeries[kind],
+          color: commitKindColorOf(kind),
+          ...(kind === "humanAi" && { hatch: kindColors.ai }),
+        })),
+      };
+    };
+    return {
+      all: chartOf("all"),
+      human: chartOf("human"),
+      ai: chartOf("ai"),
+      bot: chartOf("bot"),
+    };
+  },
+);
+
 export const CommitsPerMonthSectionMessage = UiSchema.TaggedEnum({
   ToggledKindFilter: { kindFilter: KindFilterSchema },
   ToggledPercent: { percent: Schema.Boolean },
@@ -66,15 +136,8 @@ export const CommitsPerMonthSection = Html.component({
   },
   view: (h, model) => {
     const { data } = h.props;
-    const monthlyRows = monthlyRowsOf(data.commits);
-    // Keep only kinds that ever occur, so a bot-free repo gets no empty series.
-    const presentCommitKindKeys = commitKindOrder.filter((kind) =>
-      monthlyRows.some(([, bucket]) => bucket[kind] > 0),
-    );
-    const commitKindKeys = presentCommitKindKeys.filter((kind) =>
-      commitKindsOfFilter[model.kindFilter].includes(kind),
-    );
-    const commitsSupportPercent = commitKindKeys.length > 1;
+    const commitsChart = commitsChartsOf(data)[model.kindFilter];
+    const commitsSupportPercent = commitsChart.seriesKeys.length > 1;
     return Section(h, {
       ...commitsPerMonthHeading(
         data.config?.charts?.annotations?.["commits-per-month"],
@@ -92,7 +155,7 @@ export const CommitsPerMonthSection = Html.component({
         // and merely disabled while a single-kind view leaves one — a control
         // vanishing from the row on filter change would reflow the remaining
         // ones away from the cursor.
-        presentCommitKindKeys.length > 1 &&
+        presentCommitKindKeysOf(data).length > 1 &&
           PercentControl(h, {
             key: "percent",
             label: "Commits per month value display",
@@ -105,8 +168,9 @@ export const CommitsPerMonthSection = Html.component({
       ],
       children: [
         // TEMPORARY until time-stack-chart.tsx is ported: a bar-mode
-        // TimeSeriesChart of `monthlyRows` over `commitKindKeys`, in percent
-        // mode while `model.percent && commitsSupportPercent`.
+        // TimeSeriesChart of `commitsChart` (from `commitsChartsOf`, with
+        // `pointUnit: "month"`), in percent mode while
+        // `model.percent && commitsSupportPercent`.
         ChartPlaceholder(h, {
           reactFile: "time-stack-chart.tsx",
           description: "Stacked bars of commits per month by author kind",

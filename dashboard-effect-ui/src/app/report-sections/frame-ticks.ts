@@ -10,9 +10,12 @@ import { Effect, Stream } from "effect";
  * at once.
  */
 const nextFrame = Effect.callback<undefined>((resume) => {
+  // The returned finalizer only runs when the wait is interrupted, so each
+  // way of ending it also releases what it holds before resuming.
   if (document.hidden) {
     const channel = new MessageChannel();
     channel.port1.addEventListener("message", () => {
+      channel.port1.close();
       resume(Effect.undefined);
     });
     channel.port1.start();
@@ -23,14 +26,17 @@ const nextFrame = Effect.callback<undefined>((resume) => {
   }
   const controller = new AbortController();
   const frame = requestAnimationFrame(() => {
+    controller.abort();
     resume(Effect.undefined);
   });
   document.addEventListener(
     "visibilitychange",
     () => {
+      cancelAnimationFrame(frame);
+      controller.abort();
       resume(Effect.undefined);
     },
-    { once: true, signal: controller.signal },
+    { signal: controller.signal },
   );
   return Effect.sync(() => {
     cancelAnimationFrame(frame);

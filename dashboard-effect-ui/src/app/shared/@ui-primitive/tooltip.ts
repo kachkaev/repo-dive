@@ -108,7 +108,7 @@ export const TooltipContent = <M>(
         ),
     );
 
-const TooltipMessage = UiSchema.TaggedEnum({
+export const TooltipMessage = UiSchema.TaggedEnum({
   RequestedOpenTooltip: {},
   RequestedCloseTooltip: {},
   ClickedTrigger: { alt: Schema.Boolean },
@@ -118,7 +118,7 @@ const TooltipMessage = UiSchema.TaggedEnum({
  * A click on a button trigger, with whether Alt (⌥) was held — what a legend
  * item toggles its series with. Link triggers just follow their link.
  */
-const TooltipEvents = UiSchema.TaggedEnum({
+export const TooltipEvents = UiSchema.TaggedEnum({
   Clicked: { alt: Schema.Boolean },
 });
 

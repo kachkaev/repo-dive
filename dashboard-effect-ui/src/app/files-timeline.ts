@@ -16,7 +16,10 @@ import { Section } from "./shared/primitives.ts";
  * TEMPORARY: `SurvivalTimeline` (with its controls and "View data" table) is
  * not ported yet, so this draws the section around a placeholder.
  */
-export const FilesTimeline = <M>(h: Html.H<M>, data: DashboardData) =>
+export const FilesTimeline = <M>(
+  h: Html.H<M>,
+  { data }: { data: DashboardData; maxContributorsInCharts: number },
+) =>
   Section(h, {
     title: "Number of files",
     subtitle:
