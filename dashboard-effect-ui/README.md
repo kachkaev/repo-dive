@@ -18,7 +18,7 @@ Read it with the React file you are changing open next to it.
   Copy a helper verbatim when a chart needs it; don't refactor it while porting.
 - **Same markup, same classes.**
   `src/styles.css` is a verbatim copy of the React one, and every element carries the classes and `data-*` attributes its React counterpart renders, so the pixels match.
-  When the React code computes a class with `cn(...)`, inspect the rendered DOM and paste the merged class string.
+  When the React code computes a class with `cn(...)`, inspect the rendered DOM and paste the merged class string; `pnpm fix:eslint` then sorts it.
   The semantic tokens and interaction conventions in the [editing-dashboard skill](../.agents/skills/editing-dashboard/SKILL.md) apply here as they do there.
   Every class string is linted, and options that carry classes are named `class` or `…Class` after `.class(…)`: see "Class strings are linted" in that skill.
 - **Replicate first, improve later.**
@@ -67,6 +67,7 @@ src/
     └── shared/
         ├── @ui-primitive/          # tooltip, select, toggle-group, scroll-area: ui-kit parts with the shadcn classes; shared/top-layer-reset-class.ts
         ├── primitives.ts           # Section, SectionSkeleton, StatTile, DataTable
+        ├── cn.ts                   # cn: joins class strings (no tailwind-merge) so the linter sees them
         ├── cached-by.ts            # cachedBy: derived data cached per key object (+ further arguments), one slot per key
         ├── axes.ts                 # visx's GridRows, AxisLeft and AxisBottom as view functions
         ├── contributor-kinds.ts    # kinds, their colors and labels, KindFilterControl, the kind Schemas

@@ -5,6 +5,7 @@ import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import { CommitCalendar } from "./activity-calendar.ts";
+import { cn } from "./shared/cn.ts";
 
 const props = {
   commits: [
@@ -19,7 +20,7 @@ const props = {
 };
 
 const tooltip = Locator.attr("data-slot", "tooltip-content");
-const caption = Locator.attr("class", "tabular-nums");
+const caption = Locator.attr("class", cn("tabular-nums"));
 
 /** The hover target of one day: the transparent cell drawn over its stack. */
 const dayTarget = (

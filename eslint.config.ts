@@ -56,7 +56,7 @@ const messageForWrappingInCn =
   'Wrap the class string in `cn("…")`, so better-tailwindcss lints it.';
 
 const messageForTemplateLiteral =
-  'Replace the template literal with `cn(…)`, e.g. `cn(someClassName, "…")`, so better-tailwindcss lints it and tailwind-merge resolves conflicts.';
+  'Replace the template literal with `cn(…)` arguments, e.g. `cn(someClassName, "…")`, so better-tailwindcss lints them and tailwind-merge resolves conflicts.';
 
 /**
  * Keeps the React dashboard's class strings where the selectors above see
@@ -64,7 +64,7 @@ const messageForTemplateLiteral =
  */
 const ruleArgsForNoRestrictedClassNameSyntax = [
   {
-    selector: `${classNameHolder} > Literal[value=type(string)]`,
+    selector: `${classNameHolder} > Literal[value=type(string)]:not([value=""])`,
     message: messageForWrappingInCn,
   },
   {
@@ -72,7 +72,7 @@ const ruleArgsForNoRestrictedClassNameSyntax = [
     message: messageForWrappingInCn,
   },
   {
-    selector: `${classNameHolder} > TemplateLiteral[expressions.length>0]`,
+    selector: `:matches(${classNameHolder}, CallExpression[callee.name="cn"]) > TemplateLiteral[expressions.length>0]`,
     message: messageForTemplateLiteral,
   },
   {
@@ -116,7 +116,7 @@ const classCall =
  */
 const ruleArgsForNoRestrictedClassSyntax = [
   {
-    selector: `${classHolder} > Literal[value=type(string)]`,
+    selector: `${classHolder} > Literal[value=type(string)]:not([value=""])`,
     message: messageForWrappingInCn,
   },
   {
@@ -210,7 +210,13 @@ export default defineConfig([
       ...ruleArgsForBetterTailwindcss,
       "better-tailwindcss/no-unknown-classes": [
         "error",
-        { ignore: ["^lucide(-.+)?$", "^visx-.+$"] },
+        {
+          ignore: [
+            "^lucide$",
+            // cspell:ignore linepath -- the class visx gives its LinePath
+            "^visx-(group|rows|line|linepath|axis|axis-(tick|left|bottom|line))$",
+          ],
+        },
       ],
       "no-restricted-syntax": [
         ...ruleArgsForNoRestrictedSyntax,

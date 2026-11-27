@@ -4,6 +4,7 @@ import { Locator, TestHost } from "@effect/ui/testing";
 import { it } from "@effect/vitest";
 import { Effect } from "effect";
 
+import { cn } from "./shared/cn.ts";
 import { SurvivalTimeline } from "./survival-timeline.ts";
 import { survivalTimelinePropsOf } from "./survival-timeline/survival-timeline-fixture.ts";
 
@@ -34,7 +35,7 @@ const altClick = {
 /** The year shades' row, standing further off than the primary legend. */
 const yearLegend = Locator.attr(
   "class",
-  "mt-3 text-center text-xs text-balance text-(--text-secondary)",
+  cn("mt-3 text-center text-xs text-balance text-(--text-secondary)"),
 );
 
 /** A "View data" column header, closed `<details>` or not. */

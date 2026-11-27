@@ -69,14 +69,16 @@ API notes that differ from Radix: `Select` takes `items` (value→label) so `Sel
 
 `eslint-plugin-better-tailwindcss` checks every class string in `dashboard/src` and `dashboard-effect-ui/src` against that dashboard's `styles.css`: any finding fails `pnpm lint` (unknown, conflicting or unsorted classes alike), and `pnpm fix:eslint` sorts classes and drops duplicates.
 In the React dashboard, it only sees strings in a `className` or `xyzClassName` attribute and in `cn(…)` or `cva(…)` calls, so a class string anywhere else is wrapped in `cn("…")`.
-Name a constant, object key or destructured prop that holds classes `…ClassName`: `no-restricted-syntax` then flags a bare string (or a ternary or `&&` branch) assigned to it, and a template literal with substitutions too.
+Name a constant, object key or destructured prop that holds classes `…ClassName`: `no-restricted-syntax` then flags a bare string (or a ternary or `&&` branch) assigned to it, and a template literal with substitutions too; an empty string is left alone.
 Values in a lookup table under other keys and strings returned from a helper are wrapped in `cn("…")` by hand, since nothing enforces it there.
 A lone string in an attribute stays bare (`className="…"`, not `className={cn("…")}`), and an attribute that mixes values uses `cn(a, "…")` rather than a template literal; `no-restricted-syntax` flags both.
 
 In the Effect UI dashboard, it only sees strings in the arguments of a `.class(…)` builder call (a lone string, a ternary branch, the right of `&&` or `??`) and in `cn(…)` calls, so a class string anywhere else is wrapped in `cn("…")`.
-That `cn` ([`app/shared/cn.ts`](../../../dashboard-effect-ui/src/app/shared/cn.ts)) is Effect UI's `classNames`: it joins and does not run tailwind-merge, so classes are written out already merged, as the React DOM renders them.
+That `cn` ([`app/shared/cn.ts`](../../../dashboard-effect-ui/src/app/shared/cn.ts)) is Effect UI's `classNames`: it joins and does not run tailwind-merge, so classes are written out already merged, as the React DOM renders them, and `pnpm fix:eslint` then sorts a pasted React string.
+Since neither `cn` nor `.class(…)` merges, the classes in their separate arguments must not compete: the linter checks each string on its own, and nothing catches a conflict between two of them.
 Name what holds classes `class` or `…Class`, after `.class(…)`, never `className`: an option (`{ class: cn("…") }`, `contentClass`, `triggerClass`), a constant, an object key or a destructured prop.
-`no-restricted-syntax` then flags a bare string, a ternary or `&&` branch, or a template literal with substitutions assigned to it, as in React.
+`no-restricted-syntax` then flags a bare string, a ternary or `&&` branch, or a template literal with substitutions assigned to it, as in React, and a template literal with substitutions inside `cn(…)` in either dashboard.
+Values in a lookup table under other keys and strings returned from a helper are wrapped in `cn("…")` by hand, since nothing enforces it there.
 `.class(…)` joins its arguments, so a mixed value is passed as separate arguments (`.class(scrollArrowClass, "top-0")`): `no-restricted-syntax` flags a template literal with substitutions in them, and a `cn(…)` passed straight to `.class(…)`.
 The `lucide` and `visx-*` marker classes the React dashboard's libraries render are exempt from `no-unknown-classes`.
 
