@@ -6,6 +6,15 @@ import { afterEach, vi } from "vitest";
 
 import { eventually } from "./shared/eventually.ts";
 import { TimeSeriesChart } from "./time-stack-chart.ts";
+import { ChartMarks } from "./time-stack-chart/chart-marks.ts";
+
+// Counts the marks' builds: `h.lazy` calls it only when its input changes.
+vi.mock("./time-stack-chart/chart-marks.ts", async (importOriginal) => {
+  // The module's other exports are spread as they are; only ChartMarks is
+  // typed, for the spy.
+  const original = await importOriginal<{ ChartMarks: typeof ChartMarks }>();
+  return { ...original, ChartMarks: vi.fn(original.ChartMarks) };
+});
 
 /** happy-dom lays nothing out, so a stand-in observer reports a width. */
 class FakeResizeObserver {
@@ -76,9 +85,12 @@ it.live("keeps the marks' nodes while the pointer moves", () =>
       });
     }
 
+    const marksBuilds = vi.mocked(ChartMarks).mock.calls.length;
+    expect(marksBuilds).toBeGreaterThan(0);
+
     // happy-dom puts the rect at 0,0, so clientX is the x over it. Each move
     // lands on another point, so each one renders the chart again; the marks
-    // stay the same nodes, untouched.
+    // are not built again, and stay the same nodes, untouched.
     for (const [clientX, date] of [
       [10, "1970-01-01"],
       [280, "1970-01-11"],
@@ -91,6 +103,7 @@ it.live("keeps the marks' nodes while the pointer moves", () =>
             ?.textContent,
         ).toContain(date);
       });
+      expect(vi.mocked(ChartMarks).mock.calls).toHaveLength(marksBuilds);
       expect(plot()?.firstElementChild).toBe(marks);
       expect(marks?.querySelector("path")).toBe(firstArea);
     }
