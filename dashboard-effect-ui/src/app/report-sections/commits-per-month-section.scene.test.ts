@@ -32,3 +32,24 @@ it.effect("presses the kind filter option the user picks", () =>
       .toHaveAttribute("aria-pressed", "false");
   }),
 );
+
+it.effect("marks the percentage option disabled while one series is left", () =>
+  Effect.gen(function* () {
+    const percentage = Locator.inside(
+      HtmlLocator.role("group", { name: "Commits per month value display" }),
+      HtmlLocator.role("button", { name: "percentage" }),
+    );
+    const s = yield* HtmlScene.make(CommitsPerMonthSection, {
+      data: dashboardDataOf(),
+    });
+    // Base UI writes aria-disabled on every toggle in a group, "false" too.
+    s.expect(percentage).toHaveAttribute("aria-disabled", "false");
+    s.childEmit(
+      ToggleGroup,
+      "kind-filter",
+      ToggleGroupEvents.Toggled({ value: ["bot"] }),
+    )
+      .expect(percentage)
+      .toHaveAttribute("aria-disabled", "true");
+  }),
+);
