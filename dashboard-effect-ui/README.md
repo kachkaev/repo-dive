@@ -333,6 +333,8 @@ The charts, one PR each after the scaffold (#394):
 - **Popover placement.**
   ui-kit writes the tooltip and select positioners next to their triggers in the top layer instead of in a portal on `<body>`; `topLayerReset` undoes what they would inherit there.
   It also places them at fractional pixels where Base UI rounds them, so a card (the calendar's day card, say) can sit half a pixel off.
+- **Select internals.**
+  Base UI writes a hidden `<input>` after the trigger for forms and a redundant `tabindex="0"` on the trigger button; ui-kit writes neither, and marks the value span with `data-select-value` instead.
 - **Select highlight.**
   The highlighted option follows the pointer from option to option, as Base UI's does, but ui-kit highlights an option only as the pointer enters it.
   With the pointer resting on an option, ArrowDown moves the highlight to the next one and leaves it there while the pointer moves within the first; Base UI keeps the highlight on the option under the pointer.
