@@ -255,8 +255,11 @@ const chartOf = (
 /**
  * The derivations of the React `SurvivalTimeline`'s render that depend only on
  * its props, once per distinct set of them. Keyed by `flatRows`, which every
- * caller builds once per dashboard.json (see `lines-timeline.ts`), so the
- * lines and the files timelines each keep a slot of their own.
+ * caller builds once per dashboard.json (see `lines-timeline.ts`) as a fresh
+ * array of its own, even when it is empty, so the lines and the files
+ * timelines each keep a slot of their own. A caller that passed a shared
+ * constant (say, one empty array for "no rows") would make the two timelines
+ * evict each other's slot on every render.
  */
 export const survivalVariantsOf = cachedBy(
   (

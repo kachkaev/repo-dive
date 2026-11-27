@@ -149,3 +149,59 @@ it.effect("disables what the data cannot draw, saying why", () =>
       .toHaveAttribute("aria-pressed", "true");
   }).pipe(Effect.provide(TestHost.layer())),
 );
+
+it.effect("labels the file grain and forces shading without flat rows", () =>
+  Effect.gen(function* () {
+    const play = yield* HtmlPlay.make(SurvivalTimeline, {
+      ...survivalTimelinePropsOf({ flatRows: [] }),
+      title: "Number of files",
+      unit: "files" as const,
+    });
+    yield* play
+      .expect(option("Split files", "by language"))
+      .toHaveAttribute("aria-pressed", "true");
+    yield* play
+      .expect(option("Age shading", "shade by year created"))
+      .toHaveAttribute("aria-pressed", "true");
+    yield* play
+      .expect(option("Age shading", "no shading"))
+      .toHaveAttribute("disabled", "");
+    yield* play
+      .expect(option("Age shading", "no shading"))
+      .toHaveAttribute(
+        "title",
+        "This split only exists in the survival samples, which are always dated",
+      );
+
+    // All files, drawn shaded from the samples: its only legend names the
+    // years, so no second row repeats them.
+    yield* play.click(option("Split files", "all files"));
+    yield* play
+      .expect(option("Age shading", "shade by year created"))
+      .toHaveAttribute("aria-pressed", "true");
+    yield* play.expect(yearLegend).toBeAbsent();
+    yield* play.expect(Locator.text("2025", { exact: true })).toExist();
+    yield* play
+      .expect(option("Number of files value display", "percentage"))
+      .toHaveAttribute("disabled", false);
+  }).pipe(Effect.provide(TestHost.layer())),
+);
+
+it.effect("draws no purpose split from samples that predate purposes", () =>
+  Effect.gen(function* () {
+    const props = survivalTimelinePropsOf();
+    const play = yield* HtmlPlay.make(SurvivalTimeline, {
+      ...props,
+      survivalRows: props.survivalRows.map(
+        ({ byPurpose: _byPurpose, byPurposeYear: _byPurposeYear, ...row }) =>
+          row,
+      ),
+    });
+    yield* play.expect(split("by purpose")).toHaveAttribute("disabled", "");
+    yield* play
+      .expect(split("by purpose"))
+      .toHaveAttribute("title", "No per-purpose data collected yet");
+    yield* play.click(split("by contributor"));
+    yield* play.expect(legendItem("Alice")).toExist();
+  }).pipe(Effect.provide(TestHost.layer())),
+);

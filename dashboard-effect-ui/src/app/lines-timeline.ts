@@ -32,6 +32,7 @@ const linesTimelineInputsOf = cachedBy((data: DashboardData) => ({
     date: row.date,
     values: row.byLanguage,
   })),
+  survivalRows: data.survival,
   purposeOrder: filePurposeLabelsOf(data),
   colorScales: survivalColorScalesOf(data),
 }));
@@ -55,7 +56,6 @@ export const LinesTimeline = <M>(
       subtitle: linesTimelineHeading.subtitle,
       annotation: data.config?.charts?.annotations?.["lines-of-code"],
       unit: "lines",
-      survivalRows: data.survival,
       maxContributorsInCharts,
       ...linesTimelineInputsOf(data),
     },
